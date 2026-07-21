@@ -1,0 +1,41 @@
+{
+  "name": "avecove-elapse",
+  "version": "0.2.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "npm run build && node --test tests/product.test.mjs",
+    "lint": "eslint . --ignore-pattern .next",
+    "db:migrate": "node scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "^1.25.0",
+    "mammoth": "^1.12.0",
+    "next": "16.2.10",
+    "nodemailer": "9.0.3",
+    "pdfjs-dist": "^6.1.200",
+    "pg": "^8.16.3",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.16.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "postcss": "8.5.21"
+  },
+  "type": "module"
+}

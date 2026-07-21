@@ -1,0 +1,264 @@
+[
+  {
+    "id": "demo-01",
+    "sourceNumber": "1",
+    "category": "演示题库",
+    "stem": "小儿死亡率最高的时间是：",
+    "options": [
+      {
+        "label": "A",
+        "text": "围产期"
+      },
+      {
+        "label": "B",
+        "text": "新生儿期"
+      },
+      {
+        "label": "C",
+        "text": "婴儿期"
+      },
+      {
+        "label": "D",
+        "text": "幼儿期"
+      },
+      {
+        "label": "E",
+        "text": "学龄前期"
+      }
+    ],
+    "answer": [
+      "A"
+    ],
+    "multiple": false
+  },
+  {
+    "id": "demo-02",
+    "sourceNumber": "2",
+    "category": "演示题库",
+    "stem": "胎儿期是指从受孕及在子宫内发育成熟至出生前一段时间， 大约为：",
+    "options": [
+      {
+        "label": "A",
+        "text": "36 周"
+      },
+      {
+        "label": "B",
+        "text": "37 周"
+      },
+      {
+        "label": "C",
+        "text": "38 周"
+      },
+      {
+        "label": "D",
+        "text": "40 周"
+      },
+      {
+        "label": "E",
+        "text": "42 周"
+      }
+    ],
+    "answer": [
+      "D"
+    ],
+    "multiple": false
+  },
+  {
+    "id": "demo-03",
+    "sourceNumber": "3",
+    "category": "演示题库",
+    "stem": "青春期是指：",
+    "options": [
+      {
+        "label": "A",
+        "text": "女 12 岁左右，男 13 岁左右"
+      },
+      {
+        "label": "B",
+        "text": "女 14 岁左右，男 16 岁左右"
+      },
+      {
+        "label": "C",
+        "text": "女 16 岁左右，男 15 岁左右"
+      },
+      {
+        "label": "D",
+        "text": "女 15 岁左右，男 14 岁左右"
+      },
+      {
+        "label": "E",
+        "text": "女 15 岁左右，男 16 岁左右"
+      }
+    ],
+    "answer": [
+      "A"
+    ],
+    "multiple": false
+  },
+  {
+    "id": "demo-04",
+    "sourceNumber": "4",
+    "category": "演示题库",
+    "stem": "胚胎期是指孕后：",
+    "options": [
+      {
+        "label": "A",
+        "text": "1 个月以内"
+      },
+      {
+        "label": "B",
+        "text": "2 个月以内"
+      },
+      {
+        "label": "C",
+        "text": "3 个月以内"
+      },
+      {
+        "label": "D",
+        "text": "4 个月以内"
+      },
+      {
+        "label": "E",
+        "text": "5 个月以内"
+      }
+    ],
+    "answer": [
+      "B"
+    ],
+    "multiple": false
+  },
+  {
+    "id": "demo-05",
+    "sourceNumber": "5",
+    "category": "演示题库",
+    "stem": "我国使用的围产期概念是：",
+    "options": [
+      {
+        "label": "A",
+        "text": "从妊娠 20 周~生后 1 周"
+      },
+      {
+        "label": "B",
+        "text": "从妊娠 28 周~生后 1 周"
+      },
+      {
+        "label": "C",
+        "text": "从妊娠 28 周~生后 4 周"
+      },
+      {
+        "label": "D",
+        "text": "从妊娠 24 周~生后 4 周"
+      },
+      {
+        "label": "E",
+        "text": "从妊娠 24 周~生后 1 周"
+      }
+    ],
+    "answer": [
+      "B"
+    ],
+    "multiple": false
+  },
+  {
+    "id": "demo-06",
+    "sourceNumber": "6",
+    "category": "演示题库",
+    "stem": "新生儿期的疾病特点是：",
+    "options": [
+      {
+        "label": "A",
+        "text": "传染性疾病多"
+      },
+      {
+        "label": "B",
+        "text": "先天畸形多"
+      },
+      {
+        "label": "C",
+        "text": "产伤多"
+      },
+      {
+        "label": "D",
+        "text": "死亡率高"
+      },
+      {
+        "label": "E",
+        "text": "溶血性疾病少"
+      }
+    ],
+    "answer": [
+      "B",
+      "C",
+      "D"
+    ],
+    "multiple": true
+  },
+  {
+    "id": "demo-07",
+    "sourceNumber": "7",
+    "category": "演示题库",
+    "stem": "青春期主要变化有：",
+    "options": [
+      {
+        "label": "A",
+        "text": "可出现甲状腺肿大及精神症状"
+      },
+      {
+        "label": "B",
+        "text": "颈部淋巴组织增生"
+      },
+      {
+        "label": "C",
+        "text": "体格及生殖系统发育增快"
+      },
+      {
+        "label": "D",
+        "text": "智力发育减慢"
+      },
+      {
+        "label": "E",
+        "text": "体格发育加快"
+      }
+    ],
+    "answer": [
+      "A",
+      "B",
+      "E"
+    ],
+    "multiple": true
+  },
+  {
+    "id": "demo-08",
+    "sourceNumber": "8",
+    "category": "演示题库",
+    "stem": "小儿动作发育的规律是：",
+    "options": [
+      {
+        "label": "A",
+        "text": "由下而上"
+      },
+      {
+        "label": "B",
+        "text": "由不协调到协调"
+      },
+      {
+        "label": "C",
+        "text": "由远而近"
+      },
+      {
+        "label": "D",
+        "text": "由粗糙到精细"
+      },
+      {
+        "label": "E",
+        "text": "先有正面动作后会反面动作"
+      }
+    ],
+    "answer": [
+      "B",
+      "D",
+      "E"
+    ],
+    "multiple": true
+  }
+]
