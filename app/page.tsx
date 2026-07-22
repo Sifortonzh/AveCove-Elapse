@@ -168,6 +168,8 @@ export default function HomePage() {
       if (!active) return;
       setQuoteIndex(Math.floor(Math.random() * homeQuotes.length));
       try {
+        const savedLearningMode = localStorage.getItem("avecove-learning-mode");
+        if (savedLearningMode === "english" || savedLearningMode === "medical") setLearningMode(savedLearningMode);
         setProgress(JSON.parse(localStorage.getItem("hongdou-progress") ?? localStorage.getItem("medquiz-progress") ?? "{}"));
         setFavorites(JSON.parse(localStorage.getItem("hongdou-favorites") ?? "[]"));
         setNotes(JSON.parse(localStorage.getItem("hongdou-notes") ?? "{}"));
@@ -192,6 +194,11 @@ export default function HomePage() {
       active = false;
     };
   }, []);
+
+  function switchLearningMode(mode: "medical" | "english") {
+    setLearningMode(mode);
+    localStorage.setItem("avecove-learning-mode", mode);
+  }
 
   useEffect(() => {
     let active = true;
@@ -745,7 +752,7 @@ export default function HomePage() {
   }
 
   if (learningMode === "english") {
-    return <main className={`product english-product ${settings.darkMode ? "dark" : ""}`}><EnglishLearningView onExit={() => setLearningMode("medical")} /></main>;
+    return <main className={`product english-product ${settings.darkMode ? "dark" : ""}`}><EnglishLearningView onExit={() => switchLearningMode("medical")} /></main>;
   }
 
   return (
@@ -771,7 +778,7 @@ export default function HomePage() {
           syncStatus={syncStatus}
           quote={homeQuotes[quoteIndex]}
           onAccount={() => setShowAccount(true)}
-          onEnglish={() => setLearningMode("english")}
+          onEnglish={() => switchLearningMode("english")}
         />
       ) : view === "banks" ? (
         <QuestionBankPage

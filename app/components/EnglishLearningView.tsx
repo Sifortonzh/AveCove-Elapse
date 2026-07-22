@@ -1,11 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { type Dispatch, type PointerEvent as ReactPointerEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertCircle, ArrowLeft, BookMarked, BookOpen, Check, ChevronLeft, ChevronRight,
+  AlertCircle, ArrowLeft, BookMarked, BookOpen, Bot, Check, ChevronLeft, ChevronRight,
   CirclePlay, Database, Eraser, FileSearch, FileText, Headphones,
-  Highlighter, Import, Languages, LibraryBig, MousePointer2, PenLine, Play,
+  Highlighter, Import, Languages, LibraryBig, ListOrdered, MousePointer2, PanelLeftClose, PanelLeftOpen, PenLine, Play,
   Pencil, QrCode, RotateCcw, ScanSearch, Share2, ShieldCheck, Sparkles, Trash2, Undo2, Upload, X,
 } from "lucide-react";
 import {
@@ -15,7 +16,7 @@ import {
 } from "@/app/lib/english-test";
 
 type Stage = EnglishStage;
-type PracticeTask = "cloze" | "reading" | "listening" | "writing";
+type PracticeTask = "cloze" | "reading" | "matching" | "listening" | "translation" | "writing";
 type EnglishTask = "overview" | "library" | PracticeTask;
 type HighlightRange = { start: number; end: number };
 type ReadingTool = "lookup" | "highlight" | "pen" | "marker" | "eraser";
@@ -26,8 +27,8 @@ type VocabularyEntry = { word: string; meaning: string; context: string; source?
 const vocabularyStorageKey = "avecove-english-vocabulary-v1";
 
 const stages: Array<{ id: Stage; label: string; detail: string; tasks: PracticeTask[] }> = [
-  { id: "cet", label: "CET", detail: "CET-4 / CET-6", tasks: ["cloze", "reading", "listening", "writing"] },
-  { id: "postgraduate", label: "Postgraduate", detail: "National entrance exam", tasks: ["cloze", "reading", "writing"] },
+  { id: "cet", label: "CET", detail: "CET-4 / CET-6", tasks: ["listening", "reading", "translation", "writing"] },
+  { id: "postgraduate", label: "Postgraduate", detail: "National entrance exam", tasks: ["cloze", "reading", "matching", "translation", "writing"] },
   { id: "ielts", label: "IELTS", detail: "Academic training", tasks: ["reading", "listening", "writing"] },
   { id: "toefl", label: "TOEFL", detail: "Integrated practice", tasks: ["reading", "listening", "writing"] },
 ];
@@ -35,7 +36,9 @@ const stages: Array<{ id: Stage; label: string; detail: string; tasks: PracticeT
 const taskMeta: Record<PracticeTask, { title: string; short: string; icon: typeof BookOpen }> = {
   cloze: { title: "Cloze Lab", short: "Context and vocabulary", icon: Languages },
   reading: { title: "Reading Studio", short: "Highlight while you read", icon: BookOpen },
+  matching: { title: "Paragraph Matching", short: "Build the answer order", icon: ListOrdered },
   listening: { title: "Listening Room", short: "QR and audio resources", icon: Headphones },
+  translation: { title: "Translation Desk", short: "Translate with precision", icon: Languages },
   writing: { title: "Writing Desk", short: "Draft, count and review", icon: PenLine },
 };
 
@@ -338,13 +341,13 @@ async function shareEnglishTest(test: SavedEnglishTest) {
   downloadEnglishShareFile(file);
 }
 
-function TestLibrary({ tests, onOpen, onAction, onImport }: { tests: SavedEnglishTest[]; onOpen: (test: SavedEnglishTest) => void; onAction: (action: LibraryAction) => void; onImport: () => void }) {
+function TestLibrary({ tests, stageLabel, onOpen, onAction, onImport }: { tests: SavedEnglishTest[]; stageLabel: string; onOpen: (test: SavedEnglishTest) => void; onAction: (action: LibraryAction) => void; onImport: () => void }) {
   return <section className="test-library">
-    <header><div><span>MY IMPORTED PAPERS</span><h1>Test Library</h1><p>Imported exam files are classified into practice sections and kept on this device.</p></div><button className="english-primary" onClick={onImport}><Import />Import a test</button></header>
+    <header><div><span>{stageLabel.toUpperCase()} · MY IMPORTED PAPERS</span><h1>{stageLabel} Test Library</h1><p>Only {stageLabel} papers are shown here. Change the study stage above to switch libraries instantly.</p></div><button className="english-primary" onClick={onImport}><Import />Import a test</button></header>
     {tests.length ? <div className="test-library-grid">{tests.map((test) => {
       const questionCount = test.sections.reduce((total, section) => total + section.questions.length, 0);
       return <article key={test.id}><header><span><FileText /></span><em>{test.examVariant || (test.stage === "postgraduate" ? "POSTGRADUATE" : test.stage.toUpperCase())}</em></header><h2>{test.name}</h2><p>{test.sections.length} detected section{test.sections.length === 1 ? "" : "s"} · {questionCount} practice item{questionCount === 1 ? "" : "s"} · Local record enabled</p><div className="test-section-tags">{test.sections.map((section, index) => <span key={section.id}>{section.kind === "reading" ? importedReadingLabel(test.sections, index) : englishSectionLabel(section.kind)} <b>{section.questions.length || "Text"}</b></span>)}</div><footer className="test-library-actions"><button className="test-open" onClick={() => onOpen(test)}><Play />Practice now</button><button title="Rename" aria-label={`Rename ${test.name}`} onClick={() => onAction({ kind: "rename", test })}><Pencil /></button><button title="Reset practice record" aria-label={`Reset practice record for ${test.name}`} onClick={() => onAction({ kind: "reset", test })}><RotateCcw /></button><button title="Share" aria-label={`Share ${test.name}`} onClick={() => onAction({ kind: "share", test })}><Share2 /></button><button className="danger" title="Delete file" aria-label={`Delete ${test.name}`} onClick={() => onAction({ kind: "delete", test })}><Trash2 /></button></footer></article>;
-    })}</div> : <div className="test-library-empty"><LibraryBig /><h2>Your Test Library is ready</h2><p>Import a `.doc`, `.docx`, PDF, image or AveCove English share file. The system will identify its stage and separate cloze, listening, word-bank, long-reading, close-reading, translation and writing sections.</p><button className="english-primary" onClick={onImport}><Upload />Choose a file</button></div>}
+    })}</div> : <div className="test-library-empty"><LibraryBig /><h2>No {stageLabel} papers yet</h2><p>Import a `.doc`, `.docx`, PDF, image or AveCove English share file. It will be classified automatically and appear under the matching study stage.</p><button className="english-primary" onClick={onImport}><Upload />Choose a file</button></div>}
   </section>;
 }
 
@@ -426,6 +429,49 @@ function ImportedTranslationPractice({ section, drafts, setDrafts }: { section: 
   return <div className="translation-segment-list">{section.questions.map((question) => <article key={question.id}><header><span>SEGMENT {question.number}</span><b>{drafts[question.id]?.length || 0} characters</b></header><p>{question.stem}</p><textarea value={drafts[question.id] || ""} onChange={(event) => setDrafts((value) => ({ ...value, [question.id]: event.target.value }))} placeholder={`Translate segment ${question.number} into Chinese…`} /></article>)}</div>;
 }
 
+function ImportedMatchingPractice({ section, responses, setResponses }: { section: EnglishTestSection; responses: Record<string, ImportedResponse>; setResponses: Dispatch<SetStateAction<Record<string, ImportedResponse>>> }) {
+  const [submitted, setSubmitted] = useState(false);
+  const labels = [...new Set(section.questions.flatMap((question) => question.options.map((option) => option.label)))].filter((label) => /^[A-G]$/.test(label));
+  const answered = section.questions.filter((question) => responses[question.id]?.choice).length;
+  const used = new Set(section.questions.map((question) => responses[question.id]?.choice).filter(Boolean));
+
+  function choose(question: EnglishTestQuestion, choice: string) {
+    setResponses((value) => ({ ...value, [question.id]: { choice, submitted: false } }));
+    setSubmitted(false);
+  }
+
+  function reset() {
+    setResponses((value) => {
+      const next = { ...value };
+      section.questions.forEach((question) => delete next[question.id]);
+      return next;
+    });
+    setSubmitted(false);
+  }
+
+  function check() {
+    setResponses((value) => {
+      const next = { ...value };
+      section.questions.forEach((question) => {
+        if (next[question.id]?.choice) next[question.id] = { ...next[question.id], submitted: true };
+      });
+      return next;
+    });
+    setSubmitted(true);
+  }
+
+  return <section className="imported-matching-practice">
+    <header><div><span>POSTGRADUATE · READING PART B</span><h2>Paragraph Matching · Answer Order</h2><p>The malformed OCR passage is hidden. Arrange the detected paragraph labels directly and review the answer order after submission.</p></div><em>{answered} / {section.questions.length} answered</em></header>
+    <div className="matching-answer-grid">{section.questions.map((question) => {
+      const response = responses[question.id];
+      const state = response?.submitted && question.answer ? response.choice === question.answer ? "correct" : "wrong" : "";
+      return <article key={question.id} className={state}><strong>{question.number}</strong><div>{labels.map((label) => <button key={label} disabled={used.has(label) && response?.choice !== label || submitted} className={response?.choice === label ? "selected" : ""} onClick={() => choose(question, label)}>{label}</button>)}</div>{response?.submitted && question.answer && <small>{response.choice === question.answer ? "Correct" : `Answer ${question.answer}`}</small>}</article>;
+    })}</div>
+    {submitted && <div className="matching-order-summary"><span>Detected answer order</span><strong>{section.questions.map((question) => `${question.number}-${question.answer || "?"}`).join(" · ")}</strong></div>}
+    <footer><button className="english-secondary" onClick={reset}>Reset</button><button className="english-primary" disabled={answered !== section.questions.length} onClick={check}>Check answer order <ChevronRight /></button></footer>
+  </section>;
+}
+
 function ImportedTestPractice({ test, onBack }: { test: SavedEnglishTest; onBack: () => void }) {
   const [sectionIndex, setSectionIndex] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -452,7 +498,7 @@ function ImportedTestPractice({ test, onBack }: { test: SavedEnglishTest; onBack
   }
 
   return <section className="imported-test-practice"><header><button onClick={onBack}><ChevronLeft />Test Library</button><div><span>{test.examVariant || (test.stage === "postgraduate" ? "POSTGRADUATE" : test.stage.toUpperCase())} · AUTO-CLASSIFIED</span><h1>{test.name}</h1></div><em>{sectionIndex + 1} / {test.sections.length}</em></header><nav>{test.sections.map((item, index) => <button key={item.id} className={sectionIndex === index ? "active" : ""} onClick={() => chooseSection(index)}><span>{item.kind === "reading" ? importedReadingLabel(test.sections, index) : englishSectionLabel(item.kind)}</span><b>{item.questions.length || "Text"}</b></button>)}</nav>
-    {section.kind === "cloze" ? <ImportedClozePractice key={section.id} section={{ ...section, passage: displayPassage }} responses={responses} setResponses={setResponses} /> : section.kind === "translation" && section.questions.length ? <ImportedTranslationPractice key={section.id} section={section} drafts={drafts} setDrafts={setDrafts} /> : writingLike ? <div className="imported-writing-practice"><article><span>{displayKind.toUpperCase()} PROMPT</span><h2>{displayTitle}</h2><p>{displayPassage || "The source file did not provide a separate prompt. Review the original document before writing."}</p></article><article className="writing-editor"><header><strong>Your response</strong><span>{words} words</span></header><textarea value={draft} onChange={(event) => setDrafts((value) => ({ ...value, [section.id]: event.target.value }))} placeholder={section.kind === "translation" ? "Translate the Chinese passage into English…" : "Start writing here…"} /><footer><span>Saved locally in this Test Library record</span></footer></article></div> : <div className={`imported-practice-grid ${displayPassage ? "with-passage" : ""}`}>
+    {section.kind === "cloze" ? <ImportedClozePractice key={section.id} section={{ ...section, passage: displayPassage }} responses={responses} setResponses={setResponses} /> : section.kind === "matching" ? <ImportedMatchingPractice key={section.id} section={section} responses={responses} setResponses={setResponses} /> : section.kind === "translation" && section.questions.length ? <ImportedTranslationPractice key={section.id} section={section} drafts={drafts} setDrafts={setDrafts} /> : writingLike ? <div className="imported-writing-practice"><article><span>{displayKind.toUpperCase()} PROMPT</span><h2>{displayTitle}</h2><p>{displayPassage || "The source file did not provide a separate prompt. Review the original document before writing."}</p></article><article className="writing-editor"><header><strong>Your response</strong><span>{words} words</span></header><textarea value={draft} onChange={(event) => setDrafts((value) => ({ ...value, [section.id]: event.target.value }))} placeholder={section.kind === "translation" ? "Translate the Chinese passage into English…" : "Start writing here…"} /><footer><span>Saved locally in this Test Library record</span></footer></article></div> : <div className={`imported-practice-grid ${displayPassage ? "with-passage" : ""}`}>
       {displayPassage && <article className="english-exercise-card imported-passage"><header><div><span>{displayKind.toUpperCase()} · IMPORTED</span><h2>{displayTitle}</h2></div><FileText /></header><InteractivePassage key={section.id} content={displayPassage} sourceTitle={`${test.name} · ${displayTitle}`} /></article>}
       {question ? <aside><ImportedQuestion question={question} response={responses[question.id]} disabledLabels={usedWordBankLabels} onResponse={(response) => setResponses((value) => ({ ...value, [question.id]: response }))} /><footer><button disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => Math.max(0, value - 1))}><ChevronLeft />Previous</button><span>{questionIndex + 1} / {section.questions.length}</span><button disabled={questionIndex + 1 >= section.questions.length} onClick={() => setQuestionIndex((value) => Math.min(section.questions.length - 1, value + 1))}>Next<ChevronRight /></button></footer></aside> : <div className="imported-no-questions"><AlertCircle /><h2>Reading workspace ready</h2><p>This section was identified, but no complete answer block was found. You can still look up words, highlight and write on the passage.</p></div>}
     </div>}
@@ -472,10 +518,13 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
   const [activeTest, setActiveTest] = useState<SavedEnglishTest | null>(null);
   const [libraryAction, setLibraryAction] = useState<LibraryAction | null>(null);
   const [libraryBusy, setLibraryBusy] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [importStatus, setImportStatus] = useState<{ phase: string; detail: string; progress: number; error?: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const importControllerRef = useRef<AbortController | null>(null);
   const currentStage = stages.find((item) => item.id === stage)!;
+  const stageTests = tests.filter((test) => test.stage === stage);
+  const taskTests = stageTests.filter((test) => test.sections.some((section) => task === "reading" ? ["reading", "word-bank", "long-reading"].includes(section.kind) : section.kind === task));
 
   useEffect(() => {
     let cancelled = false;
@@ -485,7 +534,7 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
 
   function chooseStage(next: Stage) {
     setStage(next);
-    setTask("overview");
+    setTask("library");
     setActiveTest(null);
   }
 
@@ -581,16 +630,17 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
     }
   }
 
-  return <div className="english-shell">
-    <aside className="english-sidebar"><div className="english-brand"><span className="english-logo"><Image src="/hongdou-logo.png" alt="AveCove Elapse medical serpent logo" width={43} height={43} /></span><div><strong>AveCove Elapse</strong><small>English Lab</small></div></div><button className="english-back" onClick={onExit}><ArrowLeft size={17} />Chinese Practice</button><nav><button className={task === "overview" ? "active" : ""} onClick={() => { setTask("overview"); setActiveTest(null); }}><Sparkles />Overview</button><button className={task === "library" ? "active" : ""} onClick={() => { setTask("library"); setActiveTest(null); }}><Database />Test Library <b>{tests.length}</b></button>{currentStage.tasks.map((item) => { const meta = taskMeta[item]; const Icon = meta.icon; return <button key={item} className={task === item ? "active" : ""} onClick={() => { setTask(item); setActiveTest(null); }}><Icon />{meta.title}</button>; })}</nav><div className="english-import"><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/json,image/*" onChange={(event) => { void handleImport(event.target.files); }} /><button onClick={() => fileRef.current?.click()} disabled={importing}><Import size={17} />{importing ? "Importing…" : "Import exam file"}</button><p>Word, PDF, image and share files<br />Automatic section mapping</p></div></aside>
-    <main className="english-main"><header className="english-topbar"><div><span>STUDY STAGE</span><div className="stage-switch">{stages.map((item) => <button key={item.id} className={stage === item.id ? "active" : ""} onClick={() => chooseStage(item.id)}>{item.label}</button>)}</div></div><button className="english-upload" onClick={() => fileRef.current?.click()} disabled={importing}><Upload size={17} />{importing ? "Importing…" : "Import"}</button></header>
+  return <div className={`english-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    <aside className="english-sidebar"><div className="english-brand"><span className="english-logo"><Image src="/hongdou-logo.png" alt="AveCove Elapse medical serpent logo" width={43} height={43} /></span><div><strong>AveCove Elapse</strong><small>English Lab</small></div></div><button className="english-back" onClick={onExit}><ArrowLeft size={17} /><span>Chinese Practice</span></button><nav><button className={task === "overview" ? "active" : ""} onClick={() => { setTask("overview"); setActiveTest(null); }}><Sparkles /><span>Overview</span></button>{currentStage.tasks.map((item) => { const meta = taskMeta[item]; const Icon = meta.icon; return <button key={item} className={task === item ? "active" : ""} onClick={() => { setTask(item); setActiveTest(null); }}><Icon /><span>{meta.title}</span></button>; })}<button className={task === "library" ? "active" : ""} onClick={() => { setTask("library"); setActiveTest(null); }}><Database /><span>Test Library</span><b>{stageTests.length}</b></button></nav><div className="english-import"><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/json,image/*" onChange={(event) => { void handleImport(event.target.files); }} /><Link className="english-ai-link" href="/custom-ai"><Bot size={17} /><span>Custom AI</span></Link><button onClick={() => fileRef.current?.click()} disabled={importing}><Import size={17} /><span>{importing ? "Importing…" : "Import exam file"}</span></button><p>Word, PDF, image and share files<br />Automatic section mapping</p></div></aside>
+    <main className="english-main"><header className="english-topbar"><div><span>STUDY STAGE</span><div className="stage-switch">{stages.map((item) => <button key={item.id} className={stage === item.id ? "active" : ""} onClick={() => chooseStage(item.id)}>{item.label}</button>)}</div></div><div className="english-topbar-actions"><button className="english-sidebar-toggle" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>{sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</button><button className="english-upload" onClick={() => fileRef.current?.click()} disabled={importing}><Upload size={17} />{importing ? "Importing…" : "Import"}</button></div></header>
       {importing && <div className="english-import-status scanning"><FileSearch /><div><strong>{importStatus?.phase || "Mapping the exam structure…"}</strong><span>{importStatus?.detail || "Finding cloze, reading, matching, translation and writing sections."}</span></div><div className="english-import-control"><b>{importStatus?.progress || 0}%</b><button type="button" onClick={cancelImport}><X />Cancel</button></div></div>}
       {!importing && importStatus && <div className={`english-import-status ${importStatus.error ? "failed" : "ready"}`}>{importStatus.error ? <AlertCircle /> : <Check />}<div><strong>{importStatus.phase}</strong><span>{importStatus.detail}</span></div><button onClick={() => setImportStatus(null)} aria-label="Dismiss import status"><X /></button></div>}
       {task === "overview" && <EnglishOverview stage={stage} onTask={setTask} />}
-      {task === "library" && (activeTest ? <ImportedTestPractice key={activeTest.id} test={activeTest} onBack={() => setActiveTest(null)} /> : <TestLibrary tests={tests} onOpen={(test) => { setStage(test.stage); setActiveTest(test); }} onAction={setLibraryAction} onImport={() => fileRef.current?.click()} />)}
+      {task === "library" && (activeTest ? <ImportedTestPractice key={activeTest.id} test={activeTest} onBack={() => setActiveTest(null)} /> : <TestLibrary tests={stageTests} stageLabel={currentStage.label} onOpen={(test) => { setStage(test.stage); setActiveTest(test); }} onAction={setLibraryAction} onImport={() => fileRef.current?.click()} />)}
       {task === "cloze" && <ClozeExercise />}
       {task === "reading" && <ReadingExercise />}
       {task === "listening" && <ListeningExercise stage={stage} />}
+      {(task === "matching" || task === "translation") && (activeTest ? <ImportedTestPractice key={activeTest.id} test={activeTest} onBack={() => setActiveTest(null)} /> : <TestLibrary tests={taskTests} stageLabel={`${currentStage.label} · ${taskMeta[task].title}`} onOpen={setActiveTest} onAction={setLibraryAction} onImport={() => fileRef.current?.click()} />)}
       {task === "writing" && <WritingExercise stage={stage} />}
     </main>
     {libraryAction && <EnglishLibraryActionModal key={`${libraryAction.kind}-${libraryAction.test.id}`} action={libraryAction} busy={libraryBusy} onClose={() => setLibraryAction(null)} onConfirm={(name) => { void confirmLibraryAction(name); }} />}

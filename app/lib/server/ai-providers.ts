@@ -52,6 +52,40 @@ function cleanBaseUrl(baseUrl: string) {
   return baseUrl.replace(/\/+$/, "");
 }
 
+type ProviderPayload = {
+  error?: { message?: string } | string;
+  message?: string;
+  choices?: Array<{ message?: { content?: string } }>;
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  content?: Array<{ type?: string; text?: string }>;
+};
+
+async function readProviderPayload(response: Response) {
+  const text = await response.text();
+  if (!text) return {} as ProviderPayload;
+  try {
+    return JSON.parse(text) as ProviderPayload;
+  } catch {
+    if (!response.ok) throw new Error(`AI 厂商返回了无法识别的错误（HTTP ${response.status}）`);
+    throw new Error("AI 厂商返回的内容不是有效 JSON");
+  }
+}
+
+function providerError(payload: ProviderPayload, response: Response) {
+  const detail = typeof payload.error === "string" ? payload.error : payload.error?.message || payload.message;
+  return String(detail || `AI 厂商请求失败（HTTP ${response.status}）`).slice(0, 360);
+}
+
+export function publicAiErrorMessage(error: unknown, apiKey = "") {
+  if (error instanceof DOMException && error.name === "AbortError") return "AI 厂商响应超时，请检查网络、模型名称与账户额度后重试。";
+  const raw = error instanceof Error ? error.message : "AI 厂商没有返回有效响应。";
+  const withoutKey = apiKey ? raw.split(apiKey).join("[已隐藏]") : raw;
+  return withoutKey
+    .replace(/([?&](?:key|api_key|token)=)[^&\s]+/gi, "$1[已隐藏]")
+    .replace(/\b(?:sk|key)-[A-Za-z0-9_-]{8,}\b/g, "[已隐藏]")
+    .slice(0, 300);
+}
+
 export async function generateAiText(config: ActiveAiConfig, prompt: string, options: { maxTokens?: number; temperature?: number; signal?: AbortSignal } = {}) {
   const preset = findProvider(config.provider);
   if (!preset) throw new Error("Unsupported AI provider");
@@ -66,8 +100,8 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature, maxOutputTokens: maxTokens } }),
     });
-    const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>; error?: { message?: string } };
-    if (!response.ok) throw new Error(data.error?.message || "Gemini request failed");
+    const data = await readProviderPayload(response);
+    if (!response.ok) throw new Error(providerError(data, response));
     return data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim() || "";
   }
 
@@ -78,8 +112,8 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
       headers: { "Content-Type": "application/json", "x-api-key": config.apiKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({ model: config.model, max_tokens: maxTokens, temperature, messages: [{ role: "user", content: prompt }] }),
     });
-    const data = await response.json() as { content?: Array<{ type?: string; text?: string }>; error?: { message?: string } };
-    if (!response.ok) throw new Error(data.error?.message || "Anthropic request failed");
+    const data = await readProviderPayload(response);
+    if (!response.ok) throw new Error(providerError(data, response));
     return data.content?.filter((item) => item.type === "text").map((item) => item.text ?? "").join("").trim() || "";
   }
 
@@ -89,7 +123,7 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
     headers: { "Authorization": `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: config.model, messages: [{ role: "user", content: prompt }], temperature, max_tokens: maxTokens, stream: false }),
   });
-  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }>; error?: { message?: string } };
-  if (!response.ok) throw new Error(data.error?.message || "AI provider request failed");
+  const data = await readProviderPayload(response);
+  if (!response.ok) throw new Error(providerError(data, response));
   return data.choices?.[0]?.message?.content?.trim() || "";
 }

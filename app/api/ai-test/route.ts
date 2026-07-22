@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findProvider } from "@/app/lib/ai-catalog";
-import { generateAiText, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
+import { generateAiText, publicAiErrorMessage, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as { personalAi?: unknown } | null;
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const detail = error instanceof DOMException && error.name === "AbortError"
       ? "连接测试超过 20 秒，已自动停止。请检查网络、接口地址或模型权限。"
-      : error instanceof Error ? error.message.slice(0, 240) : "AI 厂商没有返回有效响应。";
+      : publicAiErrorMessage(error, config.apiKey);
     return NextResponse.json({ error: `连接失败：${detail}` }, { status: 502 });
   } finally {
     clearTimeout(timer);

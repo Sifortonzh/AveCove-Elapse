@@ -179,12 +179,16 @@ test("ships an isolated, responsive English learning demo", async () => {
 
   assert.match(page, /English Learning/);
   assert.match(page, /learningMode === "english"/);
+  assert.match(page, /avecove-learning-mode/);
   assert.match(english, /CET-4 \/ CET-6/);
   assert.match(english, /National entrance exam/);
   assert.match(english, /IELTS/);
   assert.match(english, /TOEFL/);
   assert.match(english, /function ClozeExercise/);
   assert.match(english, /function ImportedClozePractice/);
+  assert.match(english, /function ImportedMatchingPractice/);
+  assert.match(english, /Paragraph Matching · Answer Order/);
+  assert.match(english, /The malformed OCR passage is hidden/);
   assert.match(english, /sanitizeEnglishPassage/);
   assert.match(english, /function ReadingExercise/);
   assert.match(english, /READING · PASSAGE A/);
@@ -204,6 +208,11 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(english, /QR RESOURCE DETECTED/);
   assert.match(english, /type="file" multiple/);
   assert.match(english, /Test Library/);
+  assert.match(english, /const stageTests = tests\.filter/);
+  assert.match(english, /setTask\("library"\)/);
+  assert.match(english, /sidebarCollapsed/);
+  assert.match(english, /PanelLeftClose/);
+  assert.match(english, /href="\/custom-ai"/);
   assert.match(english, /Rename/);
   assert.match(english, /Reset practice record/);
   assert.match(english, /Respect copyright and protect privacy/);
@@ -216,6 +225,8 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(styles, /\.imported-cloze-card/);
   assert.match(styles, /\.test-library-grid/);
   assert.match(styles, /\.english-library-action-modal/);
+  assert.match(styles, /\.english-shell\.sidebar-collapsed/);
+  assert.match(styles, /\.imported-matching-practice/);
   assert.match(styles, /English PC\/Mac and iPad primary layout/);
   assert.match(styles, /iPhone and compact mobile layout/);
   assert.match(styles, /env\(safe-area-inset-bottom\)/);
@@ -362,7 +373,7 @@ Part IV Translation
 });
 
 test("separates personal BYOK AI from administrator-wide AI", async () => {
-  const [page, personalPage, personalStore, explainRoute, importRoute, providers, adminPage] = await Promise.all([
+  const [page, personalPage, personalStore, explainRoute, importRoute, providers, adminPage, testRoute] = await Promise.all([
     text("app/page.tsx"),
     text("app/custom-ai/page.tsx"),
     text("app/lib/personal-ai.ts"),
@@ -370,16 +381,22 @@ test("separates personal BYOK AI from administrator-wide AI", async () => {
     text("app/api/import-ai/route.ts"),
     text("app/lib/server/ai-providers.ts"),
     text("app/admin/ai/page.tsx"),
+    text("app/api/ai-test/route.ts"),
   ]);
 
   assert.doesNotMatch(personalPage, /adminKey/);
   assert.match(personalPage, /不需要管理员批准/);
   assert.match(personalPage, /配置保存在此浏览器/);
+  assert.match(personalPage, /连接成功.*已自动保存/);
   assert.match(personalStore, /localStorage/);
   assert.match(page, /readPersonalAiConfig/);
   assert.match(explainRoute, /personalAi/);
   assert.match(importRoute, /personalAi/);
   assert.match(providers, /resolvePersonalAiConfig/);
+  assert.match(providers, /publicAiErrorMessage/);
+  assert.match(providers, /readProviderPayload/);
+  assert.match(explainRoute, /45_000/);
+  assert.match(testRoute, /publicAiErrorMessage/);
   assert.match(providers, /provider\.id === "custom"/);
   assert.match(adminPage, /公共 AI 配置/);
 });

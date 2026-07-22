@@ -73,8 +73,15 @@ export default function PersonalAiPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ personalAi: { provider: selectedProvider.id, baseUrl: selectedProvider.baseUrl, model: model.trim(), apiKey: nextKey } }),
       });
-      const result = await response.json() as { message?: string; error?: string };
-      setMessage(result.message ?? result.error ?? "连接测试没有返回结果。");
+      const result = await response.json() as { ok?: boolean; message?: string; error?: string };
+      if (!response.ok || !result.ok) {
+        setMessage(result.error ?? "连接测试没有返回有效结果。");
+        return;
+      }
+      savePersonalAiConfig({ provider: selectedProvider.id, baseUrl: selectedProvider.baseUrl, model: model.trim(), apiKey: nextKey });
+      setSavedKey(nextKey);
+      setApiKey("");
+      setMessage(`${result.message ?? "连接成功。"} 已自动保存到当前浏览器，可直接返回刷题。🚀`);
     } catch {
       setMessage("连接测试失败，请检查当前网络后重试。");
     } finally {

@@ -36,7 +36,7 @@ It turns personal Word and PDF collections into an organized question-bank works
 
 The project deliberately avoids advertising, phone-number login, and mandatory social-platform accounts. A student ID is converted into an irreversible sync identifier; the original value is not stored in the database.
 
-> Current release line: `0.3.x` preview. The built-in bank contains only eight demo questions. Full copyrighted course banks are not bundled.
+> Current release line: `0.4.x` preview. The built-in bank contains only eight demo questions. Full copyrighted course banks are not bundled.
 
 ## Why this project
 
@@ -79,9 +79,12 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 
 - A separate **AveCove Elapse · English Lab** workspace that does not change the medical-practice flow.
 - CET, postgraduate entrance exam, IELTS, and TOEFL stage switching.
+- Exam-aware navigation: each stage exposes its real task types and filters the Test Library to matching papers.
+- A collapsible English sidebar expands the reading and annotation workspace on desktop and iPad.
 - A browser-local **Test Library** for imported Word, legacy `.doc`, PDF, and image files.
 - Automatic stage and section mapping for cloze, reading, paragraph matching, translation, listening resources, and writing.
 - Dedicated support for the current postgraduate English I structure: Use of English 1–20, four Reading Part A texts 21–40, Part B paragraph matching 41–45, Translation 46–50, and Writing 51–52.
+- Postgraduate Part B uses a compact answer-order workspace and hides malformed OCR source layout instead of forcing unreadable text into the practice view.
 - Dedicated CET-6 mapping for Writing; Listening Conversations, Passages, and Recordings (1–25); Reading Section A word bank (26–35), Section B long-reading matching (36–45), Section C close reading (46–55); and Chinese-to-English Translation.
 - Hybrid PDF extraction keeps trustworthy text-layer pages and runs Chinese-English OCR only on scanned pages, which is especially useful for mixed answer-analysis booklets.
 - Imported answer keys and available source explanations stay attached to their questions; missing answers are never guessed.

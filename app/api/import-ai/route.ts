@@ -1,4 +1,4 @@
-import { generateAiText, loadActiveAiConfig, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
+import { generateAiText, loadActiveAiConfig, publicAiErrorMessage, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
 import { allowRequest, requestFingerprint } from "@/app/lib/server/rate-limit";
 import type { QuizQuestion } from "@/app/lib/question-parser";
 
@@ -70,12 +70,16 @@ export async function POST(request: Request) {
     "文件文字结束。",
   ].join("\n");
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90_000);
   try {
-    const content = await generateAiText(aiConfig, prompt, { maxTokens: 7000, temperature: 0 });
+    const content = await generateAiText(aiConfig, prompt, { maxTokens: 7000, temperature: 0, signal: controller.signal });
     const questions = parseAiQuestions(content, category);
     if (!questions.length) return Response.json({ error: "AI 仍未找到带有明确答案的完整题目，请检查文件或拆分后重试。" }, { status: 422 });
     return Response.json({ questions });
-  } catch {
-    return Response.json({ error: "AI 返回内容不完整或格式异常，请缩小文件后重试。" }, { status: 502 });
+  } catch (error) {
+    return Response.json({ error: `AI 文件识别失败：${publicAiErrorMessage(error, aiConfig.apiKey)}` }, { status: 502 });
+  } finally {
+    clearTimeout(timer);
   }
 }

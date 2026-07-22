@@ -1,5 +1,5 @@
 import { deriveVisitorId, readSession } from "@/app/lib/server/auth";
-import { generateAiText, loadActiveAiConfig, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
+import { generateAiText, loadActiveAiConfig, publicAiErrorMessage, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
 import { query } from "@/app/lib/server/db";
 import { requestFingerprint } from "@/app/lib/server/rate-limit";
 
@@ -17,6 +17,11 @@ export async function POST(request: Request) {
   const aiConfig = personalConfig ?? await loadActiveAiConfig();
   if (!aiConfig) return Response.json({ error: "AI 解析尚未启用。你可以从首页左下角进入“自定义AI”，填写自己的 API Key，无需管理员批准。" }, { status: 503 });
 
+  const question = body.question;
+  if (!question?.stem || !question.options?.length || !question.answer?.length) {
+    return Response.json({ error: "题目信息不完整。" }, { status: 400 });
+  }
+
   const dailyLimit = Math.max(1, Number(process.env.AI_DAILY_LIMIT || 20));
   const session = readSession(request);
   const quotaId = session?.userId ?? deriveVisitorId(requestFingerprint(request));
@@ -33,11 +38,6 @@ export async function POST(request: Request) {
     if (!usage[0]) return Response.json({ error: `今天的 AI 伴学额度已用完（${dailyLimit} 次），明天再继续吧 🌙` }, { status: 429 });
   } catch {
     return Response.json({ error: "AI 额度服务暂时不可用，请稍后重试。" }, { status: 503 });
-  }
-
-  const question = body.question;
-  if (!question?.stem || !question.options?.length || !question.answer?.length) {
-    return Response.json({ error: "题目信息不完整。" }, { status: 400 });
   }
 
   const modeInstruction = {
@@ -59,10 +59,14 @@ export async function POST(request: Request) {
     body.followUp ? "请直接回应这次追问，并与前文保持一致；不需要重复整道题的完整解析。" : "",
   ].join("\n");
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45_000);
   try {
-    const explanation = await generateAiText(aiConfig, prompt);
+    const explanation = await generateAiText(aiConfig, prompt, { signal: controller.signal });
     return Response.json({ explanation: explanation || "AI 未返回可显示的解析。" });
-  } catch {
-    return Response.json({ error: "AI 解析暂时生成失败，请稍后重试。" }, { status: 502 });
+  } catch (error) {
+    return Response.json({ error: `AI 解析失败：${publicAiErrorMessage(error, aiConfig.apiKey)}` }, { status: 502 });
+  } finally {
+    clearTimeout(timer);
   }
 }
