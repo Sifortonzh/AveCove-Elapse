@@ -44,8 +44,8 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /const homeQuotes/);
   assert.match(page, /不存原始学号/);
   assert.match(page, /自定义AI/);
-  assert.match(styles, /--type-serif:"Times New Roman","Songti SC","STSong","SimSun",serif/);
-  assert.match(styles, /--text-base:16pt/);
+  assert.match(styles, /--type-serif:serif/);
+  assert.match(styles, /--text-base:14pt/);
   assert.match(styles, /font-family:var\(--type-serif\)!important/);
   assert.match(explainRoute, /followUp/);
   assert.match(explainRoute, /history/);
