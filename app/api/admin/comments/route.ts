@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
+import { isAdminRequest } from "@/app/lib/server/admin";
 import { query } from "@/app/lib/server/db";
 
-function authorized(request: Request) {
-  const key = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  return Boolean(process.env.ADMIN_KEY && key === process.env.ADMIN_KEY);
-}
-
 export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "无管理权限。" }, { status: 401 });
+  if (!isAdminRequest(request)) return NextResponse.json({ error: "无管理权限。" }, { status: 401 });
   const rows = await query(
     `SELECT c.id, c.question_id, c.nickname, c.body, c.status, c.moderation_reason, c.created_at,
       COUNT(r.comment_id)::int AS reports
@@ -18,7 +14,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "无管理权限。" }, { status: 401 });
+  if (!isAdminRequest(request)) return NextResponse.json({ error: "无管理权限。" }, { status: 401 });
   const body = await request.json() as { commentId?: string; action?: "publish" | "hide" | "mute"; days?: number };
   const commentId = String(body.commentId ?? "");
   if (!commentId || !["publish", "hide", "mute"].includes(String(body.action))) return NextResponse.json({ error: "管理操作无效。" }, { status: 400 });

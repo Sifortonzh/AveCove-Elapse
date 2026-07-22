@@ -39,6 +39,17 @@ const defaultSettings: Settings = {
   darkMode: false,
 };
 
+const homeQuotes = [
+  { lead: "今日一页，胜过明日十页。", title: "把每一次判断，都练成临床思维。" },
+  { lead: "慢一点想清楚，快一点记牢。", title: "真正的进步，藏在每一道错题里。" },
+  { lead: "知识会遗忘，理解会留下。", title: "先问为什么，再记住是什么。" },
+  { lead: "一题一得，日日有功。", title: "把模糊的知识，练成确定。" },
+  { lead: "不怕答案错，只怕不复盘。", title: "今天弄懂的难题，是明天的底气。" },
+  { lead: "医学很长，脚步可以很稳。", title: "认真走过的每一步，都在靠近答案。" },
+  { lead: "记忆有潮汐，复习有回声。", title: "在忘记之前，再与知识相遇一次。" },
+  { lead: "心里有病人，笔下才有分寸。", title: "用严谨守住知识，也守住生命。" },
+];
+
 function shuffle<T>(items: T[]) {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -81,6 +92,7 @@ export default function HomePage() {
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState("尚未开启多端同步");
   const [toast, setToast] = useState("");
+  const [quoteIndex, setQuoteIndex] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -89,6 +101,7 @@ export default function HomePage() {
     async function restoreLocalData() {
       await Promise.resolve();
       if (!active) return;
+      setQuoteIndex(Math.floor(Math.random() * homeQuotes.length));
       try {
         setProgress(JSON.parse(localStorage.getItem("hongdou-progress") ?? localStorage.getItem("medquiz-progress") ?? "{}"));
         setFavorites(JSON.parse(localStorage.getItem("hongdou-favorites") ?? "[]"));
@@ -508,6 +521,7 @@ export default function HomePage() {
           nickname={nickname}
           account={account}
           syncStatus={syncStatus}
+          quote={homeQuotes[quoteIndex]}
           onAccount={() => setShowAccount(true)}
         />
       ) : view === "copyright" ? (
@@ -582,11 +596,11 @@ function Brand({ compact = false }: { compact?: boolean }) {
   return <div className={`brand ${compact ? "compact" : ""}`}><span className="brand-logo"><Image src="/hongdou-logo.png" alt="红豆生南国蛇形医学标识" width={48} height={48} priority /></span><div><strong>红豆生南国</strong><small>医学知识训练与复盘</small></div></div>;
 }
 
-function HomeView({ bankName, questions, answered, wrong, accuracy, progress, onPractice, onImport, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, onAccount }: {
+function HomeView({ bankName, questions, answered, wrong, accuracy, progress, onPractice, onImport, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, quote, onAccount }: {
   bankName: string; questions: number; answered: number; wrong: number; accuracy: number; progress: number;
   onPractice: (custom?: Partial<Settings>) => void; onImport: () => void; onSearch: () => void; onNotes: () => void;
   onCopyright: () => void; onToggleTheme: () => void; darkMode: boolean; nickname: string;
-  account: AccountSession | null; syncStatus: string; onAccount: () => void;
+  account: AccountSession | null; syncStatus: string; quote: (typeof homeQuotes)[number]; onAccount: () => void;
 }) {
   return <div className="home-shell">
     <aside className="home-sidebar">
@@ -598,10 +612,10 @@ function HomeView({ bankName, questions, answered, wrong, accuracy, progress, on
         <button onClick={() => onPractice({ scope: "favorite" })}><Star size={19} />收藏题目</button>
         <button onClick={onNotes}><NotebookPen size={19} />我的笔记</button>
       </nav>
-      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <small className="sync-caption">{syncStatus}</small>}<button onClick={onImport}><Import size={18} />导入题库</button><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权与使用说明</button><p>本地优先 · 无广告<br />原始题库文件不会上传</p></div>
+      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <small className="sync-caption">{syncStatus}</small>}<button onClick={onImport}><Import size={18} />导入题库</button><a className="custom-ai-entry" href="/custom-ai"><Bot size={17} />自定义AI</a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权与使用说明</button><p>本地优先 · 无广告<br />原始题库文件不会上传</p></div>
     </aside>
     <section className="home-main">
-      <header className="home-topbar"><div><p>早上好，今天也稳稳推进。</p><h1>把模糊的知识，练成确定。</h1></div><div className="top-actions"><button aria-label="搜索题目" onClick={onSearch}><Search size={19} /></button><button aria-label="切换主题" onClick={onToggleTheme}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><button className="profile" onClick={onAccount} aria-label="同步身份">{(nickname.trim()[0] || "红").toUpperCase()}</button></div></header>
+      <header className="home-topbar"><div className="home-quote"><p><Sparkles size={13} />{quote.lead}</p><h1>{quote.title}</h1></div><div className="top-actions"><button aria-label="搜索题目" onClick={onSearch}><Search size={19} /></button><button aria-label="切换主题" onClick={onToggleTheme}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><button className="profile" onClick={onAccount} aria-label="同步身份">{(nickname.trim()[0] || "红").toUpperCase()}</button></div></header>
       <section className="hero-card">
         <div className="hero-copy"><span className="overline"><Sparkles size={14} /> 今日学习</span><h2>{bankName}</h2><p>{bankName === "演示题库" ? "用少量示例题体验完整流程；准备好后，导入属于自己的医学题库。" : "从上次停下的地方继续。系统会把错题与薄弱知识点带回你的学习节奏。"}</p><div className="hero-actions"><button className="primary-action" onClick={() => onPractice({ scope: answered ? "unanswered" : "all" })}><Play size={17} fill="currentColor" />{answered ? "继续学习" : "开始学习"}</button><button className="ghost-action" onClick={() => onPractice()}>练习设置 <Settings2 size={16} /></button></div></div>
         <div className="hero-progress"><div className="progress-orbit" style={{ "--p": `${progress * 3.6}deg` } as React.CSSProperties}><div><strong>{progress}%</strong><span>总进度</span></div></div><ul><li><span>题目总数</span><b>{questions}</b></li><li><span>已完成</span><b>{answered}</b></li><li><span>当前正确率</span><b>{accuracy}%</b></li></ul></div>
@@ -615,7 +629,7 @@ function HomeView({ bankName, questions, answered, wrong, accuracy, progress, on
       </section>
       <section className="home-lower">
         <article className="insight-card"><div className="card-title"><span><Target size={18} /></span><div><strong>学习洞察</strong><p>你的个人复盘视图</p></div></div><div className="metrics"><div><b>{answered}</b><span>累计完成</span></div><div><b>{accuracy}%</b><span>正确率</span></div><div><b>{wrong}</b><span>待巩固</span></div></div><div className="tip"><Lightbulb size={17} /><p>{wrong ? "优先重做错题，比盲目刷新题更有效。" : "先完成一组题，系统就能开始生成复盘建议。"}</p></div></article>
-        <article className="ai-preview"><div className="ai-preview-head"><span className="ai-orb"><BrainCircuit size={22} /></span><div><small>AI 学习讨论区</small><strong>不是只给答案，而是陪你把题想明白</strong></div></div><div className="ai-chips"><span>大神总结</span><span>易错提示</span><span>AI我在</span></div><p>提交答案后，针对当前题目生成总结、辨析常见误区，并继续追问。</p><button onClick={() => onPractice({ scope: "unanswered" })}>去体验 <ArrowRight size={16} /></button></article>
+        <article className="ai-preview"><div className="ai-preview-head"><span className="ai-orb"><BrainCircuit size={22} /></span><div><small>AI 学习讨论区</small><strong>不是只给答案，而是陪你把题想明白</strong></div></div><div className="ai-chips"><span>大神总结</span><span>易错提示</span><span>知微</span></div><p>提交答案后，针对当前题目生成总结、辨析常见误区，并继续追问。</p><button onClick={() => onPractice({ scope: "unanswered" })}>去体验 <ArrowRight size={16} /></button></article>
       </section>
       <footer className="home-footer"><span>© 2026 红豆生南国</span><button onClick={onCopyright}>版权、隐私与医学声明 <ChevronRight size={14} /></button></footer>
     </section>
@@ -670,7 +684,7 @@ function LearningPanel({ current, submitted, note, aiMode, aiTexts, aiMessages, 
   const modes: Array<{ id: AiMode; label: string; icon: React.ReactNode }> = [
     { id: "summary", label: "大神总结", icon: <BrainCircuit size={16} /> },
     { id: "pitfall", label: "易错提示", icon: <Lightbulb size={16} /> },
-    { id: "companion", label: "AI我在", icon: <Bot size={16} /> },
+    { id: "companion", label: "知微", icon: <Bot size={16} /> },
   ];
   const sendFollowUp = () => { if (!followUp.trim()) return; onFollowUp(followUp); setFollowUp(""); };
   const sendComment = () => { if (!comment.trim()) return; onComment(comment); setComment(""); };
@@ -743,7 +757,7 @@ function AccountModal({ account, syncStatus, nickname: initialNickname, onClose,
     }
   }
 
-  return <div className="modal-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose}><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><ShieldCheck /><p><strong>放心同步 🔐☁️</strong><br />学号只会生成不可逆的同步标识，服务器不会保存原始学号；邮箱仅在你主动填写时用于验证码登录与评论身份保护 📮✨</p></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
+  return <div className="modal-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose}><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。邮箱仅在你主动填写时，用于验证码登录与评论身份保护。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
 }
 
 function SearchModal({ questions, onOpen, onClose }: { questions: QuizQuestion[]; onOpen: (id: string) => void; onClose: () => void }) {

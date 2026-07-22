@@ -1,12 +1,11 @@
 import { deriveVisitorId, readSession } from "@/app/lib/server/auth";
+import { generateAiText, loadActiveAiConfig } from "@/app/lib/server/ai-providers";
 import { query } from "@/app/lib/server/db";
 import { requestFingerprint } from "@/app/lib/server/rate-limit";
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return Response.json({ error: "AI 解析尚未启用。配置 OpenAI API 密钥后即可按需生成解析。" }, { status: 503 });
-  }
+  const aiConfig = await loadActiveAiConfig();
+  if (!aiConfig) return Response.json({ error: "AI 解析尚未启用。管理员可从首页左下角进入“自定义AI”完成配置。" }, { status: 503 });
 
   const dailyLimit = Math.max(1, Number(process.env.AI_DAILY_LIMIT || 20));
   const session = readSession(request);
@@ -40,7 +39,7 @@ export async function POST(request: Request) {
   const modeInstruction = {
     summary: "以“大神总结”的风格：先用一句话给出核心判断，再分点解释正确答案与关键鉴别，最后给一个便于记忆的短句。",
     pitfall: "以“易错提示”的风格：定位题干中的陷阱词、最相似的干扰项和做错的常见原因，并给出下一次识别方法。",
-    companion: "以“AI我在”的风格：像耐心的学习搭档一样换一种通俗方式讲解，用一个简短类比帮助理解，并邀请学习者继续追问。",
+    companion: "以“知微”的风格：从细节出发厘清知识点，像耐心的学习搭档一样换一种通俗方式讲解，用一个简短类比帮助理解，并邀请学习者继续追问。",
   }[body.mode ?? "summary"];
 
   const prompt = [
@@ -57,25 +56,7 @@ export async function POST(request: Request) {
   ].join("\n");
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-5.6-terra",
-        input: prompt,
-        reasoning: { effort: "low" },
-        text: { verbosity: "low" },
-        max_output_tokens: 900,
-        store: false,
-      }),
-    });
-    const data = await response.json() as {
-      output_text?: string;
-      output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
-      error?: { message?: string };
-    };
-    if (!response.ok) throw new Error(data.error?.message || "OpenAI request failed");
-    const explanation = data.output_text || data.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text;
+    const explanation = await generateAiText(aiConfig, prompt);
     return Response.json({ explanation: explanation || "AI 未返回可显示的解析。" });
   } catch {
     return Response.json({ error: "AI 解析暂时生成失败，请稍后重试。" }, { status: 502 });

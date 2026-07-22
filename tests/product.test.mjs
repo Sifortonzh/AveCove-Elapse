@@ -33,10 +33,16 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /版权与使用说明/);
   assert.match(page, /同学讨论/);
   assert.match(page, /云端共享 · 有审核/);
-  assert.match(page, /学号只会生成不可逆的同步标识/);
+  assert.match(page, /学号只生成不可逆的同步标识/);
   assert.match(page, /邮箱验证码/);
   assert.match(page, /导出学习记录/);
   assert.match(page, /askFollowUp/);
+  assert.match(page, /知微/);
+  assert.doesNotMatch(page, /红豆伴学/);
+  assert.doesNotMatch(page, /AI我在/);
+  assert.match(page, /const homeQuotes/);
+  assert.match(page, /不存原始学号/);
+  assert.match(page, /自定义AI/);
   assert.match(explainRoute, /followUp/);
   assert.match(explainRoute, /history/);
   assert.match(explainRoute, /AI_DAILY_LIMIT/);
@@ -59,7 +65,13 @@ test("ships shared data, moderation, branding, and deployment material", async (
     "app/api/sync/route.ts",
     "app/api/comments/route.ts",
     "app/api/admin/comments/route.ts",
+    "app/api/admin/ai-config/route.ts",
     "app/admin/page.tsx",
+    "app/admin/ai/page.tsx",
+    "app/custom-ai/page.tsx",
+    "app/lib/server/ai-providers.ts",
+    "app/lib/ai-catalog.ts",
+    "app/lib/server/secrets.ts",
     "scripts/backup.sh",
     "scripts/restore.sh",
     ".github/workflows/ci.yml",
@@ -82,6 +94,7 @@ test("ships shared data, moderation, branding, and deployment material", async (
   assert.match(compose, /env_file:\s*\.env/);
   assert.match(compose, /postgres:16-alpine/);
   assert.match(exampleEnv, /OPENAI_API_KEY/);
+  assert.match(exampleEnv, /CONFIG_ENCRYPTION_KEY/);
   assert.match(exampleEnv, /SYNC_SECRET/);
   assert.match(exampleEnv, /SMTP_HOST/);
   assert.match(caddy, /reverse_proxy/);
@@ -90,4 +103,5 @@ test("ships shared data, moderation, branding, and deployment material", async (
   assert.match(guide, /GitHub/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS learning_states/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS comment_reports/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS app_settings/);
 });
