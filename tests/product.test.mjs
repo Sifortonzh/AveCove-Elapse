@@ -85,7 +85,10 @@ test("includes the requested product flows and copy", async () => {
 });
 
 test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recognition", async () => {
-  const [fileImport, docRoute, search, aiImportRoute, emailRoute, styles] = await Promise.all([
+  const [page, english, englishStore, fileImport, docRoute, search, aiImportRoute, emailRoute, styles] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/components/EnglishLearningView.tsx"),
+    text("app/lib/english-test.ts"),
     text("app/lib/file-import.ts"),
     text("app/api/extract-doc/route.ts"),
     text("app/lib/question-search.ts"),
@@ -99,7 +102,21 @@ test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recogn
   assert.match(fileImport, /extension === "doc"/);
   assert.match(fileImport, /fetch\("\/api\/extract-doc"/);
   assert.match(fileImport, /pagesToOcr/);
+  assert.match(fileImport, /pdfPageNeedsOcr/);
+  assert.match(fileImport, /enhanceOcrCanvas/);
+  assert.match(fileImport, /chi_sim", "eng/);
+  assert.match(fileImport, /user_defined_dpi: "300"/);
+  assert.match(fileImport, /rotateAuto: true/);
+  assert.match(fileImport, /signal\?: AbortSignal/);
   assert.match(fileImport, /mergedTexts\[pageNumber - 1\]/);
+  assert.match(page, /取消当前导入/);
+  assert.match(page, /importAbortRef/);
+  assert.match(page, /onTimeout: \(\) => fileController\.abort\(\)/);
+  assert.match(page, /status: "cancelled"/);
+  assert.match(english, /Cancel/);
+  assert.match(english, /importControllerRef/);
+  assert.match(english, /timedOut = true/);
+  assert.match(englishStore, /extractEnglishTestFile\(file: File, onUpdate: \(update: ImportUpdate\) => void, signal\?: AbortSignal\)/);
   assert.match(docRoute, /OLE_SIGNATURE/);
   assert.match(docRoute, /MAX_DOC_BYTES/);
   assert.match(docRoute, /word-extractor/);
@@ -112,6 +129,31 @@ test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recogn
   assert.match(aiImportRoute, /只能采用文件明确提供的答案，不得自行推测/);
   assert.match(aiImportRoute, /答案表/);
   assert.match(emailRoute, /垃圾邮件 \/ Spam 文件夹/);
+});
+
+test("tests personal and public AI connections without exposing saved keys", async () => {
+  const [personalPage, adminPage, personalRoute, adminRoute, providers, styles] = await Promise.all([
+    text("app/custom-ai/page.tsx"),
+    text("app/admin/ai/page.tsx"),
+    text("app/api/ai-test/route.ts"),
+    text("app/api/admin/ai-config/route.ts"),
+    text("app/lib/server/ai-providers.ts"),
+    text("app/globals.css"),
+  ]);
+
+  assert.match(personalPage, /测试连接/);
+  assert.match(personalPage, /\/api\/ai-test/);
+  assert.match(adminPage, /测试连接/);
+  assert.match(adminPage, /method: "POST"/);
+  assert.match(personalRoute, /resolvePersonalAiConfig/);
+  assert.match(personalRoute, /20_000/);
+  assert.match(adminRoute, /export async function POST/);
+  assert.match(adminRoute, /当前厂商没有可复用的已保存密钥/);
+  assert.match(providers, /signal\?: AbortSignal/);
+  assert.match(providers, /signal: options\.signal/);
+  assert.match(styles, /\.personal-ai-test/);
+  assert.match(styles, /\.dark \.privacy-icon/);
+  assert.match(styles, /\.dark \.privacy-tags span/);
 });
 
 test("keeps multiple imported banks and portable share files", async () => {
@@ -127,9 +169,10 @@ test("keeps multiple imported banks and portable share files", async () => {
 });
 
 test("ships an isolated, responsive English learning demo", async () => {
-  const [page, english, styles, layout] = await Promise.all([
+  const [page, english, englishStore, styles, layout] = await Promise.all([
     text("app/page.tsx"),
     text("app/components/EnglishLearningView.tsx"),
+    text("app/lib/english-test.ts"),
     text("app/globals.css"),
     text("app/layout.tsx"),
   ]);
@@ -144,6 +187,9 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(english, /function ImportedClozePractice/);
   assert.match(english, /sanitizeEnglishPassage/);
   assert.match(english, /function ReadingExercise/);
+  assert.match(english, /READING · PASSAGE A/);
+  assert.doesNotMatch(english, /READING · PASSAGE 01/);
+  assert.match(english, /function importedReadingLabel/);
   assert.match(english, /function ListeningExercise/);
   assert.match(english, /function WritingExercise/);
   assert.match(english, /AveCove Elapse/);
@@ -158,15 +204,44 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(english, /QR RESOURCE DETECTED/);
   assert.match(english, /type="file" multiple/);
   assert.match(english, /Test Library/);
+  assert.match(english, /Rename/);
+  assert.match(english, /Reset practice record/);
+  assert.match(english, /Respect copyright and protect privacy/);
+  assert.match(english, /avecove-english-practice-v1/);
+  assert.match(english, /format: "avecove-english-test-v1"/);
   assert.match(english, /extractEnglishTestFile/);
   assert.match(english, /hongdou-logo\.png/);
   assert.match(english, /openBlank === id/);
   assert.match(styles, /\.cloze-blank\.open:not\(\.answered\)/);
   assert.match(styles, /\.imported-cloze-card/);
   assert.match(styles, /\.test-library-grid/);
+  assert.match(styles, /\.english-library-action-modal/);
+  assert.match(styles, /English PC\/Mac and iPad primary layout/);
   assert.match(styles, /iPhone and compact mobile layout/);
   assert.match(styles, /env\(safe-area-inset-bottom\)/);
   assert.match(layout, /viewportFit: "cover"/);
+  assert.match(englishStore, /export async function renameEnglishTest/);
+  assert.match(englishStore, /extension === "json"/);
+});
+
+test("reimports a portable English Test Library share file", async () => {
+  const { extractEnglishTestFile } = await loadEnglishParser();
+  const shared = {
+    format: "avecove-english-test-v1",
+    test: {
+      name: "Shared CET reading",
+      stage: "cet",
+      examVariant: "CET-6",
+      usedOcr: false,
+      sections: [{ id: "reading-a", kind: "reading", title: "Text 1", passage: "A short passage.", questions: [] }],
+    },
+  };
+  const parsed = await extractEnglishTestFile(new File([JSON.stringify(shared)], "shared.avecove-english.json", { type: "application/json" }), () => {});
+
+  assert.equal(parsed.name, "Shared CET reading");
+  assert.equal(parsed.examVariant, "CET-6");
+  assert.equal(parsed.sourceFormat, "json");
+  assert.equal(parsed.sections[0].kind, "reading");
 });
 
 test("classifies the current postgraduate English I paper structure", async () => {

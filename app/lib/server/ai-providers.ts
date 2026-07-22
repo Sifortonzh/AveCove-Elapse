@@ -52,7 +52,7 @@ function cleanBaseUrl(baseUrl: string) {
   return baseUrl.replace(/\/+$/, "");
 }
 
-export async function generateAiText(config: ActiveAiConfig, prompt: string, options: { maxTokens?: number; temperature?: number } = {}) {
+export async function generateAiText(config: ActiveAiConfig, prompt: string, options: { maxTokens?: number; temperature?: number; signal?: AbortSignal } = {}) {
   const preset = findProvider(config.provider);
   if (!preset) throw new Error("Unsupported AI provider");
   const baseUrl = cleanBaseUrl(config.baseUrl);
@@ -62,6 +62,7 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
   if (preset.protocol === "gemini") {
     const response = await fetch(`${baseUrl}/models/${encodeURIComponent(config.model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`, {
       method: "POST",
+      signal: options.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature, maxOutputTokens: maxTokens } }),
     });
@@ -73,6 +74,7 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
   if (preset.protocol === "anthropic") {
     const response = await fetch(`${baseUrl}/messages`, {
       method: "POST",
+      signal: options.signal,
       headers: { "Content-Type": "application/json", "x-api-key": config.apiKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({ model: config.model, max_tokens: maxTokens, temperature, messages: [{ role: "user", content: prompt }] }),
     });
@@ -83,6 +85,7 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
+    signal: options.signal,
     headers: { "Authorization": `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: config.model, messages: [{ role: "user", content: prompt }], temperature, max_tokens: maxTokens, stream: false }),
   });

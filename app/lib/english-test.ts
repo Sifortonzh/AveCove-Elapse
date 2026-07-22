@@ -498,10 +498,32 @@ export function parseEnglishTestText(text: string, fileName: string, usedOcr = f
   };
 }
 
-export async function extractEnglishTestFile(file: File, onUpdate: (update: ImportUpdate) => void) {
+export async function extractEnglishTestFile(file: File, onUpdate: (update: ImportUpdate) => void, signal?: AbortSignal) {
+  const ensureActive = () => {
+    if (signal?.aborted) throw new DOMException("Import cancelled", "AbortError");
+  };
+  ensureActive();
   const extension = file.name.split(".").pop()?.toLocaleLowerCase();
   let text = "";
   let usedOcr = false;
+
+  if (extension === "json") {
+    onUpdate({ phase: "Reading shared test", progress: 45, detail: "Validating the AveCove English Test file" });
+    const payload = JSON.parse(await file.text()) as { format?: string; test?: Partial<SavedEnglishTest> };
+    ensureActive();
+    const shared = payload.format === "avecove-english-test-v1" ? payload.test : undefined;
+    if (!shared?.name || !Array.isArray(shared.sections) || !shared.sections.length) throw new Error("This is not a valid AveCove English Test share file.");
+    const stage: EnglishStage = ["cet", "postgraduate", "ielts", "toefl"].includes(shared.stage || "") ? shared.stage as EnglishStage : "cet";
+    onUpdate({ phase: "Shared test ready", progress: 90, detail: "The paper can be added to your Test Library" });
+    return {
+      name: shared.name,
+      stage,
+      examVariant: shared.examVariant,
+      sourceFormat: "json",
+      usedOcr: Boolean(shared.usedOcr),
+      sections: shared.sections,
+    };
+  }
 
   if (file.type.startsWith("image/") || ["png", "jpg", "jpeg", "webp"].includes(extension || "")) {
     onUpdate({ phase: "Reading image", progress: 18, detail: "Loading English OCR" });
@@ -511,19 +533,34 @@ export async function extractEnglishTestFile(file: File, onUpdate: (update: Impo
         if (message.status === "recognizing text") onUpdate({ phase: "English OCR", progress: 25 + Math.round((message.progress ?? 0) * 55), detail: "Recognizing the exam page" });
       },
     });
+    let workerClosed = false;
+    const closeWorker = async () => {
+      if (workerClosed) return;
+      workerClosed = true;
+      await worker.terminate();
+    };
+    const cancelOcr = () => { void closeWorker(); };
+    signal?.addEventListener("abort", cancelOcr, { once: true });
     try {
+      ensureActive();
       const result = await worker.recognize(file);
+      ensureActive();
       text = result.data.text;
       usedOcr = true;
+    } catch (error) {
+      if (signal?.aborted) throw new DOMException("Import cancelled", "AbortError");
+      throw error;
     } finally {
-      await worker.terminate();
+      signal?.removeEventListener("abort", cancelOcr);
+      await closeWorker();
     }
   } else {
-    const extracted = await extractQuestionFileText(file, onUpdate);
+    const extracted = await extractQuestionFileText(file, onUpdate, signal);
     text = extracted.text;
     usedOcr = extracted.usedOcr;
   }
 
+  ensureActive();
   onUpdate({ phase: "Classifying sections", progress: 90, detail: "Finding reading, cloze, listening and writing tasks" });
   return parseEnglishTestText(text, file.name, usedOcr);
 }
@@ -559,6 +596,38 @@ export async function saveEnglishTest(input: Omit<SavedEnglishTest, "id" | "impo
     transaction.objectStore(STORE_NAME).put(test);
     transaction.oncomplete = () => { database.close(); resolve(test); };
     transaction.onerror = () => reject(transaction.error ?? new Error("Unable to save this English test."));
+  });
+}
+
+export async function renameEnglishTest(id: string, name: string): Promise<SavedEnglishTest> {
+  const nextName = name.trim();
+  if (!nextName) throw new Error("The test name cannot be empty.");
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(id);
+    let updated: SavedEnglishTest | null = null;
+    request.onsuccess = () => {
+      const current = request.result as SavedEnglishTest | undefined;
+      if (!current) {
+        transaction.abort();
+        return;
+      }
+      updated = { ...current, name: nextName.slice(0, 120), updatedAt: new Date().toISOString() };
+      store.put(updated);
+    };
+    request.onerror = () => reject(request.error ?? new Error("Unable to read this English test."));
+    transaction.oncomplete = () => {
+      database.close();
+      if (updated) resolve(updated);
+      else reject(new Error("This English test no longer exists."));
+    };
+    transaction.onabort = () => {
+      database.close();
+      reject(new Error("This English test no longer exists."));
+    };
+    transaction.onerror = () => reject(transaction.error ?? new Error("Unable to rename this English test."));
   });
 }
 

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Bot, CheckCircle2, ChevronLeft, KeyRound, LockKeyhole, RefreshCw, Save, ServerCog, Sparkles } from "lucide-react";
+import { Bot, CheckCircle2, ChevronLeft, KeyRound, LockKeyhole, PlugZap, RefreshCw, Save, ServerCog, Sparkles } from "lucide-react";
 import { providerPresets, type ProviderPreset as Provider } from "@/app/lib/ai-catalog";
 
 type SavedConfig = { provider: Provider["id"]; baseUrl: string; model: string; hasApiKey: boolean; source: string };
@@ -17,6 +17,7 @@ export default function AiConfigPage() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [message, setMessage] = useState("输入管理密钥后读取服务器配置。");
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   const selectedProvider = useMemo(() => providers.find((item) => item.id === providerId), [providerId, providers]);
 
@@ -83,6 +84,25 @@ export default function AiConfigPage() {
     }
   }
 
+  async function testConnection() {
+    if (!adminKey.trim()) return setMessage("请先填写管理密钥。");
+    setTesting(true);
+    setMessage("正在连接 AI 厂商并验证当前模型…");
+    try {
+      const response = await fetch("/api/admin/ai-config", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: providerId, baseUrl, model, apiKey }),
+      });
+      const result = await response.json() as { message?: string; error?: string };
+      setMessage(result.message ?? result.error ?? "连接测试没有返回结果。");
+    } catch {
+      setMessage("连接测试失败，请检查服务器网络后重试。");
+    } finally {
+      setTesting(false);
+    }
+  }
+
   return <main className="admin-page ai-config-page">
     <header><div><span><Bot /> AveCove Elapse</span><h1>公共 AI 配置</h1><p>管理员为全站提供公共 AI；普通用户也可在“自定义AI”中接入自己的 Key，无需管理员批准。</p></div><nav className="admin-nav"><Link href="/admin"><ChevronLeft />评论审核</Link><Link href="/custom-ai">个人 AI 页面</Link><Link href="/">返回刷题页</Link></nav></header>
     <section className="admin-auth"><input type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} placeholder="管理员密钥" autoComplete="current-password" /><button onClick={load} disabled={busy}><RefreshCw />{busy ? "正在读取" : "读取配置"}</button><p>{message}</p></section>
@@ -96,7 +116,7 @@ export default function AiConfigPage() {
         <label className="wide"><span>API Key <em>{hasApiKey ? "已安全保存；留空则保持不变" : "首次配置必填"}</em></span><div className="secret-field"><KeyRound /><input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={hasApiKey ? "••••••••（留空不修改）" : "粘贴厂商 API Key"} autoComplete="new-password" /></div></label>
       </div>
       <div className="ai-security-note"><LockKeyhole /><p><strong>密钥只在服务端使用</strong><br />保存后采用 AES-256-GCM 加密写入数据库；管理界面只显示“已配置”，不会回传明文。</p></div>
-      <button className="ai-save" disabled={busy || !providers.length}><Save />{busy ? "正在保存…" : "保存 AI 配置"}</button>
+      <div className="ai-config-actions"><button className="ai-save" disabled={busy || testing || !providers.length}><Save />{busy ? "正在保存…" : "保存 AI 配置"}</button><button type="button" className="personal-ai-test" onClick={() => void testConnection()} disabled={busy || testing || !providers.length}><PlugZap />{testing ? "正在测试…" : "测试连接"}</button></div>
       {hasApiKey && <span className="ai-ready"><CheckCircle2 />已有可用密钥配置</span>}
     </form>
   </main>;

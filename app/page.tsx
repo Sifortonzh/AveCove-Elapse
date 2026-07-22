@@ -29,7 +29,7 @@ type View = "home" | "quiz" | "banks" | "copyright";
 type AiMessage = { role: "user" | "assistant"; text: string };
 type SharedComment = { id: string; nickname: string; text: string; createdAt: string; likes: number; own?: boolean; status?: string };
 type AccountSession = { nickname: string; email?: string; expiresAt: number };
-type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "ai-ready"; detail: string };
+type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "cancelled" | "ai-ready"; detail: string };
 type AiFallbackFile = { id: string; fileName: string; extractedText: string };
 type Settings = {
   scope: Scope;
@@ -69,10 +69,31 @@ class ImportTimeoutError extends Error {
   }
 }
 
-function withImportTimeout<T>(promise: Promise<T>, timeout = 180_000): Promise<T> {
+function withImportTimeout<T>(
+  promise: Promise<T>,
+  timeout = 180_000,
+  options: { signal?: AbortSignal; onTimeout?: () => void } = {},
+): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new ImportTimeoutError()), timeout);
-    promise.then((value) => { window.clearTimeout(timer); resolve(value); }, (error) => { window.clearTimeout(timer); reject(error); });
+    let settled = false;
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      options.signal?.removeEventListener("abort", abort);
+    };
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const abort = () => finish(() => reject(new DOMException("导入已取消", "AbortError")));
+    const timer = window.setTimeout(() => finish(() => {
+      reject(new ImportTimeoutError());
+      options.onTimeout?.();
+    }), timeout);
+    if (options.signal?.aborted) return abort();
+    options.signal?.addEventListener("abort", abort, { once: true });
+    promise.then((value) => finish(() => resolve(value)), (error) => finish(() => reject(error)));
   });
 }
 
@@ -135,6 +156,9 @@ export default function HomePage() {
   const [toast, setToast] = useState("");
   const [quoteIndex, setQuoteIndex] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const importAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => importAbortRef.current?.abort(), []);
 
   useEffect(() => {
     let active = true;
@@ -529,6 +553,12 @@ export default function HomePage() {
     setImportReports((reports) => reports.map((report) => report.id === id ? { ...report, ...patch } : report));
   }
 
+  function cancelImport() {
+    if (!importAbortRef.current || importAbortRef.current.signal.aborted) return;
+    setImportState((state) => ({ ...state, phase: "正在取消导入", detail: "正在停止当前文件解析与 OCR，请稍候…" }));
+    importAbortRef.current.abort();
+  }
+
   async function handleFiles(files: File[]) {
     if (!files.length || importBusy) return;
     const batch = files.map((file, index) => ({ file, id: `${Date.now()}-${index}-${file.name}` }));
@@ -540,24 +570,40 @@ export default function HomePage() {
     const fallbackFiles: AiFallbackFile[] = [];
     let successCount = 0;
     let failureCount = 0;
+    let cancelled = false;
+    const batchController = new AbortController();
+    importAbortRef.current = batchController;
 
     for (let index = 0; index < batch.length; index += 1) {
       const { file, id } = batch[index];
+      if (batchController.signal.aborted) {
+        cancelled = true;
+        break;
+      }
       updateImportReport(id, { status: "processing", detail: `正在处理 ${index + 1} / ${batch.length}` });
       let acceptUpdates = true;
+      const fileController = new AbortController();
+      const cancelCurrentFile = () => fileController.abort();
+      batchController.signal.addEventListener("abort", cancelCurrentFile, { once: true });
       try {
         let importedName = file.name.replace(/\.(doc|docx|pdf|json)$/i, "");
         let importedQuestions: QuizQuestion[];
         let usedOcr = false;
         if (/\.json$/i.test(file.name)) {
-          const shared = parseSharedQuestionBankPackage(JSON.parse(await withImportTimeout(file.text(), 30_000)) as unknown);
+          const shared = parseSharedQuestionBankPackage(JSON.parse(await withImportTimeout(file.text(), 30_000, {
+            signal: fileController.signal,
+            onTimeout: () => fileController.abort(),
+          })) as unknown);
           importedName = shared.name;
           importedQuestions = shared.questions;
           setImportState({ phase: "正在接收分享题库", progress: 82, detail: `[${index + 1}/${batch.length}] ${file.name}` });
         } else {
           const result = await withImportTimeout(importQuestionFile(file, (update) => {
             if (acceptUpdates) setImportState({ ...update, detail: `[${index + 1}/${batch.length}] ${file.name} · ${update.detail}` });
-          }));
+          }, fileController.signal), 180_000, {
+            signal: fileController.signal,
+            onTimeout: () => fileController.abort(),
+          });
           importedQuestions = result.questions;
           importedName = result.questions[0]?.category || importedName;
           usedOcr = result.usedOcr;
@@ -569,7 +615,11 @@ export default function HomePage() {
         successCount += 1;
         updateImportReport(id, { status: "success", detail: `${saved.questions.length} 道题${usedOcr ? " · OCR" : ""}` });
       } catch (error) {
-        if (error instanceof QuestionRecognitionError && error.extractedText.trim()) {
+        if (batchController.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+          cancelled = true;
+          updateImportReport(id, { status: "cancelled", detail: "已由你取消，未保存当前文件" });
+          break;
+        } else if (error instanceof QuestionRecognitionError && error.extractedText.trim()) {
           fallbackFiles.push({ id, fileName: error.fileName, extractedText: error.extractedText });
           updateImportReport(id, { status: "ai-ready", detail: "普通模式未识别，可尝试 AI 快速整理" });
         } else {
@@ -578,18 +628,25 @@ export default function HomePage() {
         }
       } finally {
         acceptUpdates = false;
+        batchController.signal.removeEventListener("abort", cancelCurrentFile);
       }
     }
 
-    setQuestionBanks(await listQuestionBanks());
-    setImportState({ phase: "批量导入完成", progress: 100, detail: `成功 ${successCount} 个 · 待 AI ${fallbackFiles.length} 个 · 失败 ${failureCount} 个` });
-    setImportError(failureCount ? `${failureCount} 个文件导入失败或超时，请查看下方明细后重试。` : "");
+    if (cancelled) {
+      setImportReports((reports) => reports.map((report) => report.status === "waiting" ? { ...report, status: "cancelled", detail: "批量导入已取消，未开始处理" } : report));
+    }
+    setQuestionBanks(await listQuestionBanks().catch(() => questionBanks));
+    setImportState(cancelled
+      ? { phase: "导入已取消", progress: 100, detail: `已保留成功导入的 ${successCount} 个文件，其余文件未继续处理` }
+      : { phase: "批量导入完成", progress: 100, detail: `成功 ${successCount} 个 · 待 AI ${fallbackFiles.length} 个 · 失败 ${failureCount} 个` });
+    setImportError(cancelled ? "本次导入已安全取消；当前正在处理的文件没有写入题库。" : failureCount ? `${failureCount} 个文件导入失败或超时，请查看下方明细后重试。` : "");
     setImportBusy(false);
+    importAbortRef.current = null;
     if (successCount) {
       setToast(`${successCount} 份题库已就位 🎉 此刻就是新起点，题海有岸，胜利正在装进口袋 🫘📚🏆✨`);
       window.setTimeout(() => setToast(""), 4600);
     }
-    if (fallbackFiles.length) {
+    if (fallbackFiles.length && !cancelled) {
       setAiFallbackFiles(fallbackFiles);
       setShowImport(false);
       setShowAiImport(true);
@@ -789,6 +846,7 @@ export default function HomePage() {
           fileRef={fileRef}
           onClose={() => setShowImport(false)}
           onFiles={handleFiles}
+          onCancel={cancelImport}
           onDrag={setDragActive}
         />
       )}
@@ -1042,8 +1100,8 @@ function AnswerSheet({ questions, progress, currentIndex, onJump, onClose }: { q
   return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose}><X /></button></header><div className="answer-legend"><span><i className="done" />已答</span><span><i className="wrong" />错题</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => <button key={`${question.id}-${index}`} className={`${progress[question.id] ?? ""} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{index + 1}</button>)}</div></section></div>;
 }
 
-function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onDrag }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onDrag: (value: boolean) => void }) {
-  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>批量导入 · 新版文件默认在本机处理</span><h2>导入自己的题库</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>一次拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>.docx 本机解析；旧版 .doc 由本站内存转换</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>逐个处理，单个文件最长等待 3 分钟</small></span></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p></div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">.docx 与 PDF 默认在浏览器本地处理；由于旧版 .doc 是二进制格式，选择后会临时发送到你部署的本站服务器内存提取文字，不落盘、不保留原文件。普通识别失败时仍会先征求同意，再决定是否交给 AI 整理。</p></section></div>;
+function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void }) {
+  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>批量导入 · 新版文件默认在本机处理</span><h2>导入自己的题库</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>一次拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>.docx 本机解析；旧版 .doc 由本站内存转换</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>逐个处理，单个文件最长等待 3 分钟</small></span></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={onCancel}><X />取消当前导入</button>}</div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "cancelled" ? <X /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">.docx 与 PDF 默认在浏览器本地处理；由于旧版 .doc 是二进制格式，选择后会临时发送到你部署的本站服务器内存提取文字，不落盘、不保留原文件。普通识别失败时仍会先征求同意，再决定是否交给 AI 整理。</p></section></div>;
 }
 
 function AiImportFallbackModal({ files, onRecognize, onClose }: { files: AiFallbackFile[]; onRecognize: (file: AiFallbackFile) => Promise<number>; onClose: () => void }) {
