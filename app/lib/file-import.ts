@@ -2,10 +2,22 @@ import { parseQuestionText, type QuizQuestion } from "./question-parser";
 
 export type ImportUpdate = { phase: string; progress: number; detail: string };
 
-export async function importQuestionFile(
+export class QuestionRecognitionError extends Error {
+  readonly fileName: string;
+  readonly extractedText: string;
+
+  constructor(fileName: string, extractedText: string) {
+    super("普通识别没有找到完整题目与答案，可以尝试用 AI 快速整理答案区");
+    this.name = "QuestionRecognitionError";
+    this.fileName = fileName;
+    this.extractedText = extractedText;
+  }
+}
+
+export async function extractQuestionFileText(
   file: File,
   onUpdate: (update: ImportUpdate) => void,
-): Promise<{ questions: QuizQuestion[]; usedOcr: boolean; rawLength: number }> {
+): Promise<{ text: string; usedOcr: boolean }> {
   const extension = file.name.split(".").pop()?.toLowerCase();
   let text = "";
   let usedOcr = false;
@@ -20,13 +32,22 @@ export async function importQuestionFile(
     text = result.text;
     usedOcr = result.usedOcr;
   } else {
-    throw new Error("目前仅支持 .docx 和 .pdf 文件");
+    throw new Error("目前仅支持 .docx、.pdf 和红豆题库 .json 文件");
   }
+
+  return { text, usedOcr };
+}
+
+export async function importQuestionFile(
+  file: File,
+  onUpdate: (update: ImportUpdate) => void,
+): Promise<{ questions: QuizQuestion[]; usedOcr: boolean; rawLength: number }> {
+  const { text, usedOcr } = await extractQuestionFileText(file, onUpdate);
 
   onUpdate({ phase: "整理题库", progress: 92, detail: "正在识别题干、选项和答案" });
   const questions = parseQuestionText(text, file.name.replace(/\.(docx|pdf)$/i, ""));
   if (!questions.length) {
-    throw new Error("没有识别到标准题目，请确认题目包含选项及“答案：A”格式");
+    throw new QuestionRecognitionError(file.name, text);
   }
   onUpdate({ phase: "导入完成", progress: 100, detail: `成功识别 ${questions.length} 道题` });
   return { questions, usedOcr, rawLength: text.length };

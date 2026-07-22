@@ -5,24 +5,32 @@ import Image from "next/image";
 import {
   AlertCircle, ArrowRight, BookOpen, Bot, BrainCircuit, Check, CheckCircle2,
   ChevronLeft, ChevronRight, CircleHelp, Clock3, Cloud, Download, FileText, Flag, Home, Import,
-  Library, Lightbulb, ListChecks, MessageCircle, Moon, NotebookPen, Play,
-  RefreshCw, RotateCcw, ScanText, Search, Send, Settings2, ShieldCheck, Shuffle, Sparkles, Star,
-  Sun, Target, ThumbsUp, Trash2, Upload, UserRound, X, Zap,
+  Database, Library, Lightbulb, ListChecks, MessageCircle, Moon, NotebookPen, Pencil, Play,
+  RefreshCw, RotateCcw, ScanText, Search, Send, Settings2, Share2, ShieldCheck, Shuffle, Sparkles,
+  Star, Sun, Target, ThumbsUp, Trash2, Upload, UserRound, X, Zap,
 } from "lucide-react";
 import questionBank from "./questions.json";
-import { importQuestionFile, type ImportUpdate } from "./lib/file-import";
-import { clearActiveBank, loadActiveBank, saveActiveBank } from "./lib/local-bank";
+import { importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
+import {
+  activateQuestionBank, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
+  listQuestionBanks, loadActiveBank, parseSharedQuestionBankPackage, renameQuestionBank,
+  saveActiveBank, type SavedQuestionBank,
+} from "./lib/local-bank";
 import type { QuizQuestion } from "./lib/question-parser";
 
 type Progress = Record<string, "correct" | "wrong">;
 type Scope = "all" | "unanswered" | "wrong" | "favorite";
+type QuestionTypeScope = "single" | "all";
 type AiMode = "summary" | "pitfall" | "companion";
-type View = "home" | "quiz" | "copyright";
+type View = "home" | "quiz" | "banks" | "copyright";
 type AiMessage = { role: "user" | "assistant"; text: string };
 type SharedComment = { id: string; nickname: string; text: string; createdAt: string; likes: number; own?: boolean; status?: string };
 type AccountSession = { nickname: string; email?: string; expiresAt: number };
+type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "ai-ready"; detail: string };
+type AiFallbackFile = { id: string; fileName: string; extractedText: string };
 type Settings = {
   scope: Scope;
+  questionTypes: QuestionTypeScope;
   questionOrder: "sequential" | "random";
   shuffleOptions: boolean;
   autoNext: boolean;
@@ -32,6 +40,7 @@ type Settings = {
 
 const defaultSettings: Settings = {
   scope: "all",
+  questionTypes: "all",
   questionOrder: "sequential",
   shuffleOptions: false,
   autoNext: false,
@@ -50,6 +59,20 @@ const homeQuotes = [
   { lead: "心里有病人，笔下才有分寸。", title: "用严谨守住知识，也守住生命。" },
 ];
 
+class ImportTimeoutError extends Error {
+  constructor() {
+    super("导入超过 3 分钟，已停止等待；建议拆分文件后重试");
+    this.name = "ImportTimeoutError";
+  }
+}
+
+function withImportTimeout<T>(promise: Promise<T>, timeout = 180_000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new ImportTimeoutError()), timeout);
+    promise.then((value) => { window.clearTimeout(timer); resolve(value); }, (error) => { window.clearTimeout(timer); reject(error); });
+  });
+}
+
 function shuffle<T>(items: T[]) {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -63,6 +86,8 @@ export default function HomePage() {
   const [view, setView] = useState<View>("home");
   const [questions, setQuestions] = useState<QuizQuestion[]>(questionBank as QuizQuestion[]);
   const [bankName, setBankName] = useState("演示题库");
+  const [questionBanks, setQuestionBanks] = useState<SavedQuestionBank[]>([]);
+  const [activeBankId, setActiveBankId] = useState<string | null>(null);
   const [sessionQuestions, setSessionQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
@@ -80,6 +105,9 @@ export default function HomePage() {
   const [importState, setImportState] = useState<ImportUpdate>({ phase: "等待文件", progress: 0, detail: "支持 Word、文字 PDF 和扫描 PDF" });
   const [importError, setImportError] = useState("");
   const [importBusy, setImportBusy] = useState(false);
+  const [importReports, setImportReports] = useState<ImportReport[]>([]);
+  const [aiFallbackFiles, setAiFallbackFiles] = useState<AiFallbackFile[]>([]);
+  const [showAiImport, setShowAiImport] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [aiMode, setAiMode] = useState<AiMode>("summary");
   const [aiTexts, setAiTexts] = useState<Partial<Record<AiMode, string>>>({});
@@ -113,9 +141,13 @@ export default function HomePage() {
       }
 
       const saved = await loadActiveBank().catch(() => undefined);
-      if (!active || !saved?.questions.length) return;
+      const banks = await listQuestionBanks().catch(() => []);
+      if (!active) return;
+      setQuestionBanks(banks);
+      if (!saved?.questions.length) return;
       setQuestions(saved.questions);
       setBankName(saved.name);
+      setActiveBankId(saved.id);
     }
 
     void restoreLocalData();
@@ -177,18 +209,26 @@ export default function HomePage() {
   }, [account, currentId]);
 
   const answered = Object.keys(progress).filter((id) => questions.some((question) => question.id === id)).length;
-  const correct = Object.values(progress).filter((value) => value === "correct").length;
-  const wrong = Object.values(progress).filter((value) => value === "wrong").length;
+  const correct = questions.filter((question) => progress[question.id] === "correct").length;
+  const wrong = questions.filter((question) => progress[question.id] === "wrong").length;
   const accuracy = answered ? Math.round((correct / answered) * 100) : 0;
   const isFavorite = current ? favorites.includes(current.id) : false;
 
   const homeProgress = Math.min(100, Math.round((answered / Math.max(questions.length, 1)) * 100));
-  const scopeCounts = useMemo(() => ({
+  const typeCounts = useMemo(() => ({
+    single: questions.filter((question) => !question.multiple).length,
+    multiple: questions.filter((question) => question.multiple).length,
     all: questions.length,
-    unanswered: questions.filter((question) => !progress[question.id]).length,
-    wrong: questions.filter((question) => progress[question.id] === "wrong").length,
-    favorite: questions.filter((question) => favorites.includes(question.id)).length,
-  }), [favorites, progress, questions]);
+  }), [questions]);
+  const scopeCounts = useMemo(() => {
+    const typedQuestions = settings.questionTypes === "single" ? questions.filter((question) => !question.multiple) : questions;
+    return {
+      all: typedQuestions.length,
+      unanswered: typedQuestions.filter((question) => !progress[question.id]).length,
+      wrong: typedQuestions.filter((question) => progress[question.id] === "wrong").length,
+      favorite: typedQuestions.filter((question) => favorites.includes(question.id)).length,
+    };
+  }, [favorites, progress, questions, settings.questionTypes]);
 
   function saveSettings(next: Settings) {
     setSettings(next);
@@ -286,6 +326,7 @@ export default function HomePage() {
   function buildSession(custom?: Partial<Settings>) {
     const active = { ...settings, ...custom };
     let pool = questions.filter((question) => {
+      if (active.questionTypes === "single" && question.multiple) return false;
       if (active.scope === "unanswered") return !progress[question.id];
       if (active.scope === "wrong") return progress[question.id] === "wrong";
       if (active.scope === "favorite") return favorites.includes(question.id);
@@ -460,30 +501,100 @@ export default function HomePage() {
     if (response.ok) await reloadComments(current.id);
   }
 
-  async function handleFile(file: File) {
+  function updateImportReport(id: string, patch: Partial<ImportReport>) {
+    setImportReports((reports) => reports.map((report) => report.id === id ? { ...report, ...patch } : report));
+  }
+
+  async function handleFiles(files: File[]) {
+    if (!files.length || importBusy) return;
+    const batch = files.map((file, index) => ({ file, id: `${Date.now()}-${index}-${file.name}` }));
+    const initialReports: ImportReport[] = batch.map(({ file, id }) => ({ id, name: file.name, status: "waiting", detail: "等待导入" }));
     setImportBusy(true);
     setImportError("");
-    setImportState({ phase: "准备导入", progress: 3, detail: file.name });
+    setImportReports(initialReports);
+    setImportState({ phase: "准备批量导入", progress: 2, detail: `共 ${files.length} 个文件` });
+    const fallbackFiles: AiFallbackFile[] = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (let index = 0; index < batch.length; index += 1) {
+      const { file, id } = batch[index];
+      updateImportReport(id, { status: "processing", detail: `正在处理 ${index + 1} / ${batch.length}` });
+      let acceptUpdates = true;
+      try {
+        let importedName = file.name.replace(/\.(docx|pdf|json)$/i, "");
+        let importedQuestions: QuizQuestion[];
+        let usedOcr = false;
+        if (/\.json$/i.test(file.name)) {
+          const shared = parseSharedQuestionBankPackage(JSON.parse(await withImportTimeout(file.text(), 30_000)) as unknown);
+          importedName = shared.name;
+          importedQuestions = shared.questions;
+          setImportState({ phase: "正在接收分享题库", progress: 82, detail: `[${index + 1}/${batch.length}] ${file.name}` });
+        } else {
+          const result = await withImportTimeout(importQuestionFile(file, (update) => {
+            if (acceptUpdates) setImportState({ ...update, detail: `[${index + 1}/${batch.length}] ${file.name} · ${update.detail}` });
+          }));
+          importedQuestions = result.questions;
+          importedName = result.questions[0]?.category || importedName;
+          usedOcr = result.usedOcr;
+        }
+        const saved = await saveActiveBank({ name: importedName, questions: importedQuestions, importedAt: new Date().toISOString() });
+        setQuestions(saved.questions);
+        setBankName(saved.name);
+        setActiveBankId(saved.id);
+        successCount += 1;
+        updateImportReport(id, { status: "success", detail: `${saved.questions.length} 道题${usedOcr ? " · OCR" : ""}` });
+      } catch (error) {
+        if (error instanceof QuestionRecognitionError && error.extractedText.trim()) {
+          fallbackFiles.push({ id, fileName: error.fileName, extractedText: error.extractedText });
+          updateImportReport(id, { status: "ai-ready", detail: "普通模式未识别，可尝试 AI 快速整理" });
+        } else {
+          failureCount += 1;
+          updateImportReport(id, { status: "failed", detail: error instanceof Error ? error.message : "导入失败，请检查文件" });
+        }
+      } finally {
+        acceptUpdates = false;
+      }
+    }
+
+    setQuestionBanks(await listQuestionBanks());
+    setImportState({ phase: "批量导入完成", progress: 100, detail: `成功 ${successCount} 个 · 待 AI ${fallbackFiles.length} 个 · 失败 ${failureCount} 个` });
+    setImportError(failureCount ? `${failureCount} 个文件导入失败或超时，请查看下方明细后重试。` : "");
+    setImportBusy(false);
+    if (successCount) {
+      setToast(`${successCount} 份题库已就位 🎉 此刻就是新起点，题海有岸，胜利正在装进口袋 🫘📚🏆✨`);
+      window.setTimeout(() => setToast(""), 4600);
+    }
+    if (fallbackFiles.length) {
+      setAiFallbackFiles(fallbackFiles);
+      setShowImport(false);
+      setShowAiImport(true);
+    }
+  }
+
+  async function recognizeFileWithAi(file: AiFallbackFile) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 120_000);
     try {
-      const result = await importQuestionFile(file, setImportState);
-      const importedName = result.questions[0]?.category || file.name.replace(/\.(docx|pdf)$/i, "");
-      setQuestions(result.questions);
-      setBankName(importedName);
-      await saveActiveBank({ name: importedName, questions: result.questions, importedAt: new Date().toISOString() });
-      setProgress({});
-      setFavorites([]);
-      setNotes({});
-      localStorage.removeItem("hongdou-progress");
-      localStorage.removeItem("hongdou-favorites");
-      localStorage.removeItem("hongdou-notes");
-      setImportState({ phase: "导入完成", progress: 100, detail: `${result.questions.length} 道题${result.usedOcr ? " · 已使用 OCR" : ""}` });
-      setToast("题库已就位 🎉 此刻就是新起点，题海有岸，胜利正在装进口袋 🫘📚🏆✨");
-      window.setTimeout(() => setToast(""), 4200);
+      const response = await fetch("/api/import-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({ fileName: file.fileName, text: file.extractedText.slice(0, 100_000) }),
+      });
+      const result = await response.json() as { questions?: QuizQuestion[]; error?: string };
+      if (!response.ok || !result.questions?.length) throw new Error(result.error || "AI 没有返回可用题目");
+      const saved = await saveActiveBank({ name: file.fileName.replace(/\.(docx|pdf)$/i, ""), questions: result.questions, importedAt: new Date().toISOString() });
+      setQuestions(saved.questions);
+      setBankName(saved.name);
+      setActiveBankId(saved.id);
+      setQuestionBanks(await listQuestionBanks());
+      return saved.questions.length;
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "导入失败，请检查文件格式");
-      setImportState((value) => ({ ...value, phase: "导入未完成" }));
+      if (error instanceof DOMException && error.name === "AbortError") throw new Error("AI 识别超过 2 分钟，请缩小文件后重试");
+      throw error;
     } finally {
-      setImportBusy(false);
+      window.clearTimeout(timer);
     }
   }
 
@@ -491,14 +602,65 @@ export default function HomePage() {
     await clearActiveBank();
     setQuestions(questionBank as QuizQuestion[]);
     setBankName("演示题库");
-    setProgress({});
-    setFavorites([]);
-    setNotes({});
-    localStorage.removeItem("hongdou-progress");
-    localStorage.removeItem("hongdou-favorites");
-    localStorage.removeItem("hongdou-notes");
+    setActiveBankId(null);
     setToast("已恢复演示题库，随时可以重新出发");
     window.setTimeout(() => setToast(""), 3600);
+  }
+
+  async function selectQuestionBank(id: string, destination: View = "home") {
+    try {
+      const bank = await activateQuestionBank(id);
+      setQuestions(bank.questions);
+      setBankName(bank.name);
+      setActiveBankId(bank.id);
+      setView(destination);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "暂时无法切换题库");
+    }
+  }
+
+  async function renameSavedBank(id: string, name: string) {
+    const renamed = await renameQuestionBank(id, name);
+    setQuestionBanks((banks) => banks.map((bank) => bank.id === id ? renamed : bank));
+    if (activeBankId === id) setBankName(renamed.name);
+    setToast(`题库已更名为“${renamed.name}” ✍️`);
+    window.setTimeout(() => setToast(""), 3000);
+  }
+
+  async function removeSavedBank(id: string) {
+    await deleteQuestionBank(id);
+    setQuestionBanks((banks) => banks.filter((bank) => bank.id !== id));
+    if (activeBankId === id) await restoreDemoBank();
+    else {
+      setToast("题库已从本机移除，其他学习记录不受影响");
+      window.setTimeout(() => setToast(""), 3000);
+    }
+  }
+
+  async function resetSavedBankProgress(bank: SavedQuestionBank) {
+    const questionIds = new Set(bank.questions.map((question) => question.id));
+    const nextProgress = Object.fromEntries(Object.entries(progress).filter(([id]) => !questionIds.has(id))) as Progress;
+    const nextFavorites = favorites.filter((id) => !questionIds.has(id));
+    const nextNotes = Object.fromEntries(Object.entries(notes).filter(([id]) => !questionIds.has(id)));
+    setProgress(nextProgress);
+    setFavorites(nextFavorites);
+    setNotes(nextNotes);
+    localStorage.setItem("hongdou-progress", JSON.stringify(nextProgress));
+    localStorage.setItem("hongdou-favorites", JSON.stringify(nextFavorites));
+    localStorage.setItem("hongdou-notes", JSON.stringify(nextNotes));
+    setToast(`“${bank.name}”的刷题记录已重置，题库本身仍然保留。`);
+    window.setTimeout(() => setToast(""), 3800);
+  }
+
+  async function openSavedQuestion(bank: SavedQuestionBank, questionId: string) {
+    await selectQuestionBank(bank.id, "quiz");
+    const index = bank.questions.findIndex((question) => question.id === questionId);
+    setSessionQuestions(bank.questions);
+    setCurrentIndex(Math.max(0, index));
+    setSelected([]);
+    setSubmitted(false);
+    setAiTexts({});
+    setAiMessages([]);
   }
 
   return (
@@ -513,6 +675,7 @@ export default function HomePage() {
           progress={homeProgress}
           onPractice={openPractice}
           onImport={() => setShowImport(true)}
+          onBanks={() => setView("banks")}
           onSearch={() => setShowSearch(true)}
           onNotes={() => setShowNotes(true)}
           onCopyright={() => setView("copyright")}
@@ -523,6 +686,21 @@ export default function HomePage() {
           syncStatus={syncStatus}
           quote={homeQuotes[quoteIndex]}
           onAccount={() => setShowAccount(true)}
+        />
+      ) : view === "banks" ? (
+        <QuestionBankPage
+          banks={questionBanks}
+          activeBankId={activeBankId}
+          onHome={() => setView("home")}
+          onImport={() => setShowImport(true)}
+          onSelect={(id) => selectQuestionBank(id, "home")}
+          onRename={renameSavedBank}
+          onDelete={removeSavedBank}
+          onReset={resetSavedBankProgress}
+          onOpenQuestion={openSavedQuestion}
+          progress={progress}
+          favorites={favorites}
+          notes={notes}
         />
       ) : view === "copyright" ? (
         <CopyrightPage bankName={bankName} onHome={() => setView("home")} onRestoreDemo={restoreDemoBank} />
@@ -567,7 +745,7 @@ export default function HomePage() {
       )}
 
       {showSettings && (
-        <SettingsModal settings={settings} counts={scopeCounts} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
+        <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
         <AnswerSheet questions={sessionQuestions} progress={progress} currentIndex={currentIndex} onJump={(next) => { resetQuestion(next); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
@@ -578,12 +756,14 @@ export default function HomePage() {
           busy={importBusy}
           error={importError}
           dragActive={dragActive}
+          reports={importReports}
           fileRef={fileRef}
           onClose={() => setShowImport(false)}
-          onFile={handleFile}
+          onFiles={handleFiles}
           onDrag={setDragActive}
         />
       )}
+      {showAiImport && <AiImportFallbackModal files={aiFallbackFiles} onRecognize={recognizeFileWithAi} onClose={() => { setShowAiImport(false); setAiFallbackFiles([]); }} />}
       {showSearch && <SearchModal questions={questions} onOpen={openQuestion} onClose={() => setShowSearch(false)} />}
       {showNotes && <NotesModal questions={questions} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
       {showAccount && <AccountModal account={account} syncStatus={syncStatus} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pullRemoteState(true)} onExport={exportLearningRecord} onImport={importLearningRecord} />}
@@ -592,27 +772,28 @@ export default function HomePage() {
   );
 }
 
-function Brand({ compact = false }: { compact?: boolean }) {
-  return <div className={`brand ${compact ? "compact" : ""}`}><span className="brand-logo"><Image src="/hongdou-logo.png" alt="红豆生南国蛇形医学标识" width={48} height={48} priority /></span><div><strong>红豆生南国</strong><small>医学知识训练与复盘</small></div></div>;
+function Brand({ compact = false, hideTagline = false }: { compact?: boolean; hideTagline?: boolean }) {
+  return <div className={`brand ${compact ? "compact" : ""}`}><span className="brand-logo"><Image src="/hongdou-logo.png" alt="红豆生南国蛇形医学标识" width={48} height={48} priority /></span><div><strong>红豆生南国</strong>{!hideTagline && <small>医学知识训练与复盘</small>}</div></div>;
 }
 
-function HomeView({ bankName, questions, answered, wrong, accuracy, progress, onPractice, onImport, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, quote, onAccount }: {
+function HomeView({ bankName, questions, answered, wrong, accuracy, progress, onPractice, onImport, onBanks, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, quote, onAccount }: {
   bankName: string; questions: number; answered: number; wrong: number; accuracy: number; progress: number;
-  onPractice: (custom?: Partial<Settings>) => void; onImport: () => void; onSearch: () => void; onNotes: () => void;
+  onPractice: (custom?: Partial<Settings>) => void; onImport: () => void; onBanks: () => void; onSearch: () => void; onNotes: () => void;
   onCopyright: () => void; onToggleTheme: () => void; darkMode: boolean; nickname: string;
   account: AccountSession | null; syncStatus: string; quote: (typeof homeQuotes)[number]; onAccount: () => void;
 }) {
   return <div className="home-shell">
     <aside className="home-sidebar">
-      <Brand />
+      <Brand hideTagline />
       <nav className="side-nav">
         <button className="active"><Home size={19} />首页</button>
+        <button onClick={onBanks}><Database size={19} />我的题库</button>
         <button onClick={() => onPractice({ scope: "all" })}><BookOpen size={19} />开始刷题</button>
         <button onClick={() => onPractice({ scope: "wrong" })}><AlertCircle size={19} />错题复盘{wrong > 0 && <em>{wrong}</em>}</button>
         <button onClick={() => onPractice({ scope: "favorite" })}><Star size={19} />收藏题目</button>
         <button onClick={onNotes}><NotebookPen size={19} />我的笔记</button>
       </nav>
-      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <small className="sync-caption">{syncStatus}</small>}<button onClick={onImport}><Import size={18} />导入题库</button><a className="custom-ai-entry" href="/custom-ai"><Bot size={17} />自定义AI</a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权与使用说明</button><p>本地优先 · 无广告<br />原始题库文件不会上传</p></div>
+      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <small className="sync-caption">{syncStatus}</small>}<button onClick={onImport}><Import size={18} />导入题库</button><a className="custom-ai-entry" href="/custom-ai"><Bot size={17} />自定义AI</a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button><p>本地优先 · 无广告<br />原始题库文件不会上传</p></div>
     </aside>
     <section className="home-main">
       <header className="home-topbar"><div className="home-quote"><p><Sparkles size={13} />{quote.lead}</p><h1>{quote.title}</h1></div><div className="top-actions"><button aria-label="搜索题目" onClick={onSearch}><Search size={19} /></button><button aria-label="切换主题" onClick={onToggleTheme}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><button className="profile" onClick={onAccount} aria-label="同步身份">{(nickname.trim()[0] || "红").toUpperCase()}</button></div></header>
@@ -622,18 +803,146 @@ function HomeView({ bankName, questions, answered, wrong, accuracy, progress, on
       </section>
       <div className="section-heading"><div><span>选择一种节奏</span><h2>开始今天的练习</h2></div><button onClick={() => onPractice()}>更多设置 <ChevronRight size={16} /></button></div>
       <section className="mode-grid">
-        <button className="mode-card red" onClick={() => onPractice({ scope: "unanswered", questionOrder: "sequential" })}><span><BookOpen size={20} /></span><div><strong>顺序练习</strong><p>循序推进，不漏知识点</p></div><ChevronRight size={18} /></button>
-        <button className="mode-card green" onClick={() => onPractice({ scope: "all", questionOrder: "random" })}><span><Shuffle size={20} /></span><div><strong>随机挑战</strong><p>打破位置记忆，检验掌握</p></div><ChevronRight size={18} /></button>
-        <button className="mode-card gold" onClick={() => onPractice({ scope: "wrong", questionOrder: "random" })}><span><RotateCcw size={20} /></span><div><strong>错题复盘</strong><p>{wrong ? `${wrong} 道题等待重新掌握` : "目前没有错题，保持状态"}</p></div><ChevronRight size={18} /></button>
-        <button className="mode-card blue" onClick={() => onPractice({ scope: "all", questionOrder: "random", shuffleOptions: true })}><span><Clock3 size={20} /></span><div><strong>模拟考试</strong><p>随机题序与选项，接近实战</p></div><ChevronRight size={18} /></button>
+        <button className="mode-card red" onClick={() => onPractice({ scope: "unanswered", questionOrder: "sequential" })}><span><BookOpen size={20} /></span><div><strong>顺序练习</strong><p>按原题顺序稳步推进，适合系统完成第一遍。</p></div><ChevronRight size={18} /></button>
+        <button className="mode-card green" onClick={() => onPractice({ scope: "all", questionOrder: "random" })}><span><Shuffle size={20} /></span><div><strong>随机挑战</strong><p>打乱题目位置，检验真正掌握而非顺序记忆。</p></div><ChevronRight size={18} /></button>
+        <button className="mode-card gold" onClick={() => onPractice({ scope: "wrong", questionOrder: "random" })}><span><RotateCcw size={20} /></span><div><strong>错题复盘</strong><p>{wrong ? `${wrong} 道错题集中回炉，把薄弱点逐个拿下。` : "当前没有错题，可以先完成一组新练习。"}</p></div><ChevronRight size={18} /></button>
+        <button className="mode-card blue" onClick={() => onPractice({ scope: "all", questionOrder: "random", shuffleOptions: true })}><span><Clock3 size={20} /></span><div><strong>模拟考试</strong><p>题序与选项同时随机，减少提示，更接近实战。</p></div><ChevronRight size={18} /></button>
       </section>
       <section className="home-lower">
         <article className="insight-card"><div className="card-title"><span><Target size={18} /></span><div><strong>学习洞察</strong><p>你的个人复盘视图</p></div></div><div className="metrics"><div><b>{answered}</b><span>累计完成</span></div><div><b>{accuracy}%</b><span>正确率</span></div><div><b>{wrong}</b><span>待巩固</span></div></div><div className="tip"><Lightbulb size={17} /><p>{wrong ? "优先重做错题，比盲目刷新题更有效。" : "先完成一组题，系统就能开始生成复盘建议。"}</p></div></article>
         <article className="ai-preview"><div className="ai-preview-head"><span className="ai-orb"><BrainCircuit size={22} /></span><div><small>AI 学习讨论区</small><strong>不是只给答案，而是陪你把题想明白</strong></div></div><div className="ai-chips"><span>大神总结</span><span>易错提示</span><span>知微</span></div><p>提交答案后，针对当前题目生成总结、辨析常见误区，并继续追问。</p><button onClick={() => onPractice({ scope: "unanswered" })}>去体验 <ArrowRight size={16} /></button></article>
       </section>
-      <footer className="home-footer"><span>© 2026 红豆生南国</span><button onClick={onCopyright}>版权、隐私与医学声明 <ChevronRight size={14} /></button></footer>
+      <footer className="home-footer"><span>© 2026 红豆生南国</span><button onClick={onCopyright}>版权、免责声明与用户协议 <ChevronRight size={14} /></button></footer>
     </section>
   </div>;
+}
+
+function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onHome, onImport, onSelect, onRename, onDelete, onReset, onOpenQuestion }: {
+  banks: SavedQuestionBank[];
+  activeBankId: string | null;
+  progress: Progress;
+  favorites: string[];
+  notes: Record<string, string>;
+  onHome: () => void;
+  onImport: () => void;
+  onSelect: (id: string) => Promise<void>;
+  onRename: (id: string, name: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onReset: (bank: SavedQuestionBank) => Promise<void>;
+  onOpenQuestion: (bank: SavedQuestionBank, questionId: string) => Promise<void>;
+}) {
+  const [query, setQuery] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sharingBank, setSharingBank] = useState<SavedQuestionBank | null>(null);
+  const [resettingBank, setResettingBank] = useState<SavedQuestionBank | null>(null);
+  const keyword = query.trim().toLowerCase();
+  const totalQuestions = banks.reduce((sum, bank) => sum + bank.questions.length, 0);
+  const multipleQuestions = banks.reduce((sum, bank) => sum + bank.questions.filter((question) => question.multiple).length, 0);
+  const searchResults = useMemo(() => {
+    if (!keyword) return [];
+    return banks.flatMap((bank) => bank.questions.map((question) => ({ bank, question }))).filter(({ bank, question }) => {
+      const haystack = `${bank.name} ${question.category} ${question.stem} ${question.options.map((option) => option.text).join(" ")}`.toLowerCase();
+      return haystack.includes(keyword);
+    });
+  }, [banks, keyword]);
+
+  async function submitRename(bank: SavedQuestionBank) {
+    const name = renameValue.trim();
+    if (!name || name === bank.name) return setRenamingId(null);
+    await onRename(bank.id, name.slice(0, 60));
+    setRenamingId(null);
+  }
+
+  return <div className="bank-page">
+    <header className="bank-page-header"><button className="icon-button" onClick={onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div><span>本机题库空间</span><strong>我的题库</strong></div><button className="primary-action" onClick={onImport}><Import size={17} />导入题库</button></header>
+    <main>
+      <section className="bank-page-intro"><div><span className="overline"><Database size={15} /> QUESTION LIBRARY</span><h1>把散落的题目，<br />收进自己的知识书架。</h1><p>已导入题库都保存在当前浏览器。可随时切换、重命名、跨题库检索，或在确认版权边界后分享给同学。</p></div><div className="bank-overview"><article><b>{banks.length}</b><span>已导入题库</span></article><article><b>{totalQuestions}</b><span>收录题目</span></article><article><b>{multipleQuestions}</b><span>多选题</span></article></div></section>
+      <label className="bank-global-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="全局搜索：题库名、疾病、症状或知识点" /><span>{keyword ? `${searchResults.length} 条结果` : "搜索全部题库"}</span></label>
+      {keyword ? <section className="bank-search-section"><div className="bank-section-title"><div><span>GLOBAL SEARCH</span><h2>全局搜索结果</h2></div><button onClick={() => setQuery("")}><X size={16} />清除搜索</button></div>{searchResults.length ? <div className="bank-question-results">{searchResults.slice(0, 100).map(({ bank, question }) => <button key={`${bank.id}-${question.id}`} onClick={() => onOpenQuestion(bank, question.id)}><span className={question.multiple ? "multi" : ""}>{question.multiple ? "多选" : "单选"}</span><div><strong>{question.stem}</strong><small><Database size={13} />{bank.name} · {question.category} · 原题号 {question.sourceNumber}</small></div><ChevronRight /></button>)}</div> : <div className="bank-empty"><CircleHelp /><h2>还没有找到这条知识线索</h2><p>换一个更短的关键词，或者检查是否已经导入对应题库。</p></div>}</section> : <section className="bank-library-section"><div className="bank-section-title"><div><span>LOCAL COLLECTION</span><h2>已导入的题库</h2></div><p>点击“设为当前”即可回到首页继续学习</p></div>{banks.length ? <div className="bank-card-grid">{banks.map((bank) => {
+        const singleCount = bank.questions.filter((question) => !question.multiple).length;
+        const multipleCount = bank.questions.length - singleCount;
+        const isActive = bank.id === activeBankId;
+        const isRenaming = renamingId === bank.id;
+        const isDeleting = deletingId === bank.id;
+        return <article className={`bank-card ${isActive ? "active" : ""}`} key={bank.id}>
+          <header><span className="bank-card-icon"><Database /></span>{isActive && <em><Check size={13} />当前题库</em>}</header>
+          {isRenaming ? <form className="bank-rename" onSubmit={(event) => { event.preventDefault(); void submitRename(bank); }}><input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} maxLength={60} /><div><button type="submit"><Check size={15} />保存</button><button type="button" onClick={() => setRenamingId(null)}><X size={15} />取消</button></div></form> : <><h3>{bank.name}</h3><p>{bank.questions.length} 道题 · 单选 {singleCount} · 多选 {multipleCount}</p></>}
+          <div className="bank-card-meta"><span>导入于 {new Date(bank.importedAt).toLocaleDateString("zh-CN")}</span><span>仅存本机</span></div>
+          {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="重命名" title="重命名" onClick={() => { setRenamingId(bank.id); setRenameValue(bank.name); }}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
+        </article>;
+      })}</div> : <div className="bank-empty"><Database /><h2>题库书架还是空的</h2><p>导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。</p><button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button></div>}</section>}
+    </main>
+    {sharingBank && <ShareBankModal bank={sharingBank} onClose={() => setSharingBank(null)} />}
+    {resettingBank && <ResetBankProgressModal bank={resettingBank} progress={progress} favorites={favorites} notes={notes} onReset={onReset} onClose={() => setResettingBank(null)} />}
+  </div>;
+}
+
+function ResetBankProgressModal({ bank, progress, favorites, notes, onReset, onClose }: {
+  bank: SavedQuestionBank;
+  progress: Progress;
+  favorites: string[];
+  notes: Record<string, string>;
+  onReset: (bank: SavedQuestionBank) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [accepted, setAccepted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const questionIds = new Set(bank.questions.map((question) => question.id));
+  const answered = bank.questions.filter((question) => progress[question.id]).length;
+  const wrong = bank.questions.filter((question) => progress[question.id] === "wrong").length;
+  const favoriteCount = favorites.filter((id) => questionIds.has(id)).length;
+  const noteCount = Object.entries(notes).filter(([id, note]) => questionIds.has(id) && note.trim()).length;
+  const hasRecords = answered + favoriteCount + noteCount > 0;
+
+  async function confirmReset() {
+    if (!accepted || !hasRecords) return;
+    setBusy(true);
+    await onReset(bank);
+    setBusy(false);
+    onClose();
+  }
+
+  return <div className="modal-layer reset-progress-layer" onMouseDown={() => !busy && onClose()}><section className="reset-progress-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>IRREVERSIBLE ACTION</span><h2>重置“{bank.name}”的刷题记录</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="reset-warning"><AlertCircle /><div><strong>{hasRecords ? "请谨慎操作：清空后无法撤销" : "这份题库目前没有可重置的记录"}</strong><p>题库与题目本身会保留，但该题库的完成进度、错题状态、收藏和个人笔记会被清空。</p></div></div><div className="reset-impact-grid"><article><b>{answered}</b><span>已答记录</span></article><article><b>{wrong}</b><span>错题记录</span></article><article><b>{favoriteCount}</b><span>收藏题目</span></article><article><b>{noteCount}</b><span>个人笔记</span></article></div><p className="reset-sync-note"><Cloud />若已开启多端同步，这次重置也会同步到云端和其他设备。</p><button className={`reset-confirm-check ${accepted ? "checked" : ""}`} role="checkbox" aria-checked={accepted} disabled={!hasRecords} onClick={() => setAccepted((value) => !value)}><i>{accepted && <Check />}</i><span>我已了解上述记录将永久清空，并确认继续。</span></button><footer><button className="ghost-action" onClick={onClose} disabled={busy}>取消</button><button className="reset-danger-action" onClick={() => void confirmReset()} disabled={!accepted || !hasRecords || busy}><RotateCcw />{busy ? "正在重置…" : "永久重置记录"}</button></footer></section></div>;
+}
+
+function ShareBankModal({ bank, onClose }: { bank: SavedQuestionBank; onClose: () => void }) {
+  const [accepted, setAccepted] = useState(false);
+  const [message, setMessage] = useState("");
+
+  function makeFile() {
+    const payload = createSharedQuestionBankPackage(bank);
+    const safeName = bank.name.replace(/[\\/:*?"<>|]/g, "-").slice(0, 60) || "红豆题库";
+    return new File([JSON.stringify(payload, null, 2)], `${safeName}.hongdou.json`, { type: "application/json" });
+  }
+
+  function downloadFile(file: File) {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setMessage("分享文件已保存，可发送给同学；对方能在“导入题库”中直接打开。 ✨");
+  }
+
+  async function systemShare() {
+    const file = makeFile();
+    try {
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+        await navigator.share({ title: bank.name, text: "红豆生南国题库分享", files: [file] });
+        setMessage("题库已交给系统分享面板。");
+      } else {
+        downloadFile(file);
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      downloadFile(file);
+    }
+  }
+
+  return <div className="modal-layer" onMouseDown={onClose}><section className="share-bank-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>SHARE WITH CARE</span><h2>分享“{bank.name}”</h2></div><button onClick={onClose}><X /></button></header><div className="share-copyright-alert"><ShieldCheck /><div><strong>分享之前，请先确认版权与隐私边界</strong><p>请确认你拥有这份题库的使用与传播权限。不要分享未经授权的教材、课程内容，也不要包含姓名、学号、患者资料或其他敏感信息。</p></div></div><div className="share-summary"><Database /><div><strong>{bank.questions.length} 道题</strong><span>文件包含题干、选项与答案，可被“红豆生南国”再次导入</span></div></div><button className={`copyright-check ${accepted ? "checked" : ""}`} role="checkbox" aria-checked={accepted} onClick={() => setAccepted((value) => !value)}><i>{accepted && <Check />}</i><span>我已确认拥有必要权限，并会尊重题库原作者与相关权利人的版权。</span></button>{message && <p className="share-message">{message}</p>}<footer><button className="ghost-action" onClick={() => accepted && downloadFile(makeFile())} disabled={!accepted}><Download />保存分享文件</button><button className="primary-action" onClick={() => void systemShare()} disabled={!accepted}><Share2 />系统分享</button></footer></section></div>;
 }
 
 function QuizView(props: {
@@ -695,11 +1004,11 @@ function LearningPanel({ current, submitted, note, aiMode, aiTexts, aiMessages, 
   </aside>;
 }
 
-function SettingsModal({ settings, counts, onChange, onClose, onStart }: { settings: Settings; counts: Record<Scope, number>; onChange: (settings: Settings) => void; onClose: () => void; onStart: () => void }) {
+function SettingsModal({ settings, counts, typeCounts, onChange, onClose, onStart }: { settings: Settings; counts: Record<Scope, number>; typeCounts: { single: number; multiple: number; all: number }; onChange: (settings: Settings) => void; onClose: () => void; onStart: () => void }) {
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
   return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>开始之前</span><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
     ["all", "全部题目", Library], ["unanswered", "未练题目", Zap], ["wrong", "错题复盘", RotateCcw], ["favorite", "收藏题目", Star],
-  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="适合快速刷题" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /><SwitchRow label="夜间模式" detail="降低暗光环境刺激" value={settings.darkMode} onChange={(value) => update("darkMode", value)} /></div><button className="start-button" onClick={onStart}><Play size={17} fill="currentColor" />开始练习 <span>{counts[settings.scope]} 道</span></button></section></div>;
+  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div><div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋多选</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /><SwitchRow label="夜间模式" detail="降低暗光环境刺激" value={settings.darkMode} onChange={(value) => update("darkMode", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
 }
 
 function SwitchRow({ label, detail, value, onChange }: { label: string; detail: string; value: boolean; onChange: (value: boolean) => void }) {
@@ -710,8 +1019,33 @@ function AnswerSheet({ questions, progress, currentIndex, onJump, onClose }: { q
   return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose}><X /></button></header><div className="answer-legend"><span><i className="done" />已答</span><span><i className="wrong" />错题</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => <button key={`${question.id}-${index}`} className={`${progress[question.id] ?? ""} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{index + 1}</button>)}</div></section></div>;
 }
 
-function ImportModal({ state, busy, error, dragActive, fileRef, onClose, onFile, onDrag }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFile: (file: File) => void; onDrag: (value: boolean) => void }) {
-  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>本地处理，不上传原文件</span><h2>导入自己的题库</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const file = event.dataTransfer.files[0]; if (file) onFile(file); }}><span className="upload-art"><Upload /></span><strong>拖入 Word 或 PDF</strong><p>支持 .docx、文字型 PDF 与扫描 PDF（OCR）</p><button onClick={() => fileRef.current?.click()} disabled={busy}>选择文件</button><input ref={fileRef} type="file" accept=".docx,.pdf" hidden onChange={(event) => event.target.files?.[0] && onFile(event.target.files[0])} /></div><div className="format-row"><div><FileText /><span><b>Word</b><small>直接提取题干、选项与答案</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>优先提取文字，扫描件自动识别</small></span></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p></div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">OCR 首次使用会下载中文识别模型；大文件建议保持页面打开。所有识别都在浏览器内完成。</p></section></div>;
+function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onDrag }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onDrag: (value: boolean) => void }) {
+  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>批量导入 · 原文件默认在本机处理</span><h2>导入自己的题库</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>一次拖入一个或多个文件</strong><p>支持 .docx、文字型 PDF、扫描 PDF 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".docx,.pdf,.json,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>提取题干、选项、答案及题型</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>逐个处理，单个文件最长等待 3 分钟</small></span></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p></div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">每次成功导入都会收入“我的题库”。普通识别失败时会先征求你的同意，再决定是否把提取出的文字交给已配置的 AI 整理。</p></section></div>;
+}
+
+function AiImportFallbackModal({ files, onRecognize, onClose }: { files: AiFallbackFile[]; onRecognize: (file: AiFallbackFile) => Promise<number>; onClose: () => void }) {
+  const [rows, setRows] = useState(() => files.map((file) => ({ ...file, status: "waiting" as "waiting" | "processing" | "success" | "failed", detail: "等待你的确认" })));
+  const [busy, setBusy] = useState(false);
+
+  async function startRecognition() {
+    setBusy(true);
+    for (const file of files) {
+      const completed = rows.find((row) => row.id === file.id)?.status === "success";
+      if (completed) continue;
+      setRows((value) => value.map((row) => row.id === file.id ? { ...row, status: "processing", detail: "AI 正在关联题目与文件答案区…" } : row));
+      try {
+        const count = await onRecognize(file);
+        setRows((value) => value.map((row) => row.id === file.id ? { ...row, status: "success", detail: `已整理 ${count} 道题，请在练习中复核答案` } : row));
+      } catch (error) {
+        setRows((value) => value.map((row) => row.id === file.id ? { ...row, status: "failed", detail: error instanceof Error ? error.message : "AI 识别失败，请稍后重试" } : row));
+      }
+    }
+    setBusy(false);
+  }
+
+  const hasProcessed = rows.some((row) => row.status === "success" || row.status === "failed");
+  const hasRetry = rows.some((row) => row.status === "failed");
+  return <div className="modal-layer ai-import-layer" onMouseDown={() => !busy && onClose()}><section className="ai-import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>OPTIONAL AI RECOGNITION</span><h2>普通模式没有认出答案结构</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="ai-import-intro"><BrainCircuit /><div><strong>是否用 AI 快速整理文件中的答案部分？</strong><p>AI 会尝试把末尾答案表、非标准答案标记与题号关联，不再要求固定使用“题目＋答案：A”的格式。</p></div></div><div className="ai-import-warning"><ShieldCheck /><p>继续后，仅把浏览器已提取的文字发送给你配置的 AI 厂商，不发送原始文件；可能消耗接口额度。AI 可能识别错误，导入后请抽查答案，并确认文件不含患者或其他敏感信息。</p></div><div className="ai-import-files">{rows.map((row) => <div className={row.status} key={row.id}>{row.status === "success" ? <CheckCircle2 /> : row.status === "failed" ? <AlertCircle /> : row.status === "processing" ? <RefreshCw className="spin" /> : <FileText />}<span><strong>{row.fileName}</strong><small>{row.detail}</small></span></div>)}</div><footer><button className="ghost-action" onClick={onClose} disabled={busy}>{hasProcessed ? "完成并关闭" : "暂不使用 AI"}</button><button className="primary-action" onClick={() => void startRecognition()} disabled={busy || (!hasRetry && rows.every((row) => row.status === "success"))}><Sparkles />{busy ? "AI 正在识别…" : hasRetry ? "重试失败文件" : "同意并用 AI 识别"}</button></footer></section></div>;
 }
 
 function AccountModal({ account, syncStatus, nickname: initialNickname, onClose, onAuthenticated, onLogout, onDelete, onSync, onExport, onImport }: {
@@ -781,7 +1115,96 @@ function SuccessToast({ message, onClose }: { message: string; onClose: () => vo
 }
 
 function CopyrightPage({ bankName, onHome, onRestoreDemo }: { bankName: string; onHome: () => void; onRestoreDemo: () => void }) {
-  return <div className="copyright-page"><header><button className="icon-button" onClick={onHome} aria-label="返回首页"><ChevronLeft /></button><Brand /><span>版权与使用说明</span></header><main><span className="overline"><FileText size={15} /> COPYRIGHT & USE</span><h1>让知识被认真对待，<br />也让边界清晰可见。</h1><p className="copyright-lead">“红豆生南国”是一款面向医学学习场景的题库训练工具。当前题库：{bankName}。</p><section className="copyright-grid"><article><b>01</b><h2>产品与品牌</h2><p>产品名称、界面设计、蛇杖红豆标识及相关视觉资产由本项目保留。未经许可，不应直接复制为另一款同名或近似产品。</p></article><article><b>02</b><h2>题库内容</h2><p>演示题仅用于功能展示。用户导入的 Word、PDF 及其题目版权归原权利人所有；请确保拥有学习、整理与使用权限。</p></article><article><b>03</b><h2>医学声明</h2><p>题目答案、AI 总结与讨论内容仅用于学习辅助，不能替代教材、现行指南、执业判断或对患者的诊断与治疗建议。</p></article><article><b>04</b><h2>隐私与数据</h2><p>原始学号不会写入数据库，只用于生成不可逆同步标识。学习记录与共享评论可由用户导出或注销删除；原始题库文件仍在浏览器本机处理。</p></article></section><div className="copyright-actions"><button className="primary-action" onClick={onHome}>返回学习</button><button className="ghost-action" onClick={onRestoreDemo}>恢复演示题库</button></div><footer><span>© 2026 红豆生南国</span><span>AveCove Elapse v0.2 · 医学知识训练与复盘</span></footer></main></div>;
+  return (
+    <div className="copyright-page">
+      <header>
+        <button className="icon-button" onClick={onHome} aria-label="返回首页"><ChevronLeft /></button>
+        <Brand />
+        <span>版权、免责声明与用户协议</span>
+      </header>
+      <main>
+        <span className="overline"><FileText size={15} /> COPYRIGHT · DISCLAIMER · TERMS</span>
+        <h1>让知识被认真对待，<br />也让边界清晰可见。</h1>
+        <p className="copyright-lead">“红豆生南国”是一款面向医学学习场景的题库训练工具。当前题库：{bankName}。本页说明使用本产品时必须遵守的版权、隐私、医学与行为边界。</p>
+
+        <section className="legal-alert" aria-labelledby="legal-alert-title">
+          <span className="legal-alert-icon"><AlertCircle /></span>
+          <div>
+            <span>使用前请特别阅读</span>
+            <h2 id="legal-alert-title">重要免责声明与权利义务提示</h2>
+            <p><strong>题库内容的授权责任、患者隐私保护、AI 与医学信息的使用限制、违规内容处理及责任边界</strong>与你的权益直接相关。继续导入、分享、评论或调用 AI 前，请完整阅读以下协议；如不同意，请停止使用对应功能。</p>
+          </div>
+        </section>
+
+        <section className="copyright-grid" aria-label="核心使用边界">
+          <article><b>01</b><h2>产品与品牌</h2><p>产品名称、界面设计、蛇杖红豆标识及相关视觉资产由本项目保留。未经书面许可，不得冒用品牌、移除权利标识，或复制成同名、近似且足以造成混淆的产品。</p></article>
+          <article><b>02</b><h2>题库内容</h2><p>演示题仅用于功能展示。用户导入或分享的 Word、PDF、JSON、教材与课程内容版权归原权利人所有；你应在操作前确认拥有合法的学习、整理、复制与传播权限。</p></article>
+          <article><b>03</b><h2>医学与 AI 声明</h2><p>题目答案、AI 总结与讨论内容可能存在错误、遗漏或时效差异，仅用于学习辅助，不构成医疗服务，不能替代现行教材、指南、执业判断、诊断或治疗建议。</p></article>
+          <article><b>04</b><h2>隐私与数据</h2><p>原始学号只用于生成不可逆同步标识。原始题库文件默认在浏览器处理；普通识别失败时，仅在你明确同意后，提取文字才会发送至所选 AI 厂商。严禁导入可识别患者身份的资料。</p></article>
+        </section>
+
+        <section className="terms-section" aria-labelledby="terms-title">
+          <header className="terms-head">
+            <div><span>TERMS OF RESPONSIBLE USE</span><h2 id="terms-title">免责声明与使用协议</h2></div>
+            <p>版本 1.0 · 生效日期 2026-07-22</p>
+          </header>
+          <div className="terms-list">
+            <article>
+              <b>01 · 接受与适用范围</b>
+              <p>本协议适用于题库导入、练习、同步、AI、评论与分享等功能。你实际使用相应功能，即表示已阅读并同意与该功能相关的条款；如不同意，请停止使用。未成年人应在监护人知情和指导下使用。</p>
+            </article>
+            <article className="terms-emphasis">
+              <b>02 · 内容权利保证与版权保护</b>
+              <p><strong>你保证对上传、导入、发布或分享的内容拥有合法权利或充分授权。</strong>不得擅自传播教材、课程、付费题库、试卷或他人的整理成果，不得转售、公开建库或规避权利人的技术保护。收到具备初步证明的侵权通知后，运营者可先行限制访问、下架或删除相关内容，并通知相关用户依法处理。</p>
+            </article>
+            <article>
+              <b>03 · 禁止行为</b>
+              <p>不得发布违法、有害、歧视、欺诈或侵权内容；不得冒用他人身份、骚扰他人、批量抓取数据、攻击或干扰服务、绕过安全措施、恶意消耗 AI 或邮件资源，也不得利用本产品组织作弊、盗版传播或其他违法活动。</p>
+            </article>
+            <article className="terms-emphasis">
+              <b>04 · 患者隐私与个人信息</b>
+              <p><strong>不得导入患者姓名、住院号、身份证号、联系方式、面部影像、原始检查资料或其他可识别个人的信息。</strong>使用者必须先完成去标识化，并确认具备合法处理依据。邮箱、学号、密钥等也不得写入题目、评论或公开分享文件。</p>
+            </article>
+            <article className="terms-emphasis">
+              <b>05 · 医学与 AI 使用边界</b>
+              <p><strong>本产品不是医疗机构，也不提供诊断、处方、治疗或急救意见。</strong>AI 可能生成不准确、过时或虚构内容，题库答案也可能存在争议。请结合权威教材、最新指南和教师意见复核，严禁直接据此对患者作出临床决定；紧急情况应联系正规医疗机构。</p>
+            </article>
+            <article>
+              <b>06 · 第三方服务与可用性</b>
+              <p>AI、邮箱、云存储等第三方服务同时受其自身条款、隐私政策、额度和可用性约束。运营者会在合理范围内维护服务，但不承诺永不中断、完全无错或适合所有特定目的。重要题库与学习记录请自行保留备份。</p>
+            </article>
+            <article className="terms-emphasis">
+              <b>07 · 责任边界</b>
+              <p>因用户无权导入或传播内容、泄露个人信息、违规使用 AI 或违反本协议产生的责任，由实施相应行为者依法承担。运营者仅在法律规定范围内承担责任；<strong>本协议不排除或限制依法不得排除的责任，包括因故意或重大过失造成的人身损害或财产损失。</strong></p>
+            </article>
+            <article>
+              <b>08 · 举报、侵权通知与协议更新</b>
+              <p>权利人可向具体部署站点公布的运营者渠道提交身份证明、权属材料、涉嫌侵权内容位置及真实联系方式。运营者核验后依法采取措施。正式上线前，站点运营者必须公布有效的版权与隐私联系邮箱。协议有重大更新时，应以醒目方式提示，并在依法需要时重新取得同意。</p>
+            </article>
+          </div>
+          <div className="legal-reference">
+            <ShieldCheck />
+            <div>
+              <strong>法律参考与效力边界</strong>
+              <p>本页依据中华人民共和国现行民事、著作权、个人信息保护及生成式 AI 相关规则整理。它用于清晰说明产品边界，不构成针对具体争议的法律意见；公网运营、商业收费或大规模开放前，建议由中国执业律师结合运营主体、服务器所在地和实际数据流进行复核。</p>
+              <nav aria-label="法律参考">
+                <a href="https://gongbao.court.gov.cn/Details/dfe439fb9450f0525bd7e7b50a6242.html" target="_blank" rel="noreferrer">《中华人民共和国民法典》</a>
+                <a href="https://flk.npc.gov.cn/detail?fileId=&id=ff808081752b7d430175e4766bab1557&title=%E4%B8%AD%E5%8D%8E%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD%E8%91%97%E4%BD%9C%E6%9D%83%E6%B3%95&type=" target="_blank" rel="noreferrer">《中华人民共和国著作权法》</a>
+                <a href="https://www.samr.gov.cn/wljys/gzzd/art/2023/art_3ef1e889c1e644d4b65b5f5c7f432386.html" target="_blank" rel="noreferrer">《中华人民共和国个人信息保护法》</a>
+                <a href="https://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm" target="_blank" rel="noreferrer">《生成式人工智能服务管理暂行办法》</a>
+              </nav>
+            </div>
+          </div>
+        </section>
+
+        <div className="copyright-actions">
+          <button className="primary-action" onClick={onHome}>我已了解，返回学习</button>
+          <button className="ghost-action" onClick={onRestoreDemo}>恢复演示题库</button>
+        </div>
+        <footer><span>© 2026 红豆生南国 · 保留相关权利</span><span>AveCove Elapse v0.3 · 医学知识训练与复盘</span></footer>
+      </main>
+    </div>
+  );
 }
 
 function EmptySession({ onHome }: { onHome: () => void }) {

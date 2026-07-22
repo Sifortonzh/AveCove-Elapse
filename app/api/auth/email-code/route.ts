@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       [email, hashLoginCode(email, code)],
     );
     const delivery = await sendLoginCode(email, code);
-    return NextResponse.json({ ok: true, message: "验证码已发送，10 分钟内有效。", ...("debugCode" in delivery ? { debugCode: delivery.debugCode } : {}) });
+    return NextResponse.json({ ok: true, message: "验证码已发送，10 分钟内有效。如未收到，请检查垃圾邮件 / Spam 文件夹。📮", ...("debugCode" in delivery ? { debugCode: delivery.debugCode } : {}) });
   } catch (error) {
     const message = error instanceof Error && error.message.includes("邮箱验证码") ? error.message : "暂时无法发送验证码，请稍后再试。";
     return NextResponse.json({ error: message }, { status: 503 });

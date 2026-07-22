@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
-  title: "红豆生南国｜医学知识训练与复盘",
+  title: "红豆生南国",
   description: "无广告的现代医学刷题工具，支持 Word、PDF、OCR 导入，以及 AI 驱动的总结、易错提示和伴随式答疑。",
   icons: {
     icon: "/hongdou-logo.png",

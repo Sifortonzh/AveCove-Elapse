@@ -1,14 +1,36 @@
 import type { QuizQuestion } from "./question-parser";
 
 export type SavedQuestionBank = {
+  id: string;
   name: string;
   questions: QuizQuestion[];
   importedAt: string;
+  updatedAt: string;
+};
+
+export type QuestionBankInput = {
+  id?: string;
+  name: string;
+  questions: QuizQuestion[];
+  importedAt: string;
+  updatedAt?: string;
+};
+
+export type SharedQuestionBankPackage = {
+  format: "hongdou-question-bank";
+  version: 1;
+  exportedAt: string;
+  bank: {
+    name: string;
+    questions: QuizQuestion[];
+  };
 };
 
 const DB_NAME = "hongdou-local-data";
 const STORE_NAME = "question-banks";
-const ACTIVE_KEY = "active-bank";
+const LEGACY_ACTIVE_KEY = "active-bank";
+const ACTIVE_ID_KEY = "active-bank-id";
+const BANK_KEY_PREFIX = "bank:";
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -22,24 +44,137 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-export async function loadActiveBank(): Promise<SavedQuestionBank | null> {
+function createBankId() {
+  return globalThis.crypto?.randomUUID?.() ?? `bank-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function bankKey(id: string) {
+  return `${BANK_KEY_PREFIX}${id}`;
+}
+
+function normalizeQuestion(question: QuizQuestion, fallbackId: string): QuizQuestion {
+  const answer = [...new Set((question.answer ?? []).map((item) => String(item).toUpperCase()))];
+  return {
+    ...question,
+    id: question.id || fallbackId,
+    answer,
+    multiple: answer.length > 1,
+  };
+}
+
+function normalizeBank(input: QuestionBankInput): SavedQuestionBank {
+  const isNew = !input.id;
+  const id = input.id ?? createBankId();
+  const now = new Date().toISOString();
+  return {
+    id,
+    name: input.name.trim() || "未命名题库",
+    questions: input.questions.map((question, index) => normalizeQuestion({
+      ...question,
+      id: isNew ? `${id}:${index + 1}` : question.id,
+    }, `${id}:${index + 1}`)),
+    importedAt: input.importedAt || now,
+    updatedAt: input.updatedAt || now,
+  };
+}
+
+async function readValue<T>(key: IDBValidKey): Promise<T | undefined> {
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readonly");
-    const request = transaction.objectStore(STORE_NAME).get(ACTIVE_KEY);
-    request.onsuccess = () => resolve((request.result as SavedQuestionBank | undefined) ?? null);
+    const request = transaction.objectStore(STORE_NAME).get(key);
+    request.onsuccess = () => resolve(request.result as T | undefined);
     request.onerror = () => reject(request.error ?? new Error("读取本地题库失败"));
     transaction.oncomplete = () => database.close();
   });
 }
 
-export async function saveActiveBank(bank: SavedQuestionBank): Promise<void> {
+export async function listQuestionBanks(): Promise<SavedQuestionBank[]> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const banks: SavedQuestionBank[] = [];
+    const transaction = database.transaction(STORE_NAME, "readonly");
+    const request = transaction.objectStore(STORE_NAME).openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      if (typeof cursor.key === "string" && cursor.key.startsWith(BANK_KEY_PREFIX)) {
+        const raw = cursor.value as QuestionBankInput;
+        banks.push(normalizeBank({ ...raw, id: raw.id ?? cursor.key.slice(BANK_KEY_PREFIX.length) }));
+      }
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error ?? new Error("读取题库列表失败"));
+    transaction.oncomplete = () => {
+      database.close();
+      resolve(banks.sort((left, right) => right.importedAt.localeCompare(left.importedAt)));
+    };
+  });
+}
+
+export async function loadQuestionBank(id: string): Promise<SavedQuestionBank | null> {
+  const value = await readValue<QuestionBankInput>(bankKey(id));
+  return value ? normalizeBank({ ...value, id }) : null;
+}
+
+export async function loadActiveBank(): Promise<SavedQuestionBank | null> {
+  const activeId = await readValue<string>(ACTIVE_ID_KEY);
+  if (activeId) return loadQuestionBank(activeId);
+
+  // Transparently migrate the single-bank format used by earlier versions.
+  const legacy = await readValue<Omit<QuestionBankInput, "id">>(LEGACY_ACTIVE_KEY);
+  if (!legacy?.questions?.length) return null;
+  return saveActiveBank({ ...legacy, id: createBankId() });
+}
+
+export async function saveQuestionBank(input: QuestionBankInput, makeActive = false): Promise<SavedQuestionBank> {
+  const bank = normalizeBank(input);
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put(bank, ACTIVE_KEY);
-    transaction.oncomplete = () => { database.close(); resolve(); };
+    const store = transaction.objectStore(STORE_NAME);
+    store.put(bank, bankKey(bank.id));
+    if (makeActive) store.put(bank.id, ACTIVE_ID_KEY);
+    store.delete(LEGACY_ACTIVE_KEY);
+    transaction.oncomplete = () => { database.close(); resolve(bank); };
     transaction.onerror = () => reject(transaction.error ?? new Error("保存本地题库失败"));
+  });
+}
+
+export async function saveActiveBank(bank: QuestionBankInput): Promise<SavedQuestionBank> {
+  return saveQuestionBank(bank, true);
+}
+
+export async function activateQuestionBank(id: string): Promise<SavedQuestionBank> {
+  const bank = await loadQuestionBank(id);
+  if (!bank) throw new Error("找不到这份题库，它可能已被删除");
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    transaction.objectStore(STORE_NAME).put(id, ACTIVE_ID_KEY);
+    transaction.oncomplete = () => { database.close(); resolve(bank); };
+    transaction.onerror = () => reject(transaction.error ?? new Error("切换题库失败"));
+  });
+}
+
+export async function renameQuestionBank(id: string, name: string): Promise<SavedQuestionBank> {
+  const bank = await loadQuestionBank(id);
+  if (!bank) throw new Error("找不到要重命名的题库");
+  return saveQuestionBank({ ...bank, name, updatedAt: new Date().toISOString() });
+}
+
+export async function deleteQuestionBank(id: string): Promise<void> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete(bankKey(id));
+    const activeRequest = store.get(ACTIVE_ID_KEY);
+    activeRequest.onsuccess = () => {
+      if (activeRequest.result === id) store.delete(ACTIVE_ID_KEY);
+    };
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => reject(transaction.error ?? new Error("删除题库失败"));
   });
 }
 
@@ -47,8 +182,35 @@ export async function clearActiveBank(): Promise<void> {
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).delete(ACTIVE_KEY);
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete(ACTIVE_ID_KEY);
+    store.delete(LEGACY_ACTIVE_KEY);
     transaction.oncomplete = () => { database.close(); resolve(); };
     transaction.onerror = () => reject(transaction.error ?? new Error("恢复演示题库失败"));
   });
+}
+
+export function createSharedQuestionBankPackage(bank: SavedQuestionBank): SharedQuestionBankPackage {
+  return {
+    format: "hongdou-question-bank",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    bank: { name: bank.name, questions: bank.questions },
+  };
+}
+
+export function parseSharedQuestionBankPackage(value: unknown): QuestionBankInput {
+  const payload = value as Partial<SharedQuestionBankPackage>;
+  if (payload?.format !== "hongdou-question-bank" || payload.version !== 1 || !payload.bank || !Array.isArray(payload.bank.questions)) {
+    throw new Error("这不是可识别的红豆题库分享文件");
+  }
+  const questions = payload.bank.questions.filter((question): question is QuizQuestion => Boolean(
+    question && typeof question.stem === "string" && Array.isArray(question.options) && Array.isArray(question.answer),
+  ));
+  if (!questions.length) throw new Error("分享文件中没有可用题目");
+  return {
+    name: typeof payload.bank.name === "string" ? payload.bank.name : "分享题库",
+    questions,
+    importedAt: new Date().toISOString(),
+  };
 }
