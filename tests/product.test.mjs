@@ -20,9 +20,10 @@ test("ships a small, clearly labelled demo bank", async () => {
 });
 
 test("includes the requested product flows and copy", async () => {
-  const [page, layout, explainRoute, auth] = await Promise.all([
+  const [page, layout, styles, explainRoute, auth] = await Promise.all([
     text("app/page.tsx"),
     text("app/layout.tsx"),
+    text("app/globals.css"),
     text("app/api/explain/route.ts"),
     text("app/lib/server/auth.ts"),
   ]);
@@ -43,6 +44,9 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /const homeQuotes/);
   assert.match(page, /不存原始学号/);
   assert.match(page, /自定义AI/);
+  assert.match(styles, /--type-serif:"Times New Roman","Songti SC","STSong","SimSun",serif/);
+  assert.match(styles, /--text-base:16pt/);
+  assert.match(styles, /font-family:var\(--type-serif\)!important/);
   assert.match(explainRoute, /followUp/);
   assert.match(explainRoute, /history/);
   assert.match(explainRoute, /AI_DAILY_LIMIT/);
