@@ -9,7 +9,19 @@ export type StoredAiConfig = {
   apiKeyCipher: string;
 };
 
-export type ActiveAiConfig = Omit<StoredAiConfig, "apiKeyCipher"> & { apiKey: string; source: "database" | "environment" };
+export type ActiveAiConfig = Omit<StoredAiConfig, "apiKeyCipher"> & { apiKey: string; source: "database" | "environment" | "personal" };
+
+export function resolvePersonalAiConfig(input: unknown): ActiveAiConfig | null {
+  if (!input || typeof input !== "object") return null;
+  const value = input as { provider?: unknown; baseUrl?: unknown; model?: unknown; apiKey?: unknown };
+  const provider = findProvider(String(value.provider ?? ""));
+  if (!provider || provider.id === "custom") return null;
+  const baseUrl = cleanBaseUrl(String(value.baseUrl ?? ""));
+  const model = String(value.model ?? "").trim();
+  const apiKey = String(value.apiKey ?? "").trim();
+  if (baseUrl !== cleanBaseUrl(provider.baseUrl) || !model || model.length > 160 || apiKey.length < 8 || apiKey.length > 1000) return null;
+  return { provider: provider.id, baseUrl, model, apiKey, source: "personal" };
+}
 
 export async function readStoredAiConfig() {
   const rows = await query<{ value: StoredAiConfig }>("SELECT value FROM app_settings WHERE key = 'ai_config' LIMIT 1");

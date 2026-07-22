@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +22,13 @@ export const metadata: Metadata = {
     description: "无广告 · 私有题库 · AI 伴学",
     images: ["/hongdou-share.png"],
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f5f1e9",
 };
 
 export default function RootLayout({

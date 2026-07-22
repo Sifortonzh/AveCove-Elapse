@@ -40,8 +40,8 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 
 ## Why this project
 
-- **Bring your own material.** Import personal `.docx`, `.pdf`, scanned PDF, or portable `.hongdou.json` banks.
-- **Local-first by default.** Original question-bank files are parsed in the browser and are not uploaded to the application server.
+- **Bring your own material.** Import personal `.doc`, `.docx`, `.pdf`, scanned PDF, or portable `.hongdou.json` banks.
+- **Local-first by default.** `.docx` and PDF files are parsed in the browser. Legacy `.doc` files are extracted in self-hosted server memory, with no original-file persistence.
 - **A real library, not a one-off importer.** Every imported bank is retained in “My Question Banks” with switching, renaming, search, sharing, deletion, and per-bank learning-record reset.
 - **Transparent AI boundaries.** AI is optional. If normal parsing fails, extracted text is sent to the configured provider only after explicit user consent.
 - **Medical-learning safeguards.** AI output and community content are framed as learning aids, never as clinical diagnosis or treatment guidance.
@@ -54,12 +54,12 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 ### Question-bank library
 
 - Batch import multiple files in one selection or drag-and-drop operation.
-- Parse Word, text PDF, scanned PDF with browser OCR, and portable Red Bean JSON banks.
+- Parse legacy `.doc`, modern `.docx`, text PDF, scanned PDF with browser OCR, and portable Red Bean JSON banks.
 - Show per-file waiting, processing, success, AI-ready, failure, and timeout states.
 - Preserve every successful import in browser IndexedDB.
 - Switch the active bank without deleting learning records from other banks.
 - Rename or delete an imported bank.
-- Search stems, options, categories, and bank names across all local banks.
+- Search stems, options, categories, source numbers, and bank names across all local banks, with relevance ranking and highlighted matches.
 - Export a portable `.hongdou.json` file after a copyright and privacy confirmation.
 - Reset one bank’s answers, wrong-answer state, favorites, and notes through an irreversible-action confirmation UI while preserving the bank itself.
 
@@ -74,6 +74,23 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 - Answer sheet, direct question navigation, current-bank search, favorites, and personal notes.
 - Local progress persistence and import/export of learning records.
 - Light and dark themes.
+
+### English Learning beta
+
+- A separate **AveCove Elapse · English Lab** workspace that does not change the medical-practice flow.
+- CET, postgraduate entrance exam, IELTS, and TOEFL stage switching.
+- A browser-local **Test Library** for imported Word, legacy `.doc`, PDF, and image files.
+- Automatic stage and section mapping for cloze, reading, paragraph matching, translation, listening resources, and writing.
+- Dedicated support for the current postgraduate English I structure: Use of English 1–20, four Reading Part A texts 21–40, Part B paragraph matching 41–45, Translation 46–50, and Writing 51–52.
+- Dedicated CET-6 mapping for Writing; Listening Conversations, Passages, and Recordings (1–25); Reading Section A word bank (26–35), Section B long-reading matching (36–45), Section C close reading (46–55); and Chinese-to-English Translation.
+- Hybrid PDF extraction keeps trustworthy text-layer pages and runs Chinese-English OCR only on scanned pages, which is especially useful for mixed answer-analysis booklets.
+- Imported answer keys and available source explanations stay attached to their questions; missing answers are never guessed.
+- Word-bank choices are single-use within a section, and imported responses remain available while moving between questions and sections.
+- Cloze, reading, listening-resource, and writing demonstrations remain available without importing a file.
+- Click-to-translate reading words with a browser-local wordbook.
+- Text selection highlights plus real-time pen, marker, eraser, undo, and clear tools over the passage.
+- Answer submission followed by the correct option, passage evidence, and distractor analysis.
+- Responsive layouts for desktop, tablet, and iPhone-width screens.
 
 ### AI-assisted learning
 
@@ -111,17 +128,19 @@ Question-bank contents remain browser-local by design. Cross-device learning sta
 
 ```mermaid
 flowchart LR
-    A["Word / PDF / shared JSON"] --> B["Browser extraction"]
-    B --> C{"Normal parser succeeds?"}
-    C -->|Yes| D["Save bank to IndexedDB"]
-    C -->|No| E{"User approves AI fallback?"}
-    E -->|No| F["Stop without uploading text"]
-    E -->|Yes| G["Send extracted text to configured AI provider"]
-    G --> H["Validate structured questions and explicit answers"]
-    H --> D
+    A[".docx / PDF / shared JSON"] --> B["Browser extraction"]
+    C["Legacy .doc"] --> D["In-memory extraction on self-hosted server"]
+    B --> E{"Normal parser succeeds?"}
+    D --> E
+    E -->|Yes| F["Save bank to IndexedDB"]
+    E -->|No| G{"User approves AI fallback?"}
+    G -->|No| H["Stop without sending text to AI"]
+    G -->|Yes| I["Send extracted text to configured AI provider"]
+    I --> J["Validate structured questions and explicit answers"]
+    J --> F
 ```
 
-The original document is never sent by the AI fallback. Only browser-extracted text is submitted, and only after the user confirms that the file contains no patient data or other sensitive information. AI recognition can be wrong; imported answers should be sampled and verified.
+The original document is never sent to the AI provider. Only extracted text is submitted, and only after the user confirms that the file contains no patient data or other sensitive information. AI recognition can be wrong; imported answers should be sampled and verified.
 
 ## Architecture
 
@@ -243,7 +262,10 @@ SMTP_FROM=红豆生南国 <no-reply@example.com>
 
 ### AI configuration
 
-The recommended path is the `/custom-ai` page. The selected configuration is encrypted before being stored in the `app_settings` table. `OPENAI_API_KEY` and `OPENAI_MODEL` in `.env` are optional OpenAI fallbacks.
+- `/custom-ai` is self-service: users can supply their own DeepSeek, Qwen, Kimi, Doubao, GLM, OpenAI, Gemini, or Claude key without administrator approval. The configuration stays in that browser and is relayed over HTTPS only when a request is made; it is not written to the site database.
+- `/admin/ai` is for the site-wide provider. Administrators authenticate with `ADMIN_KEY`; the public provider key is encrypted before being stored in `app_settings`. `OPENAI_API_KEY` and `OPENAI_MODEL` remain optional OpenAI fallbacks.
+
+Personal configuration takes precedence over the public provider. To prevent SSRF, self-service users can select only the official endpoints of preset providers; custom compatible gateways remain an administrator setting.
 
 Set `AI_DAILY_LIMIT` to control requests per anonymous visitor or sync identity, and configure billing alerts in the provider console.
 
@@ -346,15 +368,14 @@ This repository does not currently declare an open-source license. Read [COPYRIG
 
 ## Roadmap
 
-- English-language practice mode.
-- CET-4/CET-6 and postgraduate entrance-exam question structures.
-- Reading-comprehension passages with grouped questions.
-- Cloze, vocabulary, translation, and writing practice workflows.
+- Broader CET-4, IELTS, TOEFL, and publisher-specific exam-layout coverage, plus an editable import-review screen.
+- QR/audio extraction and source-file attachment review for listening papers.
+- AI-assisted vocabulary completion, sentence translation, and writing feedback.
 - Bank-aware cross-device identity and conflict handling.
 - Stronger import review, answer auditing, and duplicate detection.
 - Optional spaced-repetition scheduling and learning analytics.
 
-Roadmap items are plans, not guarantees. English-exam support is not included in the current release.
+Roadmap items are plans, not guarantees. English imports are currently stored in the browser-local Test Library; review the detected sections and answers before high-stakes use.
 
 ## Documentation
 

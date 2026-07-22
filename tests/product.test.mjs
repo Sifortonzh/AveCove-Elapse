@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
 async function text(path) {
   return readFile(new URL(path, root), "utf8");
+}
+
+async function loadEnglishParser() {
+  const source = (await text("app/lib/english-test.ts")).replace(/^import .*?;\n/, "");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
 test("ships a small, clearly labelled demo bank", async () => {
@@ -50,6 +57,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /const homeQuotes/);
   assert.match(page, /不存原始学号/);
   assert.match(page, /自定义AI/);
+  assert.match(page, /\.docx \/ PDF 本机处理 · 旧 \.doc 仅内存转换/);
   assert.match(page, /function QuestionBankPage/);
   assert.match(page, /function ResetBankProgressModal/);
   assert.match(page, /请谨慎操作：清空后无法撤销/);
@@ -59,7 +67,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /仅做单选/);
   assert.match(page, /单选＋多选/);
   assert.match(page, /active\.questionTypes === "single" && question\.multiple/);
-  assert.match(page, /multiple accept="\.docx,\.pdf,\.json,application\/json"/);
+  assert.match(page, /multiple accept="\.doc,\.docx,\.pdf,\.json,application\/msword,application\/json"/);
   assert.match(page, /function AiImportFallbackModal/);
   assert.match(page, /答对后 0\.7 秒进入下一题/);
   assert.match(styles, /Independent desktop scroll regions/);
@@ -76,15 +84,31 @@ test("includes the requested product flows and copy", async () => {
   assert.doesNotMatch(auth, /studentId.*INSERT/i);
 });
 
-test("supports batch imports, timeouts, and opt-in AI answer recognition", async () => {
-  const [fileImport, aiImportRoute, emailRoute] = await Promise.all([
+test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recognition", async () => {
+  const [fileImport, docRoute, search, aiImportRoute, emailRoute, styles] = await Promise.all([
     text("app/lib/file-import.ts"),
+    text("app/api/extract-doc/route.ts"),
+    text("app/lib/question-search.ts"),
     text("app/api/import-ai/route.ts"),
     text("app/api/auth/email-code/route.ts"),
+    text("app/globals.css"),
   ]);
 
   assert.match(fileImport, /class QuestionRecognitionError/);
   assert.match(fileImport, /extractedText/);
+  assert.match(fileImport, /extension === "doc"/);
+  assert.match(fileImport, /fetch\("\/api\/extract-doc"/);
+  assert.match(fileImport, /pagesToOcr/);
+  assert.match(fileImport, /mergedTexts\[pageNumber - 1\]/);
+  assert.match(docRoute, /OLE_SIGNATURE/);
+  assert.match(docRoute, /MAX_DOC_BYTES/);
+  assert.match(docRoute, /word-extractor/);
+  assert.match(docRoute, /"Cache-Control": "no-store"/);
+  assert.match(search, /export function searchQuestionBanks/);
+  assert.match(search, /bankName === term \? 220 : 130/);
+  assert.match(search, /options\.some/);
+  assert.match(styles, /\.search-highlight/);
+  assert.match(styles, /\.search-result-location/);
   assert.match(aiImportRoute, /只能采用文件明确提供的答案，不得自行推测/);
   assert.match(aiImportRoute, /答案表/);
   assert.match(emailRoute, /垃圾邮件 \/ Spam 文件夹/);
@@ -100,6 +124,189 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /hongdou-question-bank/);
   assert.match(localBank, /multiple: answer\.length > 1/);
   assert.match(localBank, /Transparently migrate the single-bank format/);
+});
+
+test("ships an isolated, responsive English learning demo", async () => {
+  const [page, english, styles, layout] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/components/EnglishLearningView.tsx"),
+    text("app/globals.css"),
+    text("app/layout.tsx"),
+  ]);
+
+  assert.match(page, /English Learning/);
+  assert.match(page, /learningMode === "english"/);
+  assert.match(english, /CET-4 \/ CET-6/);
+  assert.match(english, /National entrance exam/);
+  assert.match(english, /IELTS/);
+  assert.match(english, /TOEFL/);
+  assert.match(english, /function ClozeExercise/);
+  assert.match(english, /function ImportedClozePractice/);
+  assert.match(english, /sanitizeEnglishPassage/);
+  assert.match(english, /function ReadingExercise/);
+  assert.match(english, /function ListeningExercise/);
+  assert.match(english, /function WritingExercise/);
+  assert.match(english, /AveCove Elapse/);
+  assert.doesNotMatch(english, /<strong>Red Bean<\/strong>/);
+  assert.match(english, /Click any English word for an instant meaning/);
+  assert.match(english, /function InteractivePassage/);
+  assert.match(english, /annotation-layer/);
+  assert.match(english, /CLICK-TO-TRANSLATE/);
+  assert.match(english, /Add to wordbook/);
+  assert.match(english, /avecove-english-vocabulary-v1/);
+  assert.match(english, /Why B\?/);
+  assert.match(english, /QR RESOURCE DETECTED/);
+  assert.match(english, /type="file" multiple/);
+  assert.match(english, /Test Library/);
+  assert.match(english, /extractEnglishTestFile/);
+  assert.match(english, /hongdou-logo\.png/);
+  assert.match(english, /openBlank === id/);
+  assert.match(styles, /\.cloze-blank\.open:not\(\.answered\)/);
+  assert.match(styles, /\.imported-cloze-card/);
+  assert.match(styles, /\.test-library-grid/);
+  assert.match(styles, /iPhone and compact mobile layout/);
+  assert.match(styles, /env\(safe-area-inset-bottom\)/);
+  assert.match(layout, /viewportFit: "cover"/);
+});
+
+test("classifies the current postgraduate English I paper structure", async () => {
+  const { parseEnglishTestText, sanitizeEnglishPassage } = await loadEnglishParser();
+  const sample = `2025年全国硕士研究生招生考试英语（一）真题
+Section I Use of English
+Directions: Read the text. The city is 1 to storms and 2 below the sea.
+1 [A] alien [B] prone [C] late [D] quiet
+2 [A] briefly [B] loudly [C] gradually [D] rarely
+Section II Reading Comprehension
+Part A
+Text 1
+The passage explains a research result.
+21.What is the main idea?
+[A] One [B] Two [C] Three [D] Four
+Part B
+Directions: For Questions 41-45, choose paragraphs A-G. Paragraph F and G have been placed.
+[A] Paragraph alpha.
+[B] Paragraph beta.
+[C] Paragraph gamma.
+[D] Paragraph delta.
+[E] Paragraph epsilon.
+[F] Paragraph fixed one.
+[G] Paragraph fixed two.
+Section III Translation
+Directions: Translate the underlined segments.
+(46) Citizen science creates wider participation.
+Section IV Writing
+Part A
+51. Directions: Reply to your classmate.
+Part B
+52. Directions: Describe the chart.
+2025年英语（一）真题解析
+Section I Use of English
+1.【答案】B
+【解析】The context requires the phrase prone to.
+2.【答案】C
+【解析】The adverb describes a slow change.
+21.【答案】D
+【解析】The final option summarizes the passage.
+41.【答案】A
+42.【答案】B
+43.【答案】C
+44.【答案】D
+45.【答案】E`;
+  const parsed = parseEnglishTestText(sample, "2025-postgraduate-english-I.pdf");
+
+  assert.equal(parsed.stage, "postgraduate");
+  assert.deepEqual(parsed.sections.map((section) => section.kind), ["cloze", "reading", "matching", "translation", "writing", "writing"]);
+  assert.equal(parsed.sections[0].questions.length, 2);
+  assert.doesNotMatch(parsed.sections[0].passage, /Directions?:/i);
+  assert.match(parsed.sections[0].passage, /The city is 1 to storms/);
+  parsed.sections.filter((section) => section.kind !== "writing").forEach((section) => assert.doesNotMatch(section.passage, /Directions?:/i));
+  assert.equal(parsed.sections[0].questions[0].answer, "B");
+  assert.match(parsed.sections[0].questions[0].explanation, /prone to/);
+  assert.equal(parsed.sections[1].questions[0].number, "21");
+  assert.equal(parsed.sections[2].questions.length, 5);
+  assert.deepEqual(parsed.sections[2].questions[0].options.map((option) => option.label), ["A", "B", "C", "D", "E"]);
+  assert.equal(parsed.sections[3].questions[0].number, "46");
+  assert.doesNotMatch(parsed.sections.at(-1).passage, /【答案】/);
+  assert.equal(sanitizeEnglishPassage("Directions: Read the following text. Choose the best word and mark A, B, C or D on ANSWER SHEET 1. (10 points) Located below the sea."), "Located below the sea.");
+});
+
+test("classifies the current CET-6 writing, listening, reading, and translation structure", async () => {
+  const { parseEnglishTestText } = await loadEnglishParser();
+  const sample = `2025年6月六级真题
+Part I Writing
+Write an essay about career preparation.
+Part II Listening Comprehension
+Section A
+Conversation One
+M: A computer needs repair. [1]
+1. What did the woman do?
+A) She waited.
+B) She left.
+C) She called the company.
+D) She repaired it.
+解析：故选C
+Part III Reading Comprehension
+Section A
+Campus volunteers were [26] by an environmental project.
+A) aesthetic B) chronic C) emissions D) intrigued E) outlet
+答案详解
+26. D) intrigued
+Section B
+A) Libraries connect neighbours. [36]
+B) Libraries provide free courses. [37]
+答案详解
+36. 题干译文 People build connections in libraries. 答案解析 A.
+37. 题干译文 Libraries offer learning opportunities. 答案解析 B.
+Section C
+Passage One
+Attendance reflects wider social problems.
+46. What does chronic absence indicate?
+A) A minor issue.
+B) Wider hardship.
+C) Better instruction.
+D) More holidays.
+解析：故选B
+Part IV Translation
+请将以下关于中国天宫空间站的段落译成英语。`;
+  const parsed = parseEnglishTestText(sample, "2025.06-CET6.pdf");
+
+  assert.equal(parsed.stage, "cet");
+  assert.equal(parsed.examVariant, "CET-6");
+  assert.deepEqual(parsed.sections.map((section) => section.kind), ["writing", "listening", "word-bank", "long-reading", "reading", "translation"]);
+  assert.equal(parsed.sections[1].questions[0].answer, "C");
+  assert.equal(parsed.sections[2].questions.length, 10);
+  assert.equal(parsed.sections[2].questions[0].number, "26");
+  assert.equal(parsed.sections[2].questions[0].answer, "D");
+  assert.deepEqual(parsed.sections[2].questions[0].options.map((option) => option.label), ["A", "B", "C", "D", "E"]);
+  assert.equal(parsed.sections[3].questions.length, 10);
+  assert.equal(parsed.sections[3].questions[0].answer, "A");
+  assert.doesNotMatch(parsed.sections[3].questions[0].stem, /^题干译文/);
+  assert.equal(parsed.sections[4].questions[0].number, "46");
+  assert.equal(parsed.sections[4].questions[0].answer, "B");
+  assert.match(parsed.sections[5].title, /Chinese to English/);
+});
+
+test("separates personal BYOK AI from administrator-wide AI", async () => {
+  const [page, personalPage, personalStore, explainRoute, importRoute, providers, adminPage] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/custom-ai/page.tsx"),
+    text("app/lib/personal-ai.ts"),
+    text("app/api/explain/route.ts"),
+    text("app/api/import-ai/route.ts"),
+    text("app/lib/server/ai-providers.ts"),
+    text("app/admin/ai/page.tsx"),
+  ]);
+
+  assert.doesNotMatch(personalPage, /adminKey/);
+  assert.match(personalPage, /不需要管理员批准/);
+  assert.match(personalPage, /配置保存在此浏览器/);
+  assert.match(personalStore, /localStorage/);
+  assert.match(page, /readPersonalAiConfig/);
+  assert.match(explainRoute, /personalAi/);
+  assert.match(importRoute, /personalAi/);
+  assert.match(providers, /resolvePersonalAiConfig/);
+  assert.match(providers, /provider\.id === "custom"/);
+  assert.match(adminPage, /公共 AI 配置/);
 });
 
 test("ships shared data, moderation, branding, and deployment material", async () => {

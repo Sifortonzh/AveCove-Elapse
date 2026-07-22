@@ -1,11 +1,21 @@
 import { deriveVisitorId, readSession } from "@/app/lib/server/auth";
-import { generateAiText, loadActiveAiConfig } from "@/app/lib/server/ai-providers";
+import { generateAiText, loadActiveAiConfig, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
 import { query } from "@/app/lib/server/db";
 import { requestFingerprint } from "@/app/lib/server/rate-limit";
 
 export async function POST(request: Request) {
-  const aiConfig = await loadActiveAiConfig();
-  if (!aiConfig) return Response.json({ error: "AI 解析尚未启用。管理员可从首页左下角进入“自定义AI”完成配置。" }, { status: 503 });
+  const body = await request.json() as {
+    question?: { stem?: string; options?: Array<{ label: string; text: string }>; answer?: string[] };
+    mode?: "summary" | "pitfall" | "companion";
+    followUp?: string;
+    history?: Array<{ role?: "user" | "assistant"; text?: string }>;
+    personalAi?: unknown;
+  };
+  const personalRequested = body.personalAi !== undefined;
+  const personalConfig = resolvePersonalAiConfig(body.personalAi);
+  if (personalRequested && !personalConfig) return Response.json({ error: "个人 AI 配置无效，请回到“自定义AI”重新保存。" }, { status: 400 });
+  const aiConfig = personalConfig ?? await loadActiveAiConfig();
+  if (!aiConfig) return Response.json({ error: "AI 解析尚未启用。你可以从首页左下角进入“自定义AI”，填写自己的 API Key，无需管理员批准。" }, { status: 503 });
 
   const dailyLimit = Math.max(1, Number(process.env.AI_DAILY_LIMIT || 20));
   const session = readSession(request);
@@ -25,12 +35,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "AI 额度服务暂时不可用，请稍后重试。" }, { status: 503 });
   }
 
-  const body = await request.json() as {
-    question?: { stem?: string; options?: Array<{ label: string; text: string }>; answer?: string[] };
-    mode?: "summary" | "pitfall" | "companion";
-    followUp?: string;
-    history?: Array<{ role?: "user" | "assistant"; text?: string }>;
-  };
   const question = body.question;
   if (!question?.stem || !question.options?.length || !question.answer?.length) {
     return Response.json({ error: "题目信息不完整。" }, { status: 400 });

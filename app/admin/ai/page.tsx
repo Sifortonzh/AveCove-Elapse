@@ -84,7 +84,7 @@ export default function AiConfigPage() {
   }
 
   return <main className="admin-page ai-config-page">
-    <header><div><span><Bot /> AveCove Elapse</span><h1>自定义AI</h1><p>在服务器端选择厂商、模型与接口地址，浏览器不会读取已保存的密钥。</p></div><nav className="admin-nav"><Link href="/admin"><ChevronLeft />评论审核</Link><Link href="/">返回刷题页</Link></nav></header>
+    <header><div><span><Bot /> AveCove Elapse</span><h1>公共 AI 配置</h1><p>管理员为全站提供公共 AI；普通用户也可在“自定义AI”中接入自己的 Key，无需管理员批准。</p></div><nav className="admin-nav"><Link href="/admin"><ChevronLeft />评论审核</Link><Link href="/custom-ai">个人 AI 页面</Link><Link href="/">返回刷题页</Link></nav></header>
     <section className="admin-auth"><input type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} placeholder="管理员密钥" autoComplete="current-password" /><button onClick={load} disabled={busy}><RefreshCw />{busy ? "正在读取" : "读取配置"}</button><p>{message}</p></section>
     <form className="ai-config-card" onSubmit={save}>
       <div className="ai-config-intro"><span><Sparkles /></span><div><strong>多厂商接入</strong><p>预置国内外常用厂商，也支持 OpenAI 兼容的自定义网关。接口地址和模型名都可以修改。</p></div></div>

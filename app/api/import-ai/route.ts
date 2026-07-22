@@ -1,4 +1,4 @@
-import { generateAiText, loadActiveAiConfig } from "@/app/lib/server/ai-providers";
+import { generateAiText, loadActiveAiConfig, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
 import { allowRequest, requestFingerprint } from "@/app/lib/server/rate-limit";
 import type { QuizQuestion } from "@/app/lib/question-parser";
 
@@ -47,14 +47,16 @@ export async function POST(request: Request) {
   if (!allowRequest(`ai-import:${requestFingerprint(request)}`, 8, 60 * 60_000)) {
     return Response.json({ error: "AI 文件识别请求过于频繁，请稍后再试。" }, { status: 429 });
   }
-  const aiConfig = await loadActiveAiConfig();
-  if (!aiConfig) return Response.json({ error: "尚未配置 AI。请先从首页左下角进入“自定义AI”完成配置。" }, { status: 503 });
-
-  const body = await request.json() as { fileName?: unknown; text?: unknown };
+  const body = await request.json() as { fileName?: unknown; text?: unknown; personalAi?: unknown };
+  const personalRequested = body.personalAi !== undefined;
+  const personalConfig = resolvePersonalAiConfig(body.personalAi);
+  if (personalRequested && !personalConfig) return Response.json({ error: "个人 AI 配置无效，请回到“自定义AI”重新保存。" }, { status: 400 });
+  const aiConfig = personalConfig ?? await loadActiveAiConfig();
+  if (!aiConfig) return Response.json({ error: "尚未配置 AI。你可以从首页左下角进入“自定义AI”，填写自己的 API Key，无需管理员批准。" }, { status: 503 });
   const fileName = typeof body.fileName === "string" ? body.fileName.slice(0, 180) : "导入题库";
   const text = typeof body.text === "string" ? body.text.trim().slice(0, 100_000) : "";
   if (text.length < 20) return Response.json({ error: "文件中没有足够的可识别文字。" }, { status: 400 });
-  const category = fileName.replace(/\.(docx|pdf)$/i, "") || "AI 整理题库";
+  const category = fileName.replace(/\.(doc|docx|pdf)$/i, "") || "AI 整理题库";
 
   const prompt = [
     "你是严谨的考试题库结构化助手。请整理下面从文件中提取的文字，并只返回合法 JSON，不要使用 Markdown 代码块。",
