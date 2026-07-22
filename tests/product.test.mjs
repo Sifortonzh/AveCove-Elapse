@@ -150,6 +150,8 @@ test("ships shared data, moderation, branding, and deployment material", async (
   ]);
 
   assert.match(compose, /env_file:\s*\.env/);
+  assert.match(compose, /127\.0\.0\.1:3011:3000/);
+  assert.match(compose, /profiles: \["caddy"\]/);
   assert.match(compose, /postgres:16-alpine/);
   assert.match(exampleEnv, /OPENAI_API_KEY/);
   assert.match(exampleEnv, /CONFIG_ENCRYPTION_KEY/);

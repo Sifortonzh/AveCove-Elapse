@@ -32,6 +32,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "127.0.0.1:3011:3000"
     expose:
       - "3000"
     healthcheck:
@@ -47,6 +49,7 @@ services:
         max-file: "5"
 
   caddy:
+    profiles: ["caddy"]
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
