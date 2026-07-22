@@ -47,6 +47,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(styles, /--type-serif:serif/);
   assert.match(styles, /--text-base:14pt/);
   assert.match(styles, /font-family:var\(--type-serif\)!important/);
+  assert.match(styles, /\.top-actions \.profile\{[^}]*background:var\(--green\)/);
   assert.match(explainRoute, /followUp/);
   assert.match(explainRoute, /history/);
   assert.match(explainRoute, /AI_DAILY_LIMIT/);
