@@ -14,9 +14,11 @@ import EnglishLearningView from "./components/EnglishLearningView";
 import { importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
 import {
   activateQuestionBank, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
-  listQuestionBanks, loadActiveBank, parseSharedQuestionBankPackage, renameQuestionBank,
-  saveActiveBank, type SavedQuestionBank,
+  exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, mergeQuestionBankSyncBundle,
+  parseSharedQuestionBankPackage, renameQuestionBank, saveActiveBank, type SavedQuestionBank,
 } from "./lib/local-bank";
+import { exportEnglishTestSyncBundle, mergeEnglishTestSyncBundle } from "./lib/english-test";
+import { exportEnglishPracticeSyncBundle, mergeEnglishPracticeSyncBundle } from "./lib/english-practice";
 import type { QuizQuestion } from "./lib/question-parser";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
@@ -24,6 +26,7 @@ import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 type Progress = Record<string, "correct" | "wrong">;
 type Scope = "all" | "unanswered" | "wrong" | "favorite";
 type QuestionTypeScope = "single" | "all";
+type ThemeMode = "system" | "light" | "dark";
 type AiMode = "summary" | "pitfall" | "companion";
 type View = "home" | "quiz" | "banks" | "copyright";
 type AiMessage = { role: "user" | "assistant"; text: string };
@@ -39,6 +42,7 @@ type Settings = {
   autoNext: boolean;
   autoFavoriteWrong: boolean;
   darkMode: boolean;
+  themeMode: ThemeMode;
 };
 
 const defaultSettings: Settings = {
@@ -49,7 +53,17 @@ const defaultSettings: Settings = {
   autoNext: false,
   autoFavoriteWrong: true,
   darkMode: false,
+  themeMode: "system",
 };
+
+function normalizeSettings(value: unknown): Settings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return defaultSettings;
+  const stored = value as Partial<Settings>;
+  const themeMode: ThemeMode = stored.themeMode === "light" || stored.themeMode === "dark" || stored.themeMode === "system"
+    ? stored.themeMode
+    : stored.darkMode ? "dark" : "system";
+  return { ...defaultSettings, ...stored, themeMode, darkMode: themeMode === "dark" };
+}
 
 const homeQuotes = [
   { lead: "今日一页，胜过明日十页。", title: "把每一次判断，都练成临床思维。" },
@@ -153,6 +167,9 @@ export default function HomePage() {
   const [showAccount, setShowAccount] = useState(false);
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState("尚未开启多端同步");
+  const [syncRevision, setSyncRevision] = useState(0);
+  const [systemDark, setSystemDark] = useState(false);
+  const [localReady, setLocalReady] = useState(false);
   const [toast, setToast] = useState("");
   const [quoteIndex, setQuoteIndex] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -173,7 +190,7 @@ export default function HomePage() {
         setProgress(JSON.parse(localStorage.getItem("hongdou-progress") ?? localStorage.getItem("medquiz-progress") ?? "{}"));
         setFavorites(JSON.parse(localStorage.getItem("hongdou-favorites") ?? "[]"));
         setNotes(JSON.parse(localStorage.getItem("hongdou-notes") ?? "{}"));
-        setSettings({ ...defaultSettings, ...JSON.parse(localStorage.getItem("hongdou-settings") ?? "{}") });
+        setSettings(normalizeSettings(JSON.parse(localStorage.getItem("hongdou-settings") ?? "{}")));
         setNickname(localStorage.getItem("hongdou-nickname") ?? "红豆同学");
       } catch {
         // Ignore invalid local data and keep safe defaults.
@@ -183,10 +200,12 @@ export default function HomePage() {
       const banks = await listQuestionBanks().catch(() => []);
       if (!active) return;
       setQuestionBanks(banks);
-      if (!saved?.questions.length) return;
-      setQuestions(saved.questions);
-      setBankName(saved.name);
-      setActiveBankId(saved.id);
+      if (saved?.questions.length) {
+        setQuestions(saved.questions);
+        setBankName(saved.name);
+        setActiveBankId(saved.id);
+      }
+      setLocalReady(true);
     }
 
     void restoreLocalData();
@@ -195,12 +214,27 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setSystemDark(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+
+  useEffect(() => {
+    const changed = () => setSyncRevision((value) => value + 1);
+    window.addEventListener("avecove-sync-change", changed);
+    return () => window.removeEventListener("avecove-sync-change", changed);
+  }, []);
+
   function switchLearningMode(mode: "medical" | "english") {
     setLearningMode(mode);
     localStorage.setItem("avecove-learning-mode", mode);
   }
 
   useEffect(() => {
+    if (!localReady) return;
     let active = true;
     async function restoreAccount() {
       try {
@@ -217,26 +251,14 @@ export default function HomePage() {
     void restoreAccount();
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [localReady]);
 
   useEffect(() => {
     if (!account || !syncReady) return;
-    const timer = window.setTimeout(async () => {
-      setSyncStatus("正在安全同步… ☁️");
-      try {
-        const response = await fetch("/api/sync", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ state: { progress, favorites, notes, settings, nickname } }),
-        });
-        if (!response.ok) throw new Error("sync failed");
-        setSyncStatus(`已同步 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} ☁️`);
-      } catch {
-        setSyncStatus("同步暂时离线，本机记录仍已保存");
-      }
-    }, 900);
+    const timer = window.setTimeout(() => { void pushRemoteState(); }, 1_200);
     return () => window.clearTimeout(timer);
-  }, [account, favorites, nickname, notes, progress, settings, syncReady]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, favorites, nickname, notes, progress, settings, syncReady, syncRevision]);
 
   const current = sessionQuestions[currentIndex];
   const currentId = current?.id;
@@ -286,11 +308,36 @@ export default function HomePage() {
   }, [activeBankId, bankName, questionBanks, questions]);
 
   function saveSettings(next: Settings) {
-    setSettings(next);
-    localStorage.setItem("hongdou-settings", JSON.stringify(next));
+    const normalized = normalizeSettings(next);
+    setSettings(normalized);
+    localStorage.setItem("hongdou-settings", JSON.stringify(normalized));
   }
 
-  function applyLearningState(state: Record<string, unknown>) {
+  async function refreshLocalQuestionBanks() {
+    const banks = await listQuestionBanks().catch(() => []);
+    const active = await loadActiveBank().catch(() => null);
+    setQuestionBanks(banks);
+    if (active?.questions.length) {
+      setQuestions(active.questions);
+      setBankName(active.name);
+      setActiveBankId(active.id);
+    }
+  }
+
+  async function collectLearningState() {
+    const [questionBanksBundle, englishTests] = await Promise.all([
+      exportQuestionBankSyncBundle(),
+      exportEnglishTestSyncBundle(),
+    ]);
+    return {
+      progress, favorites, notes, settings, nickname, bankName,
+      questionBanks: questionBanksBundle,
+      englishTests,
+      englishPractice: exportEnglishPracticeSyncBundle(),
+    };
+  }
+
+  async function applyLearningState(state: Record<string, unknown>) {
     if (state.progress && typeof state.progress === "object" && !Array.isArray(state.progress)) {
       setProgress(state.progress as Progress);
       localStorage.setItem("hongdou-progress", JSON.stringify(state.progress));
@@ -305,11 +352,32 @@ export default function HomePage() {
       localStorage.setItem("hongdou-notes", JSON.stringify(state.notes));
     }
     if (state.settings && typeof state.settings === "object" && !Array.isArray(state.settings)) {
-      const next = { ...defaultSettings, ...(state.settings as Partial<Settings>) };
+      const next = normalizeSettings(state.settings);
       setSettings(next);
       localStorage.setItem("hongdou-settings", JSON.stringify(next));
     }
     if (typeof state.nickname === "string" && state.nickname.trim()) saveNickname(state.nickname);
+    const bankResult = await mergeQuestionBankSyncBundle(state.questionBanks);
+    await mergeEnglishTestSyncBundle(state.englishTests);
+    mergeEnglishPracticeSyncBundle(state.englishPractice);
+    if (bankResult.merged || bankResult.activeBankId) await refreshLocalQuestionBanks();
+  }
+
+  async function pushRemoteState(showMessage = false) {
+    setSyncStatus("正在安全同步题库与学习记录… ☁️");
+    try {
+      const response = await fetch("/api/sync", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: await collectLearningState() }),
+      });
+      const result = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "sync failed");
+      setSyncStatus(`题库与记录已同步 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} ☁️`);
+      if (showMessage) setToast("题库、刷题记录与英文练习已安全同步 ☁️✨");
+    } catch (error) {
+      setSyncStatus(error instanceof Error && error.message !== "sync failed" ? error.message : "同步暂时离线，本机记录仍已保存");
+    }
   }
 
   async function pullRemoteState(showMessage = false) {
@@ -318,7 +386,7 @@ export default function HomePage() {
       const response = await fetch("/api/sync");
       if (!response.ok) throw new Error("sync unavailable");
       const result = await response.json() as { state?: { payload?: Record<string, unknown> } | null };
-      if (result.state?.payload && Object.keys(result.state.payload).length) applyLearningState(result.state.payload);
+      if (result.state?.payload && Object.keys(result.state.payload).length) await applyLearningState(result.state.payload);
       setSyncReady(true);
       setSyncStatus(result.state ? "云端记录已接入 ☁️✨" : "同步空间已创建，正在上传本机记录 ☁️");
       if (showMessage) setToast("多端学习记录已刷新 ☁️✨");
@@ -357,8 +425,8 @@ export default function HomePage() {
     setToast("云端身份与相关数据已删除。本机题库和学习记录没有受到影响。");
   }
 
-  function exportLearningRecord() {
-    const content = JSON.stringify({ product: "AveCove Elapse", version: 1, exportedAt: new Date().toISOString(), state: { progress, favorites, notes, settings, nickname } }, null, 2);
+  async function exportLearningRecord() {
+    const content = JSON.stringify({ product: "AveCove Elapse", version: 2, exportedAt: new Date().toISOString(), state: await collectLearningState() }, null, 2);
     const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
@@ -371,7 +439,7 @@ export default function HomePage() {
     try {
       const data = JSON.parse(await file.text()) as { product?: string; state?: Record<string, unknown> };
       if (!data.state || typeof data.state !== "object") throw new Error("invalid");
-      applyLearningState(data.state);
+      await applyLearningState(data.state);
       setToast("学习记录已接回来了 📚☁️ 熟悉的进度，一步都没有落下 ✨");
     } catch {
       setToast("这份学习记录无法识别，请选择从本产品导出的 JSON 文件。");
@@ -751,12 +819,14 @@ export default function HomePage() {
     setAiMessages([]);
   }
 
+  const resolvedDark = settings.themeMode === "system" ? systemDark : settings.themeMode === "dark";
+
   if (learningMode === "english") {
-    return <main className={`product english-product ${settings.darkMode ? "dark" : ""}`}><EnglishLearningView onExit={() => switchLearningMode("medical")} /></main>;
+    return <main className={`product english-product ${resolvedDark ? "dark" : ""}`}><EnglishLearningView onExit={() => switchLearningMode("medical")} /></main>;
   }
 
   return (
-    <main className={`product ${settings.darkMode ? "dark" : ""}`}>
+    <main className={`product ${resolvedDark ? "dark" : ""}`}>
       {view === "home" ? (
         <HomeView
           bankName={bankName}
@@ -771,8 +841,8 @@ export default function HomePage() {
           onSearch={() => setShowSearch(true)}
           onNotes={() => setShowNotes(true)}
           onCopyright={() => setView("copyright")}
-          onToggleTheme={() => saveSettings({ ...settings, darkMode: !settings.darkMode })}
-          darkMode={settings.darkMode}
+          onToggleTheme={() => saveSettings({ ...settings, themeMode: resolvedDark ? "light" : "dark", darkMode: !resolvedDark })}
+          darkMode={resolvedDark}
           nickname={nickname}
           account={account}
           syncStatus={syncStatus}
@@ -860,7 +930,7 @@ export default function HomePage() {
       {showAiImport && <AiImportFallbackModal files={aiFallbackFiles} onRecognize={recognizeFileWithAi} onClose={() => { setShowAiImport(false); setAiFallbackFiles([]); }} />}
       {showSearch && <SearchModal banks={searchableBanks} onOpen={async (bank, questionId) => { if (bank.id === "__demo__") openQuestion(questionId); else { await openSavedQuestion(bank, questionId); setShowSearch(false); } }} onClose={() => setShowSearch(false)} />}
       {showNotes && <NotesModal questions={questions} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
-      {showAccount && <AccountModal account={account} syncStatus={syncStatus} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pullRemoteState(true)} onExport={exportLearningRecord} onImport={importLearningRecord} />}
+      {showAccount && <AccountModal account={account} syncStatus={syncStatus} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pushRemoteState(true)} onExport={() => { void exportLearningRecord(); }} onImport={importLearningRecord} />}
       {toast && <SuccessToast message={toast} onClose={() => setToast("")} />}
     </main>
   );
@@ -1096,7 +1166,7 @@ function SettingsModal({ settings, counts, typeCounts, onChange, onClose, onStar
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
   return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>开始之前</span><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
     ["all", "全部题目", Library], ["unanswered", "未练题目", Zap], ["wrong", "错题复盘", RotateCcw], ["favorite", "收藏题目", Star],
-  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div><div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋多选</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /><SwitchRow label="夜间模式" detail="降低暗光环境刺激" value={settings.darkMode} onChange={(value) => update("darkMode", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
+  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div><div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋多选</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
 }
 
 function SwitchRow({ label, detail, value, onChange }: { label: string; detail: string; value: boolean; onChange: (value: boolean) => void }) {
@@ -1179,7 +1249,7 @@ function AccountModal({ account, syncStatus, nickname: initialNickname, onClose,
     }
   }
 
-  return <div className="modal-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose}><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。邮箱仅在你主动填写时，用于验证码登录与评论身份保护。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
+  return <div className="modal-layer account-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose} aria-label="关闭同步窗口"><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><div className="sync-coverage"><span><Database />已导入中文题库</span><span><BookOpen />英文 Test Library</span><span><CheckCircle2 />答题记录与写作草稿</span><span><NotebookPen />收藏、错题与笔记</span></div><p className="sync-privacy-copy">原始 Word、PDF 与图片不会上传；同步的是浏览器解析后的题库内容和学习记录。请只同步你有权使用的资料。</p><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。登录后可同步解析后的中英文题库与学习记录；原始文件仍只留在你的设备。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📚 同步题库与记录</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
 }
 
 function SearchModal({ banks, onOpen, onClose }: { banks: SavedQuestionBank[]; onOpen: (bank: SavedQuestionBank, id: string) => Promise<void> | void; onClose: () => void }) {

@@ -26,6 +26,12 @@ export type SharedQuestionBankPackage = {
   };
 };
 
+export type QuestionBankSyncBundle = {
+  version: 1;
+  activeBankId: string | null;
+  banks: SavedQuestionBank[];
+};
+
 const DB_NAME = "hongdou-local-data";
 const STORE_NAME = "question-banks";
 const LEGACY_ACTIVE_KEY = "active-bank";
@@ -50,6 +56,10 @@ function createBankId() {
 
 function bankKey(id: string) {
   return `${BANK_KEY_PREFIX}${id}`;
+}
+
+function notifySyncChange() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("avecove-sync-change"));
 }
 
 function normalizeQuestion(question: QuizQuestion, fallbackId: string): QuizQuestion {
@@ -136,7 +146,7 @@ export async function saveQuestionBank(input: QuestionBankInput, makeActive = fa
     store.put(bank, bankKey(bank.id));
     if (makeActive) store.put(bank.id, ACTIVE_ID_KEY);
     store.delete(LEGACY_ACTIVE_KEY);
-    transaction.oncomplete = () => { database.close(); resolve(bank); };
+    transaction.oncomplete = () => { database.close(); notifySyncChange(); resolve(bank); };
     transaction.onerror = () => reject(transaction.error ?? new Error("保存本地题库失败"));
   });
 }
@@ -152,7 +162,7 @@ export async function activateQuestionBank(id: string): Promise<SavedQuestionBan
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put(id, ACTIVE_ID_KEY);
-    transaction.oncomplete = () => { database.close(); resolve(bank); };
+    transaction.oncomplete = () => { database.close(); notifySyncChange(); resolve(bank); };
     transaction.onerror = () => reject(transaction.error ?? new Error("切换题库失败"));
   });
 }
@@ -173,7 +183,7 @@ export async function deleteQuestionBank(id: string): Promise<void> {
     activeRequest.onsuccess = () => {
       if (activeRequest.result === id) store.delete(ACTIVE_ID_KEY);
     };
-    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.oncomplete = () => { database.close(); notifySyncChange(); resolve(); };
     transaction.onerror = () => reject(transaction.error ?? new Error("删除题库失败"));
   });
 }
@@ -185,9 +195,42 @@ export async function clearActiveBank(): Promise<void> {
     const store = transaction.objectStore(STORE_NAME);
     store.delete(ACTIVE_ID_KEY);
     store.delete(LEGACY_ACTIVE_KEY);
-    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.oncomplete = () => { database.close(); notifySyncChange(); resolve(); };
     transaction.onerror = () => reject(transaction.error ?? new Error("恢复演示题库失败"));
   });
+}
+
+export async function exportQuestionBankSyncBundle(): Promise<QuestionBankSyncBundle> {
+  return {
+    version: 1,
+    activeBankId: await readValue<string>(ACTIVE_ID_KEY) ?? null,
+    banks: await listQuestionBanks(),
+  };
+}
+
+export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ merged: number; activeBankId: string | null }> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { merged: 0, activeBankId: null };
+  const bundle = value as Partial<QuestionBankSyncBundle>;
+  if (bundle.version !== 1 || !Array.isArray(bundle.banks)) return { merged: 0, activeBankId: null };
+  const local = new Map((await listQuestionBanks()).map((bank) => [bank.id, bank]));
+  let merged = 0;
+  for (const candidate of bundle.banks.slice(0, 40)) {
+    if (!candidate || typeof candidate.id !== "string" || candidate.id.length > 160 || !Array.isArray(candidate.questions) || !candidate.questions.length) continue;
+    if (candidate.questions.length > 25_000) continue;
+    const current = local.get(candidate.id);
+    if (current?.updatedAt && (!candidate.updatedAt || current.updatedAt > candidate.updatedAt)) continue;
+    await saveQuestionBank({
+      id: candidate.id,
+      name: typeof candidate.name === "string" ? candidate.name.slice(0, 160) : "同步题库",
+      questions: candidate.questions,
+      importedAt: typeof candidate.importedAt === "string" ? candidate.importedAt : new Date().toISOString(),
+      updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : new Date().toISOString(),
+    });
+    merged += 1;
+  }
+  const activeBankId = typeof bundle.activeBankId === "string" && (await loadQuestionBank(bundle.activeBankId)) ? bundle.activeBankId : null;
+  if (activeBankId) await activateQuestionBank(activeBankId);
+  return { merged, activeBankId };
 }
 
 export function createSharedQuestionBankPackage(bank: SavedQuestionBank): SharedQuestionBankPackage {

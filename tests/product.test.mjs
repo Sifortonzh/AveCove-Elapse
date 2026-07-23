@@ -169,10 +169,11 @@ test("keeps multiple imported banks and portable share files", async () => {
 });
 
 test("ships an isolated, responsive English learning demo", async () => {
-  const [page, english, englishStore, styles, layout] = await Promise.all([
+  const [page, english, englishStore, englishPractice, styles, layout] = await Promise.all([
     text("app/page.tsx"),
     text("app/components/EnglishLearningView.tsx"),
     text("app/lib/english-test.ts"),
+    text("app/lib/english-practice.ts"),
     text("app/globals.css"),
     text("app/layout.tsx"),
   ]);
@@ -216,7 +217,7 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(english, /Rename/);
   assert.match(english, /Reset practice record/);
   assert.match(english, /Respect copyright and protect privacy/);
-  assert.match(english, /avecove-english-practice-v1/);
+  assert.match(englishPractice, /avecove-english-practice-v1/);
   assert.match(english, /format: "avecove-english-test-v1"/);
   assert.match(english, /extractEnglishTestFile/);
   assert.match(english, /hongdou-logo\.png/);
@@ -233,6 +234,35 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(layout, /viewportFit: "cover"/);
   assert.match(englishStore, /export async function renameEnglishTest/);
   assert.match(englishStore, /extension === "json"/);
+});
+
+test("syncs imported libraries and practice records with system theme and iPad-safe ink", async () => {
+  const [page, route, localBank, englishStore, englishPractice, englishView, styles] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/api/sync/route.ts"),
+    text("app/lib/local-bank.ts"),
+    text("app/lib/english-test.ts"),
+    text("app/lib/english-practice.ts"),
+    text("app/components/EnglishLearningView.tsx"),
+    text("app/globals.css"),
+  ]);
+
+  assert.match(page, /questionBanks: questionBanksBundle/);
+  assert.match(page, /englishPractice: exportEnglishPracticeSyncBundle/);
+  assert.match(page, /matchMedia\("\(prefers-color-scheme: dark\)"\)/);
+  assert.match(page, /themeMode: "system"/);
+  assert.match(route, /"questionBanks", "englishTests", "englishPractice"/);
+  assert.match(route, /12_000_000/);
+  assert.match(localBank, /exportQuestionBankSyncBundle/);
+  assert.match(localBank, /mergeQuestionBankSyncBundle/);
+  assert.match(englishStore, /exportEnglishTestSyncBundle/);
+  assert.match(englishStore, /mergeEnglishTestSyncBundle/);
+  assert.match(englishPractice, /exportEnglishPracticeSyncBundle/);
+  assert.match(englishPractice, /mergeEnglishPracticeSyncBundle/);
+  assert.match(englishView, /event\.pointerType === "touch"/);
+  assert.match(styles, /\.annotation-layer\.active\{touch-action:pan-y pinch-zoom/);
+  assert.match(styles, /\.top-actions \.profile\{display:grid!important/);
+  assert.match(styles, /\.english-product\.dark/);
 });
 
 test("reimports a portable English Test Library share file", async () => {

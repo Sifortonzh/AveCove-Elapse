@@ -36,7 +36,7 @@ It turns personal Word and PDF collections into an organized question-bank works
 
 The project deliberately avoids advertising, phone-number login, and mandatory social-platform accounts. A student ID is converted into an irreversible sync identifier; the original value is not stored in the database.
 
-> Current release line: `0.4.x` preview. The built-in bank contains only eight demo questions. Full copyrighted course banks are not bundled.
+> Current release line: `0.5.x` preview. The built-in bank contains only eight demo questions. Full copyrighted course banks are not bundled.
 
 ## Why this project
 
@@ -125,7 +125,7 @@ Provider URLs and model identifiers are configurable because vendors may change 
 - Shared comments with likes, reports, personal deletion, sensitive-word pre-review, muting, and an admin moderation console.
 - Account deletion removes associated cloud learning data and community records while retaining browser-local data.
 
-Question-bank contents remain browser-local by design. Cross-device learning state does not upload original Word or PDF files; users must separately place the corresponding bank on each device.
+Question banks remain local-first. Cross-device sync never uploads the original Word, PDF, or image files; it stores the browser-parsed structured Chinese/English banks together with practice records, writing drafts, notes, favorites, settings, and identity metadata. Only sync material you are authorized to use, and protect exported learning-record files accordingly.
 
 ## Import flow and privacy boundary
 
@@ -378,7 +378,7 @@ This repository does not currently declare an open-source license. Read [COPYRIG
 - Stronger import review, answer auditing, and duplicate detection.
 - Optional spaced-repetition scheduling and learning analytics.
 
-Roadmap items are plans, not guarantees. English imports are currently stored in the browser-local Test Library; review the detected sections and answers before high-stakes use.
+Roadmap items are plans, not guarantees. English imports are stored local-first and can be copied to the signed-in personal sync space; review the detected sections and answers before high-stakes use.
 
 ## Documentation
 

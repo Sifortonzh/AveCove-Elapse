@@ -31,6 +31,8 @@ export type SavedEnglishTest = {
   sections: EnglishTestSection[];
 };
 
+export type EnglishTestSyncBundle = { version: 1; tests: SavedEnglishTest[] };
+
 const DB_NAME = "avecove-english-tests";
 const STORE_NAME = "tests";
 const sectionNames: Record<EnglishSectionKind, string> = {
@@ -46,6 +48,10 @@ const sectionNames: Record<EnglishSectionKind, string> = {
 
 function createId(prefix: string) {
   return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function notifySyncChange() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("avecove-sync-change"));
 }
 
 function normalizeText(text: string) {
@@ -587,16 +593,20 @@ export async function listEnglishTests(): Promise<SavedEnglishTest[]> {
   });
 }
 
-export async function saveEnglishTest(input: Omit<SavedEnglishTest, "id" | "importedAt" | "updatedAt">): Promise<SavedEnglishTest> {
-  const now = new Date().toISOString();
-  const test: SavedEnglishTest = { ...input, id: createId("test"), importedAt: now, updatedAt: now };
+async function writeEnglishTest(test: SavedEnglishTest): Promise<SavedEnglishTest> {
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put(test);
-    transaction.oncomplete = () => { database.close(); resolve(test); };
+    transaction.oncomplete = () => { database.close(); notifySyncChange(); resolve(test); };
     transaction.onerror = () => reject(transaction.error ?? new Error("Unable to save this English test."));
   });
+}
+
+export async function saveEnglishTest(input: Omit<SavedEnglishTest, "id" | "importedAt" | "updatedAt">): Promise<SavedEnglishTest> {
+  const now = new Date().toISOString();
+  const test: SavedEnglishTest = { ...input, id: createId("test"), importedAt: now, updatedAt: now };
+  return writeEnglishTest(test);
 }
 
 export async function renameEnglishTest(id: string, name: string): Promise<SavedEnglishTest> {
@@ -620,7 +630,7 @@ export async function renameEnglishTest(id: string, name: string): Promise<Saved
     request.onerror = () => reject(request.error ?? new Error("Unable to read this English test."));
     transaction.oncomplete = () => {
       database.close();
-      if (updated) resolve(updated);
+      if (updated) { notifySyncChange(); resolve(updated); }
       else reject(new Error("This English test no longer exists."));
     };
     transaction.onabort = () => {
@@ -636,9 +646,30 @@ export async function deleteEnglishTest(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).delete(id);
-    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.oncomplete = () => { database.close(); notifySyncChange(); resolve(); };
     transaction.onerror = () => reject(transaction.error ?? new Error("Unable to delete this English test."));
   });
+}
+
+export async function exportEnglishTestSyncBundle(): Promise<EnglishTestSyncBundle> {
+  return { version: 1, tests: await listEnglishTests() };
+}
+
+export async function mergeEnglishTestSyncBundle(value: unknown): Promise<number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return 0;
+  const bundle = value as Partial<EnglishTestSyncBundle>;
+  if (bundle.version !== 1 || !Array.isArray(bundle.tests)) return 0;
+  const local = new Map((await listEnglishTests()).map((test) => [test.id, test]));
+  let merged = 0;
+  for (const test of bundle.tests.slice(0, 80)) {
+    if (!test || typeof test.id !== "string" || test.id.length > 160 || typeof test.name !== "string" || !Array.isArray(test.sections) || test.sections.length > 80) continue;
+    if (!(["cet", "postgraduate", "ielts", "toefl"] as string[]).includes(test.stage)) continue;
+    const current = local.get(test.id);
+    if (current?.updatedAt && (!test.updatedAt || current.updatedAt > test.updatedAt)) continue;
+    await writeEnglishTest({ ...test, name: test.name.slice(0, 160) });
+    merged += 1;
+  }
+  return merged;
 }
 
 export function englishSectionLabel(kind: EnglishSectionKind) {

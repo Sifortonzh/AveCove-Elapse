@@ -14,6 +14,10 @@ import {
   renameEnglishTest, sanitizeEnglishPassage, saveEnglishTest, type EnglishStage, type EnglishTestQuestion, type EnglishTestSection,
   type SavedEnglishTest,
 } from "@/app/lib/english-test";
+import {
+  clearEnglishPractice, hasEnglishPractice, readEnglishPractice, saveEnglishPractice,
+  type ImportedResponse,
+} from "@/app/lib/english-practice";
 
 type Stage = EnglishStage;
 type PracticeTask = "cloze" | "reading" | "matching" | "listening" | "translation" | "writing";
@@ -139,6 +143,10 @@ function InteractivePassage({ content = passage, sourceTitle = "Memory is a livi
   }
 
   function beginInk(event: ReactPointerEvent<SVGSVGElement>) {
+    // On iPad, a finger should keep scrolling the paper while Apple Pencil draws.
+    // Safari exposes Pencil as pointerType="pen" and touch as pointerType="touch".
+    if (event.pointerType === "touch") return;
+    event.preventDefault();
     const { point, rect } = readPoint(event);
     event.currentTarget.setPointerCapture(event.pointerId);
     if (tool === "eraser") {
@@ -153,6 +161,9 @@ function InteractivePassage({ content = passage, sourceTitle = "Memory is a livi
   }
 
   function continueInk(event: ReactPointerEvent<SVGSVGElement>) {
+    if (event.pointerType === "touch") return;
+    if (!drawingId.current && !erasing.current) return;
+    event.preventDefault();
     const { point, rect } = readPoint(event);
     if (tool === "eraser" && erasing.current) {
       eraseAt(point, rect);
@@ -189,7 +200,7 @@ function InteractivePassage({ content = passage, sourceTitle = "Memory is a livi
     saveVocabulary(vocabulary.filter((entry) => entry.word !== word));
   }
 
-  const toolHint = tool === "lookup" ? "Click any English word for an instant meaning." : tool === "highlight" ? "Select a phrase to keep a reading highlight." : tool === "eraser" ? "Drag across a stroke to erase it." : "Write directly over the passage with a mouse, stylus or finger.";
+  const toolHint = tool === "lookup" ? "Click any English word for an instant meaning." : tool === "highlight" ? "Select a phrase to keep a reading highlight." : tool === "eraser" ? "Use Apple Pencil or a mouse to erase; one-finger touch still scrolls on iPad." : "Use Apple Pencil or a mouse to write. On iPad, one-finger touch scrolls the page without making marks.";
   const normalizedLookup = lookupWord.toLocaleLowerCase();
   const lookupSaved = vocabulary.some((entry) => entry.word === normalizedLookup);
 
@@ -278,37 +289,8 @@ function WritingExercise({ stage }: { stage: Stage }) {
   </section>;
 }
 
-type ImportedResponse = { choice: string; submitted: boolean };
-type EnglishPracticeRecord = { responses: Record<string, ImportedResponse>; drafts: Record<string, string>; updatedAt: string };
 type LibraryActionKind = "rename" | "reset" | "share" | "delete";
 type LibraryAction = { kind: LibraryActionKind; test: SavedEnglishTest };
-
-const englishPracticeStoragePrefix = "avecove-english-practice-v1:";
-
-function readEnglishPractice(testId: string): EnglishPracticeRecord {
-  const empty = { responses: {}, drafts: {}, updatedAt: "" };
-  if (typeof window === "undefined") return empty;
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(`${englishPracticeStoragePrefix}${testId}`) || "null") as Partial<EnglishPracticeRecord> | null;
-    if (!parsed || typeof parsed !== "object") return empty;
-    return { responses: parsed.responses || {}, drafts: parsed.drafts || {}, updatedAt: parsed.updatedAt || "" };
-  } catch {
-    return empty;
-  }
-}
-
-function saveEnglishPractice(testId: string, record: Pick<EnglishPracticeRecord, "responses" | "drafts">) {
-  window.localStorage.setItem(`${englishPracticeStoragePrefix}${testId}`, JSON.stringify({ ...record, updatedAt: new Date().toISOString() }));
-}
-
-function clearEnglishPractice(testId: string) {
-  if (typeof window !== "undefined") window.localStorage.removeItem(`${englishPracticeStoragePrefix}${testId}`);
-}
-
-function hasEnglishPractice(testId: string) {
-  const record = readEnglishPractice(testId);
-  return Object.values(record.responses).some((response) => Boolean(response.choice)) || Object.values(record.drafts).some((draft) => Boolean(draft.trim()));
-}
 
 function importedReadingLabel(sections: EnglishTestSection[], index: number) {
   const passageIndex = sections.slice(0, index + 1).filter((section) => section.kind === "reading").length - 1;

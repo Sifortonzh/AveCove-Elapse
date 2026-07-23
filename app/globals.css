@@ -307,3 +307,34 @@ input,textarea,select{padding-block:12px}
   .qr-detection-card{gap:15px}.qr-visual{width:96px;height:96px;border-width:7px}.qr-visual svg{width:58px}
   .writing-editor textarea{min-height:240px;padding:16px;font-size:.72rem!important}
 }
+
+/* v0.5: system theme, complete sync surfaces, iOS-safe account sheet, iPad Pencil. */
+.product{color-scheme:light}.product.dark{color-scheme:dark}.theme-segmented{grid-template-columns:repeat(3,1fr)}
+.account-layer{overflow-y:auto;overscroll-behavior:contain;display:flex;align-items:center;justify-content:center;padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left))}
+.account-modal{max-height:min(92vh,calc(100dvh - 40px));overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.sync-coverage{margin-top:11px;display:grid;grid-template-columns:1fr 1fr;gap:7px}.sync-coverage span{min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--surface-2);display:flex;align-items:center;gap:7px;font-size:.75rem!important;line-height:1.35}.sync-coverage svg{width:16px;height:16px;flex:0 0 auto;color:var(--green)}.sync-privacy-copy{margin:10px 2px 0;color:var(--muted);font-size:.75rem!important;line-height:1.6}
+
+/* Finger scrolling remains native on iPad. Pointer handlers reserve ink for
+   Apple Pencil (pointerType=pen) and mouse input. */
+.annotation-layer.active{touch-action:pan-y pinch-zoom;-webkit-user-select:none;user-select:none}.interactive-paper{touch-action:pan-y pinch-zoom;overscroll-behavior:contain}
+
+/* The English workspace uses the same resolved system theme as Chinese mode. */
+.english-product.dark{--english-ink:#edf5f4;--english-muted:#a9bbb9;--english-blue:#8fc1cf;--english-sky:#253d44;--english-coral:#f18a72;--english-paper:#0f191c;--english-card:#17272b;background:var(--english-paper)}
+.english-product.dark .english-shell,.english-product.dark .english-main{color:var(--english-ink);background:var(--english-paper)}
+.english-product.dark :is(.stage-switch,.english-upload,.english-sidebar-toggle,.english-task-grid>button,.english-exercise-card,.reading-questions,.qr-detection-card,.audio-practice,.writing-prompt,.writing-editor,.test-library-grid>article,.test-library-empty,.english-library-action-modal,.translation-segment-list>article,.imported-test-practice>nav,.imported-question-card,.imported-practice-grid>aside>footer,.imported-no-questions,.imported-writing-practice>article:first-child,.imported-matching-practice,.interactive-paper,.reading-wordbook,.cloze-popover){color:var(--english-ink);border-color:#365057;background:var(--english-card)}
+.english-product.dark :is(.reading-toolbox,.matching-answer-grid article,.translation-segment-list textarea,.english-library-name-field input,.writing-editor textarea){color:var(--english-ink);border-color:#365057;background:#122226}
+.english-product.dark :is(.stage-switch button,.reading-toolbox button,.imported-test-practice>nav button,.test-library-grid footer button,.imported-question-card>div:first-of-type>button,.cloze-popover button,.matching-answer-grid article button,.english-library-confirm-check,.word-lookup-actions button){color:var(--english-muted);border-color:#365057;background:#1a2c31}
+.english-product.dark .reading-questions>button:not(.english-primary){color:var(--english-ink);border-color:#365057;background:#1a2c31}.english-product.dark .reading-questions>button b{color:#c9dedd;background:#2a4147}.english-product.dark .reading-questions>button:not(.english-primary).selected{color:#eff9fa;border-color:#5793a5;background:#294a53}.english-product.dark .reading-questions>button.correct{color:#d9f2e8!important;border-color:#578b75!important;background:#244139!important}.english-product.dark .reading-questions>button.wrong{color:#ffe1dc!important;border-color:#a9665d!important;background:#452c29!important}
+.english-product.dark :is(.stage-switch button.active,.reading-toolbox button.active,.imported-test-practice>nav button.active,.imported-question-card>div:first-of-type>button.selected,.matching-answer-grid article button.selected){color:#fff;border-color:#5793a5;background:#315f6d}
+.english-product.dark .exercise-instruction{color:#d2bfba;background:#342724}.english-product.dark .cloze-blank>button{color:#f3a18d;background:#342724}.english-product.dark .cloze-blank.answered>button{color:#b9e0e8;background:#243c43}.english-product.dark .word-lookup-card{color:#dceeed;border-color:#47666a;background:linear-gradient(135deg,#193238,#352923)}.english-product.dark .reading-wordbook>header,.english-product.dark .reading-wordbook article,.english-product.dark .writing-editor>header,.english-product.dark .writing-editor>footer{border-color:#365057}.english-product.dark .test-section-tags>span,.english-product.dark .imported-question-card>div:first-of-type>button b,.english-product.dark .imported-test-practice>nav button b{color:#b9d9df;background:#263d43}.english-product.dark .english-library-action-note{border-color:#47666a;background:#1d3438}.english-product.dark .english-library-confirm-check.checked{color:#d8efeb;border-color:#5b8f82;background:#24413a}.english-product.dark .english-secondary{color:#c2e1e6;border-color:#47666a;background:#1a2c31}
+
+@media(max-width:620px){
+  .top-actions .profile{display:grid!important;width:34px!important;height:34px!important;min-height:34px!important}
+  .account-layer{align-items:flex-start;padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+  .account-modal{width:100%;max-height:calc(100dvh - max(20px,env(safe-area-inset-top)) - max(20px,env(safe-area-inset-bottom)));margin:auto 0;padding:18px 14px;border-radius:18px}
+  .account-modal>header{position:sticky;z-index:2;top:-18px;margin:-18px -14px 0;padding:18px 14px 12px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(14px)}
+  .account-modal>header h2{font-size:1.2rem!important}.account-badge{grid-template-columns:40px minmax(0,1fr) auto;padding:12px}.account-badge>span{width:40px;height:40px}.account-badge p{overflow-wrap:anywhere}
+  .sync-state{align-items:flex-start;padding:12px}.sync-coverage{grid-template-columns:1fr}.sync-coverage span{padding:9px}.sync-privacy-copy{font-size:.68rem!important}
+  .record-actions{grid-template-columns:1fr 1fr}.record-actions button:first-child{grid-column:1/-1}.record-actions button{min-height:44px;padding:9px;font-size:.72rem!important}.account-danger{gap:10px;align-items:flex-start}.account-danger button{text-align:left}
+  .theme-segmented{grid-template-columns:1fr}.theme-segmented button{justify-content:flex-start}
+}
