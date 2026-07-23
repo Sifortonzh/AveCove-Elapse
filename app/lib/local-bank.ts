@@ -71,7 +71,7 @@ function normalizeQuestion(question: QuizQuestion, fallbackId: string): QuizQues
     ...question,
     id: question.id || fallbackId,
     answer,
-    multiple: answer.length > 1,
+    multiple: question.questionType === "X" || answer.length > 1,
   };
 }
 
@@ -234,7 +234,7 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
     if (!candidate || typeof candidate.id !== "string" || candidate.id.length > 160 || !Array.isArray(candidate.questions) || !candidate.questions.length) continue;
     if (candidate.questions.length > 25_000) continue;
     const current = local.get(candidate.id);
-    if (current?.updatedAt && (!candidate.updatedAt || current.updatedAt > candidate.updatedAt)) continue;
+    if (current?.updatedAt && (!candidate.updatedAt || current.updatedAt >= candidate.updatedAt)) continue;
     await saveQuestionBank({
       id: candidate.id,
       name: typeof candidate.name === "string" ? candidate.name.slice(0, 160) : "同步题库",
@@ -246,7 +246,8 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
     merged += 1;
   }
   const activeBankId = typeof bundle.activeBankId === "string" && (await loadQuestionBank(bundle.activeBankId)) ? bundle.activeBankId : null;
-  if (activeBankId) await activateQuestionBank(activeBankId);
+  const localActiveBankId = await readValue<string>(ACTIVE_ID_KEY) ?? null;
+  if (activeBankId && activeBankId !== localActiveBankId) await activateQuestionBank(activeBankId);
   return { merged, activeBankId };
 }
 

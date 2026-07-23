@@ -36,7 +36,7 @@ It turns personal Word and PDF collections into an organized question-bank works
 
 The project deliberately avoids advertising, phone-number login, and mandatory social-platform accounts. A student ID is converted into an irreversible sync identifier; the original value is not stored in the database.
 
-> Current release line: `0.5.x` preview. The built-in bank contains only eight demo questions. Full copyrighted course banks are not bundled.
+> Current release line: `0.8.x` preview. The built-in bank contains only eight demo questions. Full copyrighted course banks are not bundled.
 
 ## Why this project
 
@@ -67,6 +67,7 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 ### Practice and review
 
 - Automatically distinguish single-choice and multiple-choice questions from answer data.
+- Apply a dedicated Western Medicine 306 profile for A-, B-, and X-type questions, shared B-type option groups, and the official 165-question / 300-point scoring distribution.
 - Practice only single-choice questions or include both types.
 - Sequential practice, a 20-question Random Challenge, and a 100-question Mock Exam sampled from the active bank.
 - Friendly boundary reminders when navigating before the first question or beyond the final question.
@@ -84,12 +85,15 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 - Exam-aware navigation: each stage exposes its real task types and filters the Test Library to matching papers.
 - A collapsible English sidebar expands the reading and annotation workspace on desktop and iPad.
 - A browser-local **Test Library** for imported Word, legacy `.doc`, PDF, and image files.
-- Automatic stage and section mapping for cloze, reading, paragraph matching, translation, listening resources, and writing.
+- Ordinary English exam imports are AI-structured after browser extraction/OCR; JSON share files remain directly importable.
+- A blank paper and its answer/analysis paper can be selected together and merged by question number. If only a blank paper is imported, the app offers to add the companion answer file and upgrades the existing library entry in place.
+- Exam-aware mapping for cloze, word-bank, reading, paragraph matching, translation, listening resources, and writing.
 - Dedicated support for the current postgraduate English I structure: Use of English 1–20, four Reading Part A texts 21–40, Part B paragraph matching 41–45, Translation 46–50, and Writing 51–52.
 - Postgraduate Part B uses a compact answer-order workspace and hides malformed OCR source layout instead of forcing unreadable text into the practice view.
 - Dedicated CET-6 mapping for Writing; Listening Conversations, Passages, and Recordings (1–25); Reading Section A word bank (26–35), Section B long-reading matching (36–45), Section C close reading (46–55); and Chinese-to-English Translation.
 - Hybrid PDF extraction keeps trustworthy text-layer pages and runs Chinese-English OCR only on scanned pages, which is especially useful for mixed answer-analysis booklets.
 - Imported answer keys and available source explanations stay attached to their questions; missing answers are never guessed.
+- Directions are stored in a separate collapsible instruction panel. Cloze and word-bank passages use canonical `[[questionNumber]]` blanks so ordinary numbers and page breaks do not corrupt the passage.
 - Word-bank choices are single-use within a section, and imported responses remain available while moving between questions and sections.
 - Cloze, reading, listening-resource, and writing demonstrations remain available without importing a file.
 - Click-to-translate reading words with a browser-local wordbook.
@@ -103,6 +107,7 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 - “易错提示”: trap words, distractors, and recurring mistakes.
 - “知微”: patient follow-up explanations with conversational context.
 - Optional AI fallback for non-standard answer sheets, including formats such as `1-A`, `1.A`, or a consolidated answer table.
+- Process long medical documents in bounded fragments and validate every returned question independently, so one malformed JSON item no longer invalidates an otherwise usable import.
 - AI fallback never guesses missing answers by design; it is instructed to keep only questions with explicit source answers.
 - Daily request quota and provider-side budget controls.
 - API keys remain server-side and may be encrypted in PostgreSQL with AES-256-GCM.
@@ -146,7 +151,7 @@ flowchart LR
     J --> F
 ```
 
-The original document is never sent to the AI provider. Only extracted text is submitted, and only after the user confirms that the file contains no patient data or other sensitive information. AI recognition can be wrong; imported answers should be sampled and verified.
+The original document is never sent to the AI provider. Only extracted text is submitted. English exam imports require a configured personal or site-wide AI provider because section and answer pairing is not reliable enough with rules alone; medical-bank AI fallback remains opt-in. AI recognition can be wrong, so imported sections and answers should be sampled and verified. See the [English AI import prompt and pairing protocol](docs/英语AI导入Prompt.md).
 
 ## Architecture
 
@@ -253,16 +258,17 @@ openssl rand -base64 36
 ### SMTP for a domain mailbox
 
 ```dotenv
-SMTP_HOST=smtp.example.com
+SMTP_HOST=smtp.qq.com
 SMTP_PORT=465
 SMTP_SECURE=true
-SMTP_USER=no-reply@example.com
-SMTP_PASS=replace-with-smtp-password-or-app-password
-SMTP_FROM=红豆生南国 <no-reply@example.com>
+SMTP_USER=your-account@foxmail.com
+SMTP_PASS=replace-with-qq-mail-smtp-authorization-code
+SMTP_FROM=红豆生南国 <your-account@foxmail.com>
 ```
 
 - Port `465` normally uses `SMTP_SECURE=true`.
 - Port `587` with STARTTLS normally uses `SMTP_SECURE=false`.
+- QQ Mail and Foxmail use `smtp.qq.com`; enable SMTP first and use the generated authorization code rather than the web-login password.
 - Use the SMTP password or application-specific password issued by your mailbox provider, not necessarily the webmail password.
 - After changing `.env`, recreate the application container and send a real verification code. Check the spam folder during validation.
 

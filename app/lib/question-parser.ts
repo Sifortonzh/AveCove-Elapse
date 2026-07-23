@@ -7,6 +7,12 @@ export type QuizQuestion = {
   options: QuizOption[];
   answer: string[];
   multiple: boolean;
+  examProfile?: "western-medicine-306";
+  questionType?: "A" | "B" | "X";
+  points?: number;
+  sharedOptionGroup?: string;
+  explanation?: string;
+  answerSource?: string;
 };
 
 const normalizeLabel = (value: string) => value.toUpperCase().replace(/[ＡＢＣＤＥＦＧ]/g, (letter) => "ABCDEFG"["ＡＢＣＤＥＦＧ".indexOf(letter)]);

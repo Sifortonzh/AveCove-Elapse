@@ -10,10 +10,11 @@ import {
   Pencil, QrCode, RotateCcw, ScanSearch, Share2, ShieldCheck, Sparkles, Trash2, Undo2, Upload, X,
 } from "lucide-react";
 import {
-  deleteEnglishTest, englishSectionLabel, extractEnglishTestFile, listEnglishTests,
-  renameEnglishTest, sanitizeEnglishPassage, saveEnglishTest, type EnglishStage, type EnglishTestQuestion, type EnglishTestSection,
+  deleteEnglishTest, englishSectionLabel, extractEnglishSourceFile, extractEnglishTestFile, listEnglishTests,
+  renameEnglishTest, replaceEnglishTestContent, sanitizeEnglishPassage, saveEnglishTest, type EnglishStage, type EnglishTestQuestion, type EnglishTestSection,
   type SavedEnglishTest,
 } from "@/app/lib/english-test";
+import { readPersonalAiConfig } from "@/app/lib/personal-ai";
 import {
   clearEnglishPractice, hasEnglishPractice, readEnglishPractice, saveEnglishPractice,
   type ImportedResponse,
@@ -27,8 +28,50 @@ type ReadingTool = "lookup" | "highlight" | "pen" | "marker" | "eraser";
 type InkPoint = { x: number; y: number };
 type InkStroke = { id: string; tool: "pen" | "marker"; points: InkPoint[] };
 type VocabularyEntry = { word: string; meaning: string; context: string; source?: string; addedAt: string };
+type PendingCompanionImport = {
+  test: SavedEnglishTest;
+  sourceFileName: string;
+  sourceText: string;
+  usedOcr: boolean;
+};
+type EnglishAiImportReport = {
+  sections: number;
+  totalQuestions: number;
+  answeredQuestions: number;
+  answerCoverage: number;
+  warnings: string[];
+};
 
 const vocabularyStorageKey = "avecove-english-vocabulary-v1";
+
+function looksLikeAnswerOrAnalysisFile(file: File) {
+  return /答案|解析|详解|answer|analysis|solution|explanation|key/i.test(file.name);
+}
+
+async function requestEnglishAiImport(
+  input: {
+    sourceFileName: string;
+    sourceText: string;
+    answerFileName?: string;
+    answerText?: string;
+    usedOcr: boolean;
+  },
+  signal: AbortSignal,
+) {
+  const response = await fetch("/api/import-english-ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal,
+    body: JSON.stringify({ ...input, personalAi: readPersonalAiConfig() ?? undefined }),
+  });
+  const result = await response.json().catch(() => ({})) as {
+    test?: Omit<SavedEnglishTest, "id" | "importedAt" | "updatedAt">;
+    report?: EnglishAiImportReport;
+    error?: string;
+  };
+  if (!response.ok || !result.test || !result.report) throw new Error(result.error || "AI did not return a usable English test.");
+  return { test: result.test, report: result.report };
+}
 
 const stages: Array<{ id: Stage; label: string; detail: string; tasks: PracticeTask[] }> = [
   { id: "cet", label: "CET", detail: "CET-4 / CET-6", tasks: ["listening", "reading", "translation", "writing"] },
@@ -325,11 +368,11 @@ async function shareEnglishTest(test: SavedEnglishTest) {
 
 function TestLibrary({ tests, stageLabel, onOpen, onAction, onImport }: { tests: SavedEnglishTest[]; stageLabel: string; onOpen: (test: SavedEnglishTest) => void; onAction: (action: LibraryAction) => void; onImport: () => void }) {
   return <section className="test-library">
-    <header><div><span>{stageLabel.toUpperCase()} · MY IMPORTED PAPERS</span><h1>{stageLabel} Test Library</h1><p>Only {stageLabel} papers are shown here. Change the study stage above to switch libraries instantly.</p></div><button className="english-primary" onClick={onImport}><Import />Import a test</button></header>
+    <header><div><span>{stageLabel.toUpperCase()} · MY IMPORTED PAPERS</span><h1>{stageLabel} Test Library</h1><p>Only {stageLabel} papers are shown here. English exam imports are structured by AI; a blank paper and its answer/analysis file can be paired into one practice record.</p></div><button className="english-primary" onClick={onImport}><Import />Import a test</button></header>
     {tests.length ? <div className="test-library-grid">{tests.map((test) => {
       const questionCount = test.sections.reduce((total, section) => total + section.questions.length, 0);
-      return <article key={test.id}><header><span><FileText /></span><em>{test.examVariant || (test.stage === "postgraduate" ? "POSTGRADUATE" : test.stage.toUpperCase())}</em></header><h2>{test.name}</h2><p>{test.sections.length} detected section{test.sections.length === 1 ? "" : "s"} · {questionCount} practice item{questionCount === 1 ? "" : "s"} · Local record enabled</p><div className="test-section-tags">{test.sections.map((section, index) => <span key={section.id}>{section.kind === "reading" ? importedReadingLabel(test.sections, index) : englishSectionLabel(section.kind)} <b>{section.questions.length || "Text"}</b></span>)}</div><footer className="test-library-actions"><button className="test-open" onClick={() => onOpen(test)}><Play />Practice now</button><button title="Rename" aria-label={`Rename ${test.name}`} onClick={() => onAction({ kind: "rename", test })}><Pencil /></button><button title="Reset practice record" aria-label={`Reset practice record for ${test.name}`} onClick={() => onAction({ kind: "reset", test })}><RotateCcw /></button><button title="Share" aria-label={`Share ${test.name}`} onClick={() => onAction({ kind: "share", test })}><Share2 /></button><button className="danger" title="Delete file" aria-label={`Delete ${test.name}`} onClick={() => onAction({ kind: "delete", test })}><Trash2 /></button></footer></article>;
-    })}</div> : <div className="test-library-empty"><LibraryBig /><h2>No {stageLabel} papers yet</h2><p>Import a `.doc`, `.docx`, PDF, image or AveCove English share file. It will be classified automatically and appear under the matching study stage.</p><button className="english-primary" onClick={onImport}><Upload />Choose a file</button></div>}
+      return <article key={test.id}><header><span><FileText /></span><em>{test.aiImported ? "AI · " : ""}{test.examVariant || (test.stage === "postgraduate" ? "POSTGRADUATE" : test.stage.toUpperCase())}</em></header><h2>{test.name}</h2><p>{test.sections.length} detected section{test.sections.length === 1 ? "" : "s"} · {questionCount} practice item{questionCount === 1 ? "" : "s"} · {test.answerSourceName ? "Answer file paired" : "Local record enabled"}</p><div className="test-section-tags">{test.sections.map((section, index) => <span key={section.id}>{section.kind === "reading" ? importedReadingLabel(test.sections, index) : englishSectionLabel(section.kind)} <b>{section.questions.length || "Text"}</b></span>)}</div><footer className="test-library-actions"><button className="test-open" onClick={() => onOpen(test)}><Play />Practice now</button><button title="Rename" aria-label={`Rename ${test.name}`} onClick={() => onAction({ kind: "rename", test })}><Pencil /></button><button title="Reset practice record" aria-label={`Reset practice record for ${test.name}`} onClick={() => onAction({ kind: "reset", test })}><RotateCcw /></button><button title="Share" aria-label={`Share ${test.name}`} onClick={() => onAction({ kind: "share", test })}><Share2 /></button><button className="danger" title="Delete file" aria-label={`Delete ${test.name}`} onClick={() => onAction({ kind: "delete", test })}><Trash2 /></button></footer></article>;
+    })}</div> : <div className="test-library-empty"><LibraryBig /><h2>No {stageLabel} papers yet</h2><p>Import a `.doc`, `.docx`, PDF, image or AveCove English share file. AI is required for ordinary exam files so that section boundaries, passages, blanks and answer provenance can be checked before practice.</p><button className="english-primary" onClick={onImport}><Upload />Choose a file</button></div>}
   </section>;
 }
 
@@ -348,15 +391,32 @@ function EnglishLibraryActionModal({ action, busy, onClose, onConfirm }: { actio
   return <div className="modal-layer english-library-action-layer" onMouseDown={() => !busy && onClose()}><section className={`english-library-action-modal ${action.kind}`} onMouseDown={(event) => event.stopPropagation()}><header><div><span>{content.overline}</span><h2>{content.title}</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="english-library-action-note">{action.kind === "share" ? <ShieldCheck /> : action.kind === "rename" ? <Pencil /> : <AlertCircle />}<div><strong>{action.kind === "share" ? "Respect copyright and protect privacy" : action.kind === "reset" ? "Reset with care" : action.kind === "delete" ? "This cannot be undone" : "Keep the title easy to find"}</strong><p>{content.description}</p></div></div>{action.kind === "rename" && <label className="english-library-name-field"><span>Test name</span><input autoFocus maxLength={120} value={name} onChange={(event) => setName(event.target.value)} /></label>}{needsAcceptance && <button className={`english-library-confirm-check ${accepted ? "checked" : ""}`} role="checkbox" aria-checked={accepted} disabled={action.kind === "reset" && !hasPractice} onClick={() => setAccepted((value) => !value)}><i>{accepted && <Check />}</i><span>{action.kind === "share" ? "I confirm that I have permission to share this material and that it contains no private or patient information." : action.kind === "reset" ? "I understand that this test’s saved answers and drafts will be permanently cleared." : "I understand that the imported test and its local record will be permanently deleted."}</span></button>}<footer><button className="english-secondary" onClick={onClose} disabled={busy}>Cancel</button><button className={action.kind === "delete" || action.kind === "reset" ? "english-danger" : "english-primary"} disabled={disabled} onClick={() => onConfirm(name)}>{action.kind === "rename" ? <Pencil /> : action.kind === "reset" ? <RotateCcw /> : action.kind === "share" ? <Share2 /> : <Trash2 />}{busy ? "Working…" : action.kind === "rename" ? "Save name" : action.kind === "reset" ? "Reset record" : action.kind === "share" ? "Share test" : "Delete file"}</button></footer></section></div>;
 }
 
+function DirectionsPanel({ directions }: { directions?: string }) {
+  if (!directions) return null;
+  return <details className="english-directions">
+    <summary><FileText /><span><strong>Directions</strong><small>Instructions are kept separate from the passage</small></span><ChevronRight /></summary>
+    <p>{directions}</p>
+  </details>;
+}
+
 function ImportedClozePractice({ section, responses, setResponses }: { section: EnglishTestSection; responses: Record<string, ImportedResponse>; setResponses: Dispatch<SetStateAction<Record<string, ImportedResponse>>> }) {
   const [openBlank, setOpenBlank] = useState<string | null>(null);
   const questions = new Map(section.questions.map((question) => [question.number, question]));
   const numbers = [...questions.keys()].sort((left, right) => Number(right) - Number(left));
-  const pattern = numbers.length ? new RegExp(`\\b(${numbers.join("|")})\\b`, "g") : /$^/g;
+  const escapedNumbers = numbers.map((number) => number.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const passage = sanitizeEnglishPassage(section.passage);
+  const hasCanonicalBlanks = /\[\[\d{1,3}\]\]/.test(passage);
+  const pattern = numbers.length
+    ? new RegExp(hasCanonicalBlanks
+      ? `(\\[\\[(?:${escapedNumbers.join("|")})\\]\\])`
+      : `(\\b(?:${escapedNumbers.join("|")})\\b)`, "g")
+    : /$^/g;
   const segments = passage.split(pattern);
   const answered = section.questions.filter((question) => responses[question.id]?.choice).length;
   const allAnswered = answered === section.questions.length && section.questions.length > 0;
+  const usedWordBankLabels = section.kind === "word-bank"
+    ? new Set(section.questions.map((question) => responses[question.id]?.choice).filter(Boolean))
+    : new Set<string>();
 
   function choose(question: EnglishTestQuestion, choice: string) {
     setResponses((value) => ({ ...value, [question.id]: { choice, submitted: false } }));
@@ -383,17 +443,21 @@ function ImportedClozePractice({ section, responses, setResponses }: { section: 
   }
 
   return <section className="english-exercise-card imported-cloze-card">
-    <header><div><span>CLOZE · IMPORTED</span><h2>{section.title}</h2></div><em>{answered} / {section.questions.length} answered</em></header>
+    <header><div><span>{section.kind === "word-bank" ? "WORD BANK" : "CLOZE"} · AI IMPORTED</span><h2>{section.title}</h2></div><em>{answered} / {section.questions.length} answered</em></header>
     <p className="exercise-instruction">Tap a blank to choose in context. The selected word is written back into the passage; check all answers when you finish.</p>
     <article className="cloze-copy imported-cloze-copy">{segments.map((segment, index) => {
-      const question = questions.get(segment);
+      const questionNumber = segment.match(/\d{1,3}/)?.[0] ?? "";
+      const question = questions.get(questionNumber);
       if (!question) return <span key={`${index}-${segment.slice(0, 12)}`}>{segment}</span>;
       const response = responses[question.id];
       const selected = question.options.find((option) => option.label === response?.choice);
       const state = response?.submitted ? response.choice === question.answer ? "correct" : question.answer ? "wrong" : "unscored" : "";
       return <span key={question.id} className={`cloze-blank imported-cloze-blank ${selected ? "answered" : ""} ${openBlank === question.id ? "open" : ""} ${state}`}>
         <button aria-expanded={openBlank === question.id} title={response?.submitted && question.answer ? `Correct answer: ${question.answer}` : undefined} onClick={() => setOpenBlank((value) => value === question.id ? null : question.id)}>{selected?.text || `Blank ${question.number}`}</button>
-        <span className="cloze-popover imported-cloze-popover">{question.options.map((option) => <button key={option.label} onClick={() => choose(question, option.label)}><b>{option.label}</b>{option.text}</button>)}</span>
+        <span className="cloze-popover imported-cloze-popover">{question.options.map((option) => {
+          const unavailable = usedWordBankLabels.has(option.label) && response?.choice !== option.label;
+          return <button key={option.label} disabled={unavailable} title={unavailable ? "Already used for another blank" : undefined} onClick={() => choose(question, option.label)}><b>{option.label}</b>{option.text}</button>;
+        })}</span>
       </span>;
     })}</article>
     <footer><button className="english-secondary" onClick={reset}>Reset</button><button className="english-primary" disabled={!allAnswered} onClick={checkAnswers}>Check answers <ChevronRight size={16} /></button></footer>
@@ -464,7 +528,6 @@ function ImportedTestPractice({ test, onBack }: { test: SavedEnglishTest; onBack
   const writingLike = section.kind === "writing" || section.kind === "translation";
   const draft = drafts[section.id] || "";
   const words = draft.trim() ? draft.trim().split(/\s+/).length : 0;
-  const usedWordBankLabels = section.kind === "word-bank" ? new Set(Object.entries(responses).filter(([id, response]) => id.startsWith(`${section.id}:`) && id !== question?.id && response.choice).map(([, response]) => response.choice)) : new Set<string>();
   const displayPassage = section.kind === "writing" ? section.passage : sanitizeEnglishPassage(section.passage);
   const readingLabel = section.kind === "reading" ? importedReadingLabel(test.sections, sectionIndex) : "";
   const displayTitle = readingLabel || section.title;
@@ -479,17 +542,31 @@ function ImportedTestPractice({ test, onBack }: { test: SavedEnglishTest; onBack
     setQuestionIndex(0);
   }
 
-  return <section className="imported-test-practice"><header><button onClick={onBack}><ChevronLeft />Test Library</button><div><span>{test.examVariant || (test.stage === "postgraduate" ? "POSTGRADUATE" : test.stage.toUpperCase())} · AUTO-CLASSIFIED</span><h1>{test.name}</h1></div><em>{sectionIndex + 1} / {test.sections.length}</em></header><nav>{test.sections.map((item, index) => <button key={item.id} className={sectionIndex === index ? "active" : ""} onClick={() => chooseSection(index)}><span>{item.kind === "reading" ? importedReadingLabel(test.sections, index) : englishSectionLabel(item.kind)}</span><b>{item.questions.length || "Text"}</b></button>)}</nav>
-    {section.kind === "cloze" ? <ImportedClozePractice key={section.id} section={{ ...section, passage: displayPassage }} responses={responses} setResponses={setResponses} /> : section.kind === "matching" ? <ImportedMatchingPractice key={section.id} section={section} responses={responses} setResponses={setResponses} /> : section.kind === "translation" && section.questions.length ? <ImportedTranslationPractice key={section.id} section={section} drafts={drafts} setDrafts={setDrafts} /> : writingLike ? <div className="imported-writing-practice"><article><span>{displayKind.toUpperCase()} PROMPT</span><h2>{displayTitle}</h2><p>{displayPassage || "The source file did not provide a separate prompt. Review the original document before writing."}</p></article><article className="writing-editor"><header><strong>Your response</strong><span>{words} words</span></header><textarea value={draft} onChange={(event) => setDrafts((value) => ({ ...value, [section.id]: event.target.value }))} placeholder={section.kind === "translation" ? "Translate the Chinese passage into English…" : "Start writing here…"} /><footer><span>Saved locally in this Test Library record</span></footer></article></div> : <div className={`imported-practice-grid ${displayPassage ? "with-passage" : ""}`}>
+  return <section className="imported-test-practice"><header><button onClick={onBack}><ChevronLeft />Test Library</button><div><span>{test.examVariant || (test.stage === "postgraduate" ? "POSTGRADUATE" : test.stage.toUpperCase())} · {test.aiImported ? "AI-STRUCTURED" : "AUTO-CLASSIFIED"}</span><h1>{test.name}</h1></div><em>{sectionIndex + 1} / {test.sections.length}</em></header><nav>{test.sections.map((item, index) => <button key={item.id} className={sectionIndex === index ? "active" : ""} onClick={() => chooseSection(index)}><span>{item.kind === "reading" ? importedReadingLabel(test.sections, index) : englishSectionLabel(item.kind)}</span><b>{item.questions.length || "Text"}</b></button>)}</nav>
+    {test.aiWarnings?.length ? <div className="english-ai-warnings"><Bot /><div><strong>AI import review</strong><p>{test.aiWarnings.join(" · ")}</p></div></div> : null}
+    <DirectionsPanel directions={section.directions} />
+    {section.kind === "cloze" || section.kind === "word-bank" ? <ImportedClozePractice key={section.id} section={{ ...section, passage: displayPassage }} responses={responses} setResponses={setResponses} /> : section.kind === "matching" ? <ImportedMatchingPractice key={section.id} section={section} responses={responses} setResponses={setResponses} /> : section.kind === "translation" && section.questions.length ? <ImportedTranslationPractice key={section.id} section={section} drafts={drafts} setDrafts={setDrafts} /> : writingLike ? <div className="imported-writing-practice"><article><span>{displayKind.toUpperCase()} PROMPT</span><h2>{displayTitle}</h2><p>{displayPassage || "The source file did not provide a separate prompt. Review the original document before writing."}</p></article><article className="writing-editor"><header><strong>Your response</strong><span>{words} words</span></header><textarea value={draft} onChange={(event) => setDrafts((value) => ({ ...value, [section.id]: event.target.value }))} placeholder={section.kind === "translation" ? "Translate the Chinese passage into English…" : "Start writing here…"} /><footer><span>Saved locally in this Test Library record</span></footer></article></div> : <div className={`imported-practice-grid ${displayPassage ? "with-passage" : ""}`}>
       {displayPassage && <article className="english-exercise-card imported-passage"><header><div><span>{displayKind.toUpperCase()} · IMPORTED</span><h2>{displayTitle}</h2></div><FileText /></header><InteractivePassage key={section.id} content={displayPassage} sourceTitle={`${test.name} · ${displayTitle}`} /></article>}
-      {question ? <aside><ImportedQuestion question={question} response={responses[question.id]} disabledLabels={usedWordBankLabels} onResponse={(response) => setResponses((value) => ({ ...value, [question.id]: response }))} /><footer><button disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => Math.max(0, value - 1))}><ChevronLeft />Previous</button><span>{questionIndex + 1} / {section.questions.length}</span><button disabled={questionIndex + 1 >= section.questions.length} onClick={() => setQuestionIndex((value) => Math.min(section.questions.length - 1, value + 1))}>Next<ChevronRight /></button></footer></aside> : <div className="imported-no-questions"><AlertCircle /><h2>Reading workspace ready</h2><p>This section was identified, but no complete answer block was found. You can still look up words, highlight and write on the passage.</p></div>}
+      {question ? <aside><ImportedQuestion question={question} response={responses[question.id]} onResponse={(response) => setResponses((value) => ({ ...value, [question.id]: response }))} /><footer><button disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => Math.max(0, value - 1))}><ChevronLeft />Previous</button><span>{questionIndex + 1} / {section.questions.length}</span><button disabled={questionIndex + 1 >= section.questions.length} onClick={() => setQuestionIndex((value) => Math.min(section.questions.length - 1, value + 1))}>Next<ChevronRight /></button></footer></aside> : <div className="imported-no-questions"><AlertCircle /><h2>Reading workspace ready</h2><p>This section was identified, but no complete answer block was found. You can still look up words, highlight and write on the passage.</p></div>}
     </div>}
   </section>;
 }
 
 function EnglishOverview({ stage, onTask }: { stage: Stage; onTask: (task: EnglishTask) => void }) {
   const currentStage = stages.find((item) => item.id === stage)!;
-  return <><section className="english-hero"><div><span><Sparkles size={14} />ENGLISH LEARNING</span><h1>Read actively. Think clearly.<br />Use English with confidence.</h1><p>A focused workspace for {currentStage.label} practice — designed around real exam tasks, annotations and AI-assisted imports.</p><button className="english-primary" onClick={() => onTask(currentStage.tasks[0])}>Start a demo session <ChevronRight size={17} /></button></div><div className="english-hero-stat"><strong>4</strong><span>interactive task formats</span><i /><strong>1</strong><span>smart import workspace</span></div></section><div className="english-section-title"><div><span>YOUR PRACTICE MAP</span><h2>Choose a skill to train</h2></div><p>{currentStage.detail}</p></div><section className="english-task-grid">{currentStage.tasks.map((task) => { const meta = taskMeta[task]; const Icon = meta.icon; return <button key={task} onClick={() => onTask(task)}><span><Icon size={22} /></span><div><strong>{meta.title}</strong><p>{meta.short}</p></div><ChevronRight /></button>; })}</section></>;
+  return <><section className="english-hero"><div><span><Sparkles size={14} />ENGLISH LEARNING</span><h1>Read actively. Think clearly.<br />Use English with confidence.</h1><p>A focused workspace for {currentStage.label} practice — designed around real exam tasks, annotations and AI-structured imports.</p><button className="english-primary" onClick={() => onTask(currentStage.tasks[0])}>Start a demo session <ChevronRight size={17} /></button></div><div className="english-hero-stat"><strong>4</strong><span>interactive task formats</span><i /><strong>AI</strong><span>exam-aware import engine</span></div></section><div className="english-section-title"><div><span>YOUR PRACTICE MAP</span><h2>Choose a skill to train</h2></div><p>{currentStage.detail}</p></div><section className="english-task-grid">{currentStage.tasks.map((task) => { const meta = taskMeta[task]; const Icon = meta.icon; return <button key={task} onClick={() => onTask(task)}><span><Icon size={22} /></span><div><strong>{meta.title}</strong><p>{meta.short}</p></div><ChevronRight /></button>; })}</section></>;
+}
+
+function AnswerCompanionModal({ testName, busy, onChoose, onSkip }: { testName: string; busy: boolean; onChoose: () => void; onSkip: () => void }) {
+  return <div className="modal-layer english-answer-companion-layer" onMouseDown={() => !busy && onSkip()}>
+    <section className="english-answer-companion" onMouseDown={(event) => event.stopPropagation()}>
+      <header><span><Bot /></span><div><small>AI ANSWER PAIRING</small><h2>Add the answer or analysis file?</h2></div></header>
+      <p>“{testName}” looks like a blank paper. Import its matching answer/analysis PDF now, and AI will combine the question paper, answer key, listening transcript and explanations into the same Test Library entry.</p>
+      <div><FileText /><span><strong>No duplicate test</strong><small>The existing paper will be upgraded in place.</small></span></div>
+      <div><ShieldCheck /><span><strong>No guessed answers</strong><small>Scoring uses only answers explicitly found in the companion file.</small></span></div>
+      <footer><button className="english-secondary" onClick={onSkip} disabled={busy}>Not now</button><button className="english-primary" onClick={onChoose} disabled={busy}><Upload />{busy ? "Pairing with AI…" : "Choose answer / analysis file"}</button></footer>
+    </section>
+  </div>;
 }
 
 export default function EnglishLearningView({ onExit }: { onExit: () => void }) {
@@ -500,9 +577,11 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
   const [activeTest, setActiveTest] = useState<SavedEnglishTest | null>(null);
   const [libraryAction, setLibraryAction] = useState<LibraryAction | null>(null);
   const [libraryBusy, setLibraryBusy] = useState(false);
+  const [pendingCompanion, setPendingCompanion] = useState<PendingCompanionImport | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [importStatus, setImportStatus] = useState<{ phase: string; detail: string; progress: number; error?: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const companionFileRef = useRef<HTMLInputElement>(null);
   const importControllerRef = useRef<AbortController | null>(null);
   const currentStage = stages.find((item) => item.id === stage)!;
   const stageTests = tests.filter((test) => test.stage === stage);
@@ -524,13 +603,19 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
     if (!files?.length || importing) return;
     setImporting(true);
     const selected = Array.from(files);
+    const pairedAnswer = selected.length === 2 ? selected.find(looksLikeAnswerOrAnalysisFile) : undefined;
+    const pairedSource = pairedAnswer ? selected.find((file) => file !== pairedAnswer) : undefined;
+    const jobs = pairedAnswer && pairedSource
+      ? [{ source: pairedSource, answer: pairedAnswer }]
+      : selected.map((file) => ({ source: file, answer: looksLikeAnswerOrAnalysisFile(file) ? file : undefined }));
     const saved: SavedEnglishTest[] = [];
     const failed: string[] = [];
+    let companionCandidate: PendingCompanionImport | null = null;
     const batchController = new AbortController();
     importControllerRef.current = batchController;
     let cancelled = false;
-    for (let index = 0; index < selected.length; index += 1) {
-      const file = selected[index];
+    for (let index = 0; index < jobs.length; index += 1) {
+      const { source, answer } = jobs[index];
       if (batchController.signal.aborted) {
         cancelled = true;
         break;
@@ -542,17 +627,56 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
       const timer = window.setTimeout(() => {
         timedOut = true;
         fileController.abort();
-      }, 180_000);
+      }, 270_000);
       try {
-        const parsed = await extractEnglishTestFile(file, (update) => setImportStatus({ ...update, phase: `${index + 1}/${selected.length} · ${update.phase}` }), fileController.signal);
+        if (source.name.toLocaleLowerCase().endsWith(".json")) {
+          const parsed = await extractEnglishTestFile(source, (update) => setImportStatus({ ...update, phase: `${index + 1}/${jobs.length} · ${update.phase}` }), fileController.signal);
+          saved.push(await saveEnglishTest(parsed));
+          continue;
+        }
+        const sourceExtracted = await extractEnglishSourceFile(
+          source,
+          (update) => setImportStatus({ ...update, phase: `${index + 1}/${jobs.length} · Source: ${update.phase}` }),
+          fileController.signal,
+        );
+        const answerExtracted = answer
+          ? answer === source
+            ? sourceExtracted
+            : await extractEnglishSourceFile(
+                answer,
+                (update) => setImportStatus({ ...update, phase: `${index + 1}/${jobs.length} · Answers: ${update.phase}` }),
+                fileController.signal,
+              )
+          : undefined;
+        setImportStatus({
+          phase: `${index + 1}/${jobs.length} · AI structuring`,
+          detail: answer ? "Pairing the blank paper with its answer/analysis file by question number." : "Mapping sections, passages, blanks and questions with AI.",
+          progress: 92,
+        });
+        const result = await requestEnglishAiImport({
+          sourceFileName: source.name,
+          sourceText: sourceExtracted.text,
+          answerFileName: answer?.name,
+          answerText: answerExtracted?.text,
+          usedOcr: sourceExtracted.usedOcr || Boolean(answerExtracted?.usedOcr),
+        }, fileController.signal);
         if (fileController.signal.aborted) throw new DOMException("Import cancelled", "AbortError");
-        saved.push(await saveEnglishTest(parsed));
+        const savedTest = await saveEnglishTest(result.test);
+        saved.push(savedTest);
+        if (!answer && result.report.answerCoverage < 75 && !companionCandidate) {
+          companionCandidate = {
+            test: savedTest,
+            sourceFileName: source.name,
+            sourceText: sourceExtracted.text,
+            usedOcr: sourceExtracted.usedOcr,
+          };
+        }
       } catch (error) {
         if (batchController.signal.aborted) {
           cancelled = true;
           break;
         }
-        failed.push(`${file.name}: ${timedOut ? "Import timed out after 3 minutes and was stopped" : error instanceof Error ? error.message : "Import failed"}`);
+        failed.push(`${source.name}: ${timedOut ? "Import timed out after 4.5 minutes and was stopped" : error instanceof Error ? error.message : "Import failed"}`);
       } finally {
         window.clearTimeout(timer);
         batchController.signal.removeEventListener("abort", cancelCurrentFile);
@@ -566,13 +690,61 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
       setStage(saved[0].stage);
       setActiveTest(saved[0]);
       setTask("library");
+      if (companionCandidate) setPendingCompanion(companionCandidate);
       setImportStatus(cancelled
         ? { phase: "Import cancelled", detail: `${saved.length} completed test${saved.length === 1 ? " was" : "s were"} kept. Remaining files were not processed.`, progress: 100, error: true }
-        : { phase: `${saved.length} test${saved.length === 1 ? "" : "s"} ready`, detail: failed.length ? `${failed.length} file(s) could not be imported: ${failed.join(" ")}` : "The paper was classified and added to your Test Library.", progress: 100, error: Boolean(failed.length) });
+        : { phase: `${saved.length} AI-structured test${saved.length === 1 ? "" : "s"} ready`, detail: failed.length ? `${failed.length} file(s) could not be imported: ${failed.join(" ")}` : companionCandidate ? "The paper is ready. Add its answer/analysis file now to unlock reliable scoring and explanations." : "The paper and available answers were mapped into your Test Library.", progress: 100, error: Boolean(failed.length) });
     } else {
       setImportStatus(cancelled
         ? { phase: "Import cancelled", detail: "The current OCR/file analysis was stopped and nothing was saved.", progress: 0, error: true }
         : { phase: "Import failed", detail: failed.join(" ") || "No readable exam content was found.", progress: 0, error: true });
+    }
+  }
+
+  async function handleCompanionImport(files: FileList | null) {
+    const answerFile = files?.[0];
+    if (!answerFile || !pendingCompanion || importing) return;
+    setImporting(true);
+    const controller = new AbortController();
+    importControllerRef.current = controller;
+    const timer = window.setTimeout(() => controller.abort(), 270_000);
+    try {
+      const answerExtracted = await extractEnglishSourceFile(
+        answerFile,
+        (update) => setImportStatus({ ...update, phase: `Answer file: ${update.phase}` }),
+        controller.signal,
+      );
+      setImportStatus({ phase: "AI pairing source and answers", detail: "Matching answer keys, transcripts and source-grounded explanations by question number.", progress: 92 });
+      const result = await requestEnglishAiImport({
+        sourceFileName: pendingCompanion.sourceFileName,
+        sourceText: pendingCompanion.sourceText,
+        answerFileName: answerFile.name,
+        answerText: answerExtracted.text,
+        usedOcr: pendingCompanion.usedOcr || answerExtracted.usedOcr,
+      }, controller.signal);
+      const updated = await replaceEnglishTestContent(pendingCompanion.test.id, result.test);
+      setTests(await listEnglishTests());
+      setActiveTest(updated);
+      setStage(updated.stage);
+      setTask("library");
+      setPendingCompanion(null);
+      setImportStatus({
+        phase: "Answer file merged",
+        detail: `${result.report.answeredQuestions}/${result.report.totalQuestions} objective questions now have source-backed answers. The original library entry was updated, not duplicated.`,
+        progress: 100,
+      });
+    } catch (error) {
+      setImportStatus({
+        phase: "Answer pairing failed",
+        detail: error instanceof DOMException && error.name === "AbortError" ? "The answer import was cancelled or timed out." : error instanceof Error ? error.message : "Please retry with the matching answer/analysis file.",
+        progress: 0,
+        error: true,
+      });
+    } finally {
+      window.clearTimeout(timer);
+      setImporting(false);
+      importControllerRef.current = null;
+      if (companionFileRef.current) companionFileRef.current.value = "";
     }
   }
 
@@ -613,7 +785,7 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
   }
 
   return <div className={`english-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-    <aside className="english-sidebar"><div className="english-brand"><span className="english-logo"><Image src="/hongdou-logo.png" alt="AveCove Elapse medical serpent logo" width={43} height={43} /></span><div><strong>AveCove Elapse</strong><small>English Lab</small></div></div><button className="english-back" onClick={onExit}><ArrowLeft size={17} /><span>Chinese Practice</span></button><nav><button className={task === "overview" ? "active" : ""} onClick={() => { setTask("overview"); setActiveTest(null); }}><Sparkles /><span>Overview</span></button>{currentStage.tasks.map((item) => { const meta = taskMeta[item]; const Icon = meta.icon; return <button key={item} className={task === item ? "active" : ""} onClick={() => { setTask(item); setActiveTest(null); }}><Icon /><span>{meta.title}</span></button>; })}<button className={task === "library" ? "active" : ""} onClick={() => { setTask("library"); setActiveTest(null); }}><Database /><span>Test Library</span><b>{stageTests.length}</b></button></nav><div className="english-import"><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/json,image/*" onChange={(event) => { void handleImport(event.target.files); }} /><Link className="english-ai-link" href="/custom-ai"><Bot size={17} /><span>Custom AI</span></Link><button onClick={() => fileRef.current?.click()} disabled={importing}><Import size={17} /><span>{importing ? "Importing…" : "Import exam file"}</span></button><p>Word, PDF, image and share files<br />Automatic section mapping</p></div></aside>
+    <aside className="english-sidebar"><div className="english-brand"><span className="english-logo"><Image src="/hongdou-logo.png" alt="AveCove Elapse medical serpent logo" width={43} height={43} /></span><div><strong>AveCove Elapse</strong><small>English Lab</small></div></div><button className="english-back" onClick={onExit}><ArrowLeft size={17} /><span>Chinese Practice</span></button><nav><button className={task === "overview" ? "active" : ""} onClick={() => { setTask("overview"); setActiveTest(null); }}><Sparkles /><span>Overview</span></button>{currentStage.tasks.map((item) => { const meta = taskMeta[item]; const Icon = meta.icon; return <button key={item} className={task === item ? "active" : ""} onClick={() => { setTask(item); setActiveTest(null); }}><Icon /><span>{meta.title}</span></button>; })}<button className={task === "library" ? "active" : ""} onClick={() => { setTask("library"); setActiveTest(null); }}><Database /><span>Test Library</span><b>{stageTests.length}</b></button></nav><div className="english-import"><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/json,image/*" onChange={(event) => { void handleImport(event.target.files); }} /><input ref={companionFileRef} type="file" accept=".doc,.docx,.pdf,image/*" onChange={(event) => { void handleCompanionImport(event.target.files); }} /><Link className="english-ai-link" href="/custom-ai"><Bot size={17} /><span>Custom AI</span></Link><button onClick={() => fileRef.current?.click()} disabled={importing}><Import size={17} /><span>{importing ? "Importing…" : "Import exam file"}</span></button><p>AI structuring is required<br />Blank paper + answer file pairing</p></div></aside>
     <main className="english-main"><header className="english-topbar"><div><span>STUDY STAGE</span><div className="stage-switch">{stages.map((item) => <button key={item.id} className={stage === item.id ? "active" : ""} onClick={() => chooseStage(item.id)}>{item.label}</button>)}</div></div><div className="english-topbar-actions"><button className="english-sidebar-toggle" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>{sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</button><button className="english-upload" onClick={() => fileRef.current?.click()} disabled={importing}><Upload size={17} />{importing ? "Importing…" : "Import"}</button></div></header>
       {importing && <div className="english-import-status scanning"><FileSearch /><div><strong>{importStatus?.phase || "Mapping the exam structure…"}</strong><span>{importStatus?.detail || "Finding cloze, reading, matching, translation and writing sections."}</span></div><div className="english-import-control"><b>{importStatus?.progress || 0}%</b><button type="button" onClick={cancelImport}><X />Cancel</button></div></div>}
       {!importing && importStatus && <div className={`english-import-status ${importStatus.error ? "failed" : "ready"}`}>{importStatus.error ? <AlertCircle /> : <Check />}<div><strong>{importStatus.phase}</strong><span>{importStatus.detail}</span></div><button onClick={() => setImportStatus(null)} aria-label="Dismiss import status"><X /></button></div>}
@@ -626,5 +798,6 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
       {task === "writing" && <WritingExercise stage={stage} />}
     </main>
     {libraryAction && <EnglishLibraryActionModal key={`${libraryAction.kind}-${libraryAction.test.id}`} action={libraryAction} busy={libraryBusy} onClose={() => setLibraryAction(null)} onConfirm={(name) => { void confirmLibraryAction(name); }} />}
+    {pendingCompanion && <AnswerCompanionModal testName={pendingCompanion.test.name} busy={importing} onChoose={() => companionFileRef.current?.click()} onSkip={() => setPendingCompanion(null)} />}
   </div>;
 }

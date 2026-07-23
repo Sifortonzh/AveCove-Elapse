@@ -16,6 +16,7 @@ export type EnglishTestSection = {
   kind: EnglishSectionKind;
   title: string;
   part?: string;
+  directions?: string;
   passage: string;
   questions: EnglishTestQuestion[];
 };
@@ -28,6 +29,9 @@ export type SavedEnglishTest = {
   updatedAt: string;
   sourceFormat: string;
   usedOcr: boolean;
+  aiImported?: boolean;
+  answerSourceName?: string;
+  aiWarnings?: string[];
   sections: EnglishTestSection[];
 };
 
@@ -504,7 +508,7 @@ export function parseEnglishTestText(text: string, fileName: string, usedOcr = f
   };
 }
 
-export async function extractEnglishTestFile(file: File, onUpdate: (update: ImportUpdate) => void, signal?: AbortSignal) {
+export async function extractEnglishSourceFile(file: File, onUpdate: (update: ImportUpdate) => void, signal?: AbortSignal) {
   const ensureActive = () => {
     if (signal?.aborted) throw new DOMException("Import cancelled", "AbortError");
   };
@@ -513,23 +517,7 @@ export async function extractEnglishTestFile(file: File, onUpdate: (update: Impo
   let text = "";
   let usedOcr = false;
 
-  if (extension === "json") {
-    onUpdate({ phase: "Reading shared test", progress: 45, detail: "Validating the AveCove English Test file" });
-    const payload = JSON.parse(await file.text()) as { format?: string; test?: Partial<SavedEnglishTest> };
-    ensureActive();
-    const shared = payload.format === "avecove-english-test-v1" ? payload.test : undefined;
-    if (!shared?.name || !Array.isArray(shared.sections) || !shared.sections.length) throw new Error("This is not a valid AveCove English Test share file.");
-    const stage: EnglishStage = ["cet", "postgraduate", "ielts", "toefl"].includes(shared.stage || "") ? shared.stage as EnglishStage : "cet";
-    onUpdate({ phase: "Shared test ready", progress: 90, detail: "The paper can be added to your Test Library" });
-    return {
-      name: shared.name,
-      stage,
-      examVariant: shared.examVariant,
-      sourceFormat: "json",
-      usedOcr: Boolean(shared.usedOcr),
-      sections: shared.sections,
-    };
-  }
+  if (extension === "json") throw new Error("Structured share files do not need text extraction.");
 
   if (file.type.startsWith("image/") || ["png", "jpg", "jpeg", "webp"].includes(extension || "")) {
     onUpdate({ phase: "Reading image", progress: 18, detail: "Loading English OCR" });
@@ -567,8 +555,35 @@ export async function extractEnglishTestFile(file: File, onUpdate: (update: Impo
   }
 
   ensureActive();
+  if (text.replace(/\s/g, "").length < 30) throw new Error("The file does not contain enough readable English text.");
+  return { text, usedOcr, sourceFormat: extension || "file" };
+}
+
+export async function extractEnglishTestFile(file: File, onUpdate: (update: ImportUpdate) => void, signal?: AbortSignal) {
+  const extension = file.name.split(".").pop()?.toLocaleLowerCase();
+  if (extension === "json") {
+    onUpdate({ phase: "Reading shared test", progress: 45, detail: "Validating the AveCove English Test file" });
+    const payload = JSON.parse(await file.text()) as { format?: string; test?: Partial<SavedEnglishTest> };
+    if (signal?.aborted) throw new DOMException("Import cancelled", "AbortError");
+    const shared = payload.format === "avecove-english-test-v1" ? payload.test : undefined;
+    if (!shared?.name || !Array.isArray(shared.sections) || !shared.sections.length) throw new Error("This is not a valid AveCove English Test share file.");
+    const stage: EnglishStage = ["cet", "postgraduate", "ielts", "toefl"].includes(shared.stage || "") ? shared.stage as EnglishStage : "cet";
+    onUpdate({ phase: "Shared test ready", progress: 90, detail: "The paper can be added to your Test Library" });
+    return {
+      name: shared.name,
+      stage,
+      examVariant: shared.examVariant,
+      sourceFormat: "json",
+      usedOcr: Boolean(shared.usedOcr),
+      aiImported: Boolean(shared.aiImported),
+      answerSourceName: shared.answerSourceName,
+      aiWarnings: shared.aiWarnings,
+      sections: shared.sections,
+    };
+  }
+  const extracted = await extractEnglishSourceFile(file, onUpdate, signal);
   onUpdate({ phase: "Classifying sections", progress: 90, detail: "Finding reading, cloze, listening and writing tasks" });
-  return parseEnglishTestText(text, file.name, usedOcr);
+  return parseEnglishTestText(extracted.text, file.name, extracted.usedOcr);
 }
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -607,6 +622,46 @@ export async function saveEnglishTest(input: Omit<SavedEnglishTest, "id" | "impo
   const now = new Date().toISOString();
   const test: SavedEnglishTest = { ...input, id: createId("test"), importedAt: now, updatedAt: now };
   return writeEnglishTest(test);
+}
+
+export async function replaceEnglishTestContent(
+  id: string,
+  input: Omit<SavedEnglishTest, "id" | "importedAt" | "updatedAt">,
+): Promise<SavedEnglishTest> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(id);
+    let updated: SavedEnglishTest | null = null;
+    request.onsuccess = () => {
+      const current = request.result as SavedEnglishTest | undefined;
+      if (!current) {
+        transaction.abort();
+        return;
+      }
+      updated = {
+        ...input,
+        id: current.id,
+        importedAt: current.importedAt,
+        updatedAt: new Date().toISOString(),
+      };
+      store.put(updated);
+    };
+    request.onerror = () => reject(request.error ?? new Error("Unable to read this English test."));
+    transaction.oncomplete = () => {
+      database.close();
+      if (updated) {
+        notifySyncChange();
+        resolve(updated);
+      } else reject(new Error("This English test no longer exists."));
+    };
+    transaction.onabort = () => {
+      database.close();
+      reject(new Error("This English test no longer exists."));
+    };
+    transaction.onerror = () => reject(transaction.error ?? new Error("Unable to update this English test."));
+  });
 }
 
 export async function renameEnglishTest(id: string, name: string): Promise<SavedEnglishTest> {
@@ -665,7 +720,7 @@ export async function mergeEnglishTestSyncBundle(value: unknown): Promise<number
     if (!test || typeof test.id !== "string" || test.id.length > 160 || typeof test.name !== "string" || !Array.isArray(test.sections) || test.sections.length > 80) continue;
     if (!(["cet", "postgraduate", "ielts", "toefl"] as string[]).includes(test.stage)) continue;
     const current = local.get(test.id);
-    if (current?.updatedAt && (!test.updatedAt || current.updatedAt > test.updatedAt)) continue;
+    if (current?.updatedAt && (!test.updatedAt || current.updatedAt >= test.updatedAt)) continue;
     await writeEnglishTest({ ...test, name: test.name.slice(0, 160) });
     merged += 1;
   }

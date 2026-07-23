@@ -24,6 +24,7 @@ import {
   type LearningRecords, type RecordLedger,
 } from "./lib/record-sync";
 import type { QuizQuestion } from "./lib/question-parser";
+import { western306Score } from "./lib/medical-ai-import";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 
@@ -172,6 +173,7 @@ export default function HomePage() {
   const [showAccount, setShowAccount] = useState(false);
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState("尚未开启多端同步");
+  const [manualSyncing, setManualSyncing] = useState(false);
   const [syncRevision, setSyncRevision] = useState(0);
   const [systemDark, setSystemDark] = useState(false);
   const [localReady, setLocalReady] = useState(false);
@@ -179,6 +181,7 @@ export default function HomePage() {
   const [quoteIndex, setQuoteIndex] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const importAbortRef = useRef<AbortController | null>(null);
+  const syncInFlightRef = useRef(false);
 
   useEffect(() => () => importAbortRef.current?.abort(), []);
 
@@ -286,6 +289,12 @@ export default function HomePage() {
   const correct = questions.filter((question) => progress[question.id] === "correct").length;
   const wrong = questions.filter((question) => progress[question.id] === "wrong").length;
   const accuracy = answered ? Math.round((correct / answered) * 100) : 0;
+  const examScore = questions.some((question) => question.examProfile === "western-medicine-306")
+    ? western306Score(questions, progress)
+    : undefined;
+  const sessionExamScore = sessionQuestions.some((question) => question.examProfile === "western-medicine-306")
+    ? western306Score(sessionQuestions, progress)
+    : undefined;
   const isFavorite = current ? favorites.includes(current.id) : false;
 
   const homeProgress = Math.min(100, Math.round((answered / Math.max(questions.length, 1)) * 100));
@@ -384,7 +393,15 @@ export default function HomePage() {
   }
 
   async function pushRemoteState(showMessage = false) {
-    setSyncStatus("正在安全同步题库与学习记录… ☁️");
+    if (syncInFlightRef.current) {
+      if (showMessage) setToast("已有一次同步正在进行，请稍候 ☁️");
+      return;
+    }
+    syncInFlightRef.current = true;
+    if (showMessage) {
+      setManualSyncing(true);
+      setSyncStatus("正在手动同步题库与学习记录… ☁️");
+    }
     try {
       const response = await fetch("/api/sync", {
         method: "PUT",
@@ -401,11 +418,14 @@ export default function HomePage() {
       if (showMessage) setToast("题库、刷题记录与英文练习已安全同步 ☁️✨");
     } catch (error) {
       setSyncStatus(error instanceof Error && error.message !== "sync failed" ? error.message : "同步暂时离线，本机记录仍已保存");
+    } finally {
+      syncInFlightRef.current = false;
+      if (showMessage) setManualSyncing(false);
     }
   }
 
   async function pullRemoteState(showMessage = false) {
-    setSyncStatus("正在读取云端学习记录… ☁️");
+    if (showMessage) setSyncStatus("正在读取云端学习记录… ☁️");
     try {
       const response = await fetch("/api/sync");
       if (!response.ok) throw new Error("sync unavailable");
@@ -778,24 +798,35 @@ export default function HomePage() {
 
   async function recognizeFileWithAi(file: AiFallbackFile) {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 120_000);
+    const timer = window.setTimeout(() => controller.abort(), 12 * 60_000);
     try {
       const response = await fetch("/api/import-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
-        body: JSON.stringify({ fileName: file.fileName, text: file.extractedText.slice(0, 100_000), personalAi: readPersonalAiConfig() ?? undefined }),
+        body: JSON.stringify({ fileName: file.fileName, text: file.extractedText.slice(0, 480_000), personalAi: readPersonalAiConfig() ?? undefined }),
       });
-      const result = await response.json() as { questions?: QuizQuestion[]; error?: string };
+      const result = await response.json() as {
+        questions?: QuizQuestion[];
+        error?: string;
+        report?: { profile?: string; chunks?: number; successfulChunks?: number; warnings?: string[] };
+      };
       if (!response.ok || !result.questions?.length) throw new Error(result.error || "AI 没有返回可用题目");
-      const saved = await saveActiveBank({ name: file.fileName.replace(/\.(doc|docx|pdf)$/i, ""), questions: result.questions, importedAt: new Date().toISOString() });
+      const isWestern306 = result.report?.profile === "western-medicine-306";
+      const description = isWestern306
+        ? "西医综合 306 专项题库：按 A、B、X 型题及 165 题 / 300 分规则整理。请在正式练习前抽查原题号、共用选项与答案。"
+        : "";
+      const saved = await saveActiveBank({ name: file.fileName.replace(/\.(doc|docx|pdf)$/i, ""), description, questions: result.questions, importedAt: new Date().toISOString() });
       setQuestions(saved.questions);
       setBankName(saved.name);
       setActiveBankId(saved.id);
       setQuestionBanks(await listQuestionBanks());
+      if (result.report?.warnings?.length) {
+        setToast(`已保留 ${saved.questions.length} 道有效题；${result.report.warnings.length} 个片段未完成，可稍后拆分原文件补充。`);
+      }
       return saved.questions.length;
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") throw new Error("AI 识别超过 2 分钟，请缩小文件后重试");
+      if (error instanceof DOMException && error.name === "AbortError") throw new Error("AI 识别超过 12 分钟，已停止等待；可拆分文件后重试");
       throw error;
     } finally {
       window.clearTimeout(timer);
@@ -884,6 +915,7 @@ export default function HomePage() {
           wrong={wrong}
           accuracy={accuracy}
           progress={homeProgress}
+          examScore={examScore}
           onPractice={openPractice}
           onImport={() => setShowImport(true)}
           onBanks={() => setView("banks")}
@@ -895,8 +927,10 @@ export default function HomePage() {
           nickname={nickname}
           account={account}
           syncStatus={syncStatus}
+          syncing={manualSyncing}
           quote={homeQuotes[quoteIndex]}
           onAccount={() => setShowAccount(true)}
+          onSync={() => pushRemoteState(true)}
           onEnglish={() => switchLearningMode("english")}
         />
       ) : view === "banks" ? (
@@ -921,6 +955,7 @@ export default function HomePage() {
           current={current}
           currentIndex={currentIndex}
           total={sessionQuestions.length}
+          examScore={sessionExamScore}
           selected={selected}
           submitted={submitted}
           result={progress[current.id]}
@@ -989,11 +1024,12 @@ function Brand({ compact = false, hideTagline = false }: { compact?: boolean; hi
   return <div className={`brand ${compact ? "compact" : ""}`}><span className="brand-logo"><Image src="/hongdou-logo.png" alt="红豆生南国蛇形医学标识" width={48} height={48} priority /></span><div><strong>红豆生南国</strong>{!hideTagline && <small>医学知识训练与复盘</small>}</div></div>;
 }
 
-function HomeView({ bankName, questions, answered, wrong, accuracy, progress, onPractice, onImport, onBanks, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, quote, onAccount, onEnglish }: {
+function HomeView({ bankName, questions, answered, wrong, accuracy, progress, examScore, onPractice, onImport, onBanks, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, syncing, quote, onAccount, onSync, onEnglish }: {
   bankName: string; questions: number; answered: number; wrong: number; accuracy: number; progress: number;
+  examScore?: { earned: number; answeredMaximum: number; total: number };
   onPractice: (custom?: Partial<Settings>, limit?: number) => void; onImport: () => void; onBanks: () => void; onSearch: () => void; onNotes: () => void;
   onCopyright: () => void; onToggleTheme: () => void; darkMode: boolean; nickname: string;
-  account: AccountSession | null; syncStatus: string; quote: (typeof homeQuotes)[number]; onAccount: () => void; onEnglish: () => void;
+  account: AccountSession | null; syncStatus: string; syncing: boolean; quote: (typeof homeQuotes)[number]; onAccount: () => void; onSync: () => void; onEnglish: () => void;
 }) {
   return <div className="home-shell">
     <aside className="home-sidebar">
@@ -1006,13 +1042,13 @@ function HomeView({ bankName, questions, answered, wrong, accuracy, progress, on
         <button onClick={() => onPractice({ scope: "favorite" })}><Star size={19} />收藏题目</button>
         <button onClick={onNotes}><NotebookPen size={19} />我的笔记</button>
       </nav>
-      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <small className="sync-caption">{syncStatus}</small>}<button className="import-entry" aria-label="导入题库" onClick={onImport}><Import size={18} /><span>导入题库</span></button><a className="custom-ai-entry" aria-label="自定义 AI" href="/custom-ai"><Bot size={17} /><span>自定义AI</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button><p>本地优先 · 无广告<br />.docx / PDF 本机处理 · 旧 .doc 仅内存转换</p></div>
+      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <div className="sync-caption-row"><small className="sync-caption">{syncStatus}</small><button className="sync-now" aria-label="立即手动同步" title="立即手动同步" onClick={onSync} disabled={syncing}><RefreshCw className={syncing ? "spinning" : ""} /></button></div>}<button className="import-entry" aria-label="导入题库" onClick={onImport}><Import size={18} /><span>导入题库</span></button><a className="custom-ai-entry" aria-label="自定义 AI" href="/custom-ai"><Bot size={17} /><span>自定义AI</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button><p>本地优先 · 无广告<br />.docx / PDF 本机处理 · 旧 .doc 仅内存转换</p></div>
     </aside>
     <section className="home-main">
       <header className="home-topbar"><div className="home-quote"><p><Sparkles size={13} />{quote.lead}</p><h1>{quote.title}</h1></div><div className="top-actions"><button className="english-learning-toggle" aria-label="English Learning" onClick={onEnglish}><Languages size={17} /><span>English Learning</span></button><button aria-label="搜索题目" onClick={onSearch}><Search size={19} /></button><button aria-label="切换主题" onClick={onToggleTheme}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><button className="profile" onClick={onAccount} aria-label="同步身份">{(nickname.trim()[0] || "红").toUpperCase()}</button></div></header>
       <section className="hero-card">
         <div className="hero-copy"><span className="overline"><Sparkles size={14} /> 今日学习</span><h2>{bankName}</h2><p>{bankName === "演示题库" ? "用少量示例题体验完整流程；准备好后，导入属于自己的医学题库。" : "从上次停下的地方继续。系统会把错题与薄弱知识点带回你的学习节奏。"}</p><div className="hero-actions"><button className="primary-action" onClick={() => onPractice({ scope: answered ? "unanswered" : "all" })}><Play size={17} fill="currentColor" />{answered ? "继续学习" : "开始学习"}</button><button className="ghost-action" onClick={() => onPractice()}>练习设置 <Settings2 size={16} /></button></div></div>
-        <div className="hero-progress"><div className="progress-orbit" style={{ "--p": `${progress * 3.6}deg` } as React.CSSProperties}><div><strong>{progress}%</strong><span>总进度</span></div></div><ul><li><span>题目总数</span><b>{questions}</b></li><li><span>已完成</span><b>{answered}</b></li><li><span>当前正确率</span><b>{accuracy}%</b></li></ul></div>
+        <div className="hero-progress"><div className="progress-orbit" style={{ "--p": `${progress * 3.6}deg` } as React.CSSProperties}><div><strong>{progress}%</strong><span>总进度</span></div></div><ul>{examScore ? <><li><span>西综题目</span><b>{questions}</b></li><li><span>当前得分</span><b>{examScore.earned}</b></li><li><span>试卷总分</span><b>{examScore.total}</b></li></> : <><li><span>题目总数</span><b>{questions}</b></li><li><span>已完成</span><b>{answered}</b></li><li><span>当前正确率</span><b>{accuracy}%</b></li></>}</ul></div>
       </section>
       <div className="section-heading"><div><span>选择一种节奏</span><h2>开始今天的练习</h2></div><button onClick={() => onPractice()}>更多设置 <ChevronRight size={16} /></button></div>
       <section className="mode-grid">
@@ -1176,6 +1212,7 @@ function ShareBankModal({ bank, onClose }: { bank: SavedQuestionBank; onClose: (
 
 function QuizView(props: {
   current: QuizQuestion; currentIndex: number; total: number; selected: string[]; submitted: boolean;
+  examScore?: { earned: number; answeredMaximum: number; total: number };
   result?: "correct" | "wrong"; favorite: boolean; note: string; aiMode: AiMode;
   aiTexts: Partial<Record<AiMode, string>>; aiMessages: AiMessage[]; aiLoading: boolean; mobilePanel: boolean;
   nickname: string; account: AccountSession | null; comments: SharedComment[];
@@ -1186,13 +1223,14 @@ function QuizView(props: {
   onLikeComment: (commentId: string) => void; onReportComment: (commentId: string) => void;
   onDeleteComment: (commentId: string) => void; onRequireLogin: () => void; onMobilePanel: () => void;
 }) {
-  const { current, currentIndex, total, selected, submitted, result, favorite, note, aiMode, aiTexts, aiMessages, aiLoading } = props;
+  const { current, currentIndex, total, selected, submitted, result, favorite, note, aiMode, aiTexts, aiMessages, aiLoading, examScore } = props;
   const progress = Math.round(((currentIndex + 1) / total) * 100);
+  const questionKind = current.questionType ? `${current.questionType} 型题` : current.multiple ? "多选题" : "单选题";
   return <div className="quiz-shell">
-    <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><span>{current.category}</span><div><i style={{ width: `${progress}%` }} /></div><b>{currentIndex + 1} / {total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
+    <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><span>{current.category}{examScore ? ` · ${examScore.earned}/${examScore.total} 分` : ""}</span><div><i style={{ width: `${progress}%` }} /></div><b>{currentIndex + 1} / {total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
-        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{current.multiple ? "多选题" : "单选题"}</span><span>原题号 {current.sourceNumber}</span></div><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已收藏" : "收藏"}</button></div>
+        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{current.questionType === "B" && <span>共用备选项{current.sharedOptionGroup ? ` · ${current.sharedOptionGroup}` : ""}</span>}</div><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已收藏" : "收藏"}</button></div>
         <article className="question-body"><h1>{current.stem}</h1><p className="choose-hint">{current.multiple ? "本题有多个正确答案，请选择所有符合项" : "请选择一个最符合题意的答案"}</p><div className="answer-options">{current.options.map((option) => {
           const picked = selected.includes(option.label);
           const isAnswer = submitted && current.answer.includes(option.label);
@@ -1204,8 +1242,8 @@ function QuizView(props: {
       </section>
       <LearningPanel current={current} submitted={submitted} note={note} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} />
     </div>
-    <nav className="quiz-bottom"><button onClick={props.onPrevious}><ChevronLeft /><span>上一题</span></button><button onClick={props.onAnswerSheet}><ListChecks /><span>答题卡</span></button><button className={favorite ? "active" : ""} onClick={props.onFavorite}><Star fill={favorite ? "currentColor" : "none"} /><span>收藏</span></button><button onClick={props.onMobilePanel}><MessageCircle /><span>学习区</span></button><button onClick={props.onSettings}><Settings2 /><span>设置</span></button><button onClick={props.onNext}><ChevronRight /><span>下一题</span></button></nav>
-      {props.mobilePanel && <div className="mobile-learning"><button className="drawer-close" onClick={props.onMobilePanel}><X /></button><LearningPanel current={current} submitted={submitted} note={note} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} /></div>}
+    <nav className="quiz-bottom"><button onClick={props.onPrevious}><ChevronLeft /><span>上一题</span></button><button onClick={props.onAnswerSheet}><ListChecks /><span>答题卡</span></button><button className={favorite ? "active" : ""} onClick={props.onFavorite}><Star fill={favorite ? "currentColor" : "none"} /><span>收藏</span></button><button onClick={props.onMobilePanel}><MessageCircle /><span>学习区</span></button><button onClick={props.onSettings}><Settings2 /><span>设置</span></button>{submitted ? <button className="mobile-next" onClick={props.onNext}><ChevronRight /><span>下一题</span></button> : <button className="mobile-confirm" onClick={props.onSubmit} disabled={!selected.length}><CheckCircle2 /><span>确认答案</span></button>}</nav>
+      {props.mobilePanel && <div className="mobile-learning"><button className="drawer-close" aria-label="关闭学习区" onClick={props.onMobilePanel}><X /></button><LearningPanel current={current} submitted={submitted} note={note} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} /></div>}
   </div>;
 }
 

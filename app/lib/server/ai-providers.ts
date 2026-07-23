@@ -90,7 +90,7 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
   const preset = findProvider(config.provider);
   if (!preset) throw new Error("Unsupported AI provider");
   const baseUrl = cleanBaseUrl(config.baseUrl);
-  const maxTokens = Math.max(200, Math.min(options.maxTokens ?? 900, 8000));
+  const maxTokens = Math.max(200, Math.min(options.maxTokens ?? 900, 20_000));
   const temperature = options.temperature ?? 0.2;
 
   if (preset.protocol === "gemini") {

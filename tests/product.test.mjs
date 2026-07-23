@@ -15,11 +15,57 @@ async function loadEnglishParser() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadEnglishAiImport() {
+  const source = (await text("app/lib/english-ai-import.ts")).replace(/^import type \{[\s\S]*?\} from "\.\/english-test";\n/, "");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 async function loadRecordSync() {
   const source = await text("app/lib/record-sync.ts");
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
+
+async function loadMedicalAiImport() {
+  const source = (await text("app/lib/medical-ai-import.ts"))
+    .replace(/^import type \{[\s\S]*?\} from "\.\/question-parser";\n/, "");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
+test("recovers medical questions from partially malformed AI JSON and applies 306 scoring", async () => {
+  const {
+    detectMedicalExamProfile,
+    parseMedicalAiResponse,
+    western306Metadata,
+    western306Score,
+  } = await loadMedicalAiImport();
+  const malformed = `{"questions":[
+    {"sourceNumber":"1","stem":"完整 A 型题","options":[{"label":"A","text":"甲"},{"label":"B","text":"乙"}],"answer":["A"]},
+    {"sourceNumber":"2","stem":"损坏题","options":[{"label":"A","text":"甲"} "answer":["A"]},
+    {"sourceNumber":"116","stem":"完整 B 型题","options":[{"label":"A","text":"甲"},{"label":"B","text":"乙"}],"answer":["B"],"sharedOptionGroup":"116-117"}
+  ]}`;
+  const profile = detectMedicalExamProfile("2025西综306考研真题+参考答案.pdf");
+  const parsed = parseMedicalAiResponse(malformed, "西医综合", profile);
+
+  assert.equal(profile, "western-medicine-306");
+  assert.equal(parsed.questions.length, 2);
+  assert.deepEqual(parsed.questions.map((question) => question.questionType), ["A", "B"]);
+  assert.deepEqual(western306Metadata("136"), { questionType: "X", points: 2, multiple: true });
+  const score = western306Score(parsed.questions, {
+    [parsed.questions[0].id]: "correct",
+    [parsed.questions[1].id]: "wrong",
+  });
+  assert.equal(score.earned, 1.5);
+  assert.equal(score.total, 3);
+  const fullPaper = Array.from({ length: 165 }, (_, index) => {
+    const sourceNumber = String(index + 1);
+    const metadata = western306Metadata(sourceNumber);
+    return { id: sourceNumber, sourceNumber, answer: ["A"], options: [], stem: "", category: "", ...metadata };
+  });
+  assert.equal(western306Score(fullPaper, {}).total, 300);
+});
 
 test("ships a small, clearly labelled demo bank", async () => {
   const questions = JSON.parse(await text("app/questions.json"));
@@ -96,7 +142,7 @@ test("includes the requested product flows and copy", async () => {
 });
 
 test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recognition", async () => {
-  const [page, english, englishStore, fileImport, docRoute, search, aiImportRoute, emailRoute, styles] = await Promise.all([
+  const [page, english, englishStore, fileImport, docRoute, search, aiImportRoute, medicalAiImport, emailRoute, styles] = await Promise.all([
     text("app/page.tsx"),
     text("app/components/EnglishLearningView.tsx"),
     text("app/lib/english-test.ts"),
@@ -104,6 +150,7 @@ test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recogn
     text("app/api/extract-doc/route.ts"),
     text("app/lib/question-search.ts"),
     text("app/api/import-ai/route.ts"),
+    text("app/lib/medical-ai-import.ts"),
     text("app/api/auth/email-code/route.ts"),
     text("app/globals.css"),
   ]);
@@ -137,8 +184,10 @@ test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recogn
   assert.match(search, /options\.some/);
   assert.match(styles, /\.search-highlight/);
   assert.match(styles, /\.search-result-location/);
-  assert.match(aiImportRoute, /只能采用文件明确提供的答案，不得自行推测/);
-  assert.match(aiImportRoute, /答案表/);
+  assert.match(medicalAiImport, /不得根据医学常识猜答案、改答案或补题/);
+  assert.match(medicalAiImport, /答案表/);
+  assert.match(aiImportRoute, /Promise\.allSettled/);
+  assert.match(aiImportRoute, /480_000/);
   assert.match(emailRoute, /垃圾邮件 \/ Spam 文件夹/);
 });
 
@@ -178,7 +227,7 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /description: typeof input\.description/);
   assert.match(localBank, /bank: \{ name: bank\.name, description: bank\.description, questions: bank\.questions \}/);
   assert.match(localBank, /hongdou-question-bank/);
-  assert.match(localBank, /multiple: answer\.length > 1/);
+  assert.match(localBank, /multiple: question\.questionType === "X" \|\| answer\.length > 1/);
   assert.match(localBank, /Transparently migrate the single-bank format/);
 });
 
@@ -250,6 +299,72 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(englishStore, /extension === "json"/);
 });
 
+test("uses AI to pair English source and answer papers with exam-aware structure", async () => {
+  const [english, englishStore, route, styles] = await Promise.all([
+    text("app/components/EnglishLearningView.tsx"),
+    text("app/lib/english-test.ts"),
+    text("app/api/import-english-ai/route.ts"),
+    text("app/globals.css"),
+  ]);
+  const { buildEnglishImportPrompt, parseEnglishAiResponse } = await loadEnglishAiImport();
+  const input = {
+    sourceFileName: "2025.06六级真题第1套.pdf",
+    sourceText: "Part III Reading Comprehension\\nSection A\\nCampus volunteers were 26 by an environmental project.",
+    answerFileName: "2025.06英语六级解析第1套.pdf",
+    answerText: "26. J) intrigued\\n语法判断：此处需要形容词。\\n语义判断：intrigued 符合语境。",
+    usedOcr: true,
+  };
+  const prompt = buildEnglishImportPrompt(input);
+
+  assert.match(prompt, /canonical token \[\[questionNumber\]\]/);
+  assert.match(prompt, /Section A is kind=word-bank, questions 26-35/);
+  assert.match(prompt, /Preserve paragraphs A-N/);
+  assert.match(prompt, /Part III as 'Part ID'/);
+  assert.match(prompt, /Never infer or guess an answer/);
+  assert.match(prompt, /section\.directions field/);
+  assert.match(prompt, /companion answer\/analysis file/);
+
+  const parsed = parseEnglishAiResponse(JSON.stringify({
+    name: "2025.06 CET-6",
+    stage: "cet",
+    examVariant: "CET-6",
+    warnings: [],
+    sections: [{
+      kind: "word-bank",
+      title: "Reading Section A",
+      part: "Part III · Section A",
+      directions: "Read the passage and select one word for each blank.",
+      passage: "Campus volunteers were [[26]] by an environmental project.",
+      questions: [{
+        number: "26",
+        stem: "Blank 26",
+        options: [{ label: "J", text: "intrigued" }, { label: "K", text: "isolated" }],
+        answer: "J",
+        explanation: "The analysis explicitly identifies intrigued.",
+      }],
+    }],
+  }), input);
+
+  assert.equal(parsed.aiImported, true);
+  assert.equal(parsed.answerSourceName, input.answerFileName);
+  assert.equal(parsed.sections[0].directions, "Read the passage and select one word for each blank.");
+  assert.equal(parsed.sections[0].passage, "Campus volunteers were [[26]] by an environmental project.");
+  assert.equal(parsed.sections[0].questions[0].answer, "J");
+  assert.match(route, /buildEnglishImportPrompt/);
+  assert.match(route, /English imports require AI/);
+  assert.match(route, /personalAi/);
+  assert.match(english, /Add the answer or analysis file\?/);
+  assert.match(english, /No duplicate test/);
+  assert.match(english, /replaceEnglishTestContent/);
+  assert.match(english, /section\.kind === "cloze" \|\| section\.kind === "word-bank"/);
+  assert.match(english, /hasCanonicalBlanks/);
+  assert.match(english, /function DirectionsPanel/);
+  assert.match(englishStore, /export async function extractEnglishSourceFile/);
+  assert.match(englishStore, /export async function replaceEnglishTestContent/);
+  assert.match(styles, /\.english-directions/);
+  assert.match(styles, /\.english-answer-companion/);
+});
+
 test("syncs imported libraries and practice records with system theme and iPad-safe ink", async () => {
   const [page, route, localBank, englishStore, englishPractice, englishView, styles] = await Promise.all([
     text("app/page.tsx"),
@@ -277,6 +392,30 @@ test("syncs imported libraries and practice records with system theme and iPad-s
   assert.match(styles, /\.annotation-layer\.active\{touch-action:pan-y pinch-zoom/);
   assert.match(styles, /\.top-actions \.profile\{display:grid!important/);
   assert.match(styles, /\.english-product\.dark/);
+});
+
+test("keeps sync quiet and makes iPhone answer confirmation and drawer closing explicit", async () => {
+  const [page, localBank, englishStore, styles] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/lib/local-bank.ts"),
+    text("app/lib/english-test.ts"),
+    text("app/globals.css"),
+  ]);
+
+  assert.match(page, /syncInFlightRef/);
+  assert.match(page, /if \(showMessage\) \{\s*setManualSyncing\(true\)/);
+  assert.match(page, /aria-label="立即手动同步"/);
+  assert.match(page, /className="mobile-confirm"/);
+  assert.match(page, /确认答案/);
+  assert.match(page, /aria-label="关闭学习区"/);
+  assert.match(localBank, /current\.updatedAt >= candidate\.updatedAt/);
+  assert.match(localBank, /activeBankId !== localActiveBankId/);
+  assert.match(englishStore, /current\.updatedAt >= test\.updatedAt/);
+  assert.match(styles, /\.sync-caption-row/);
+  assert.match(styles, /\.quiz-bottom \.mobile-confirm/);
+  assert.match(styles, /\.drawer-close\{position:fixed/);
+  assert.match(styles, /env\(safe-area-inset-bottom\)/);
+  assert.match(styles, /touch-action:manipulation/);
 });
 
 test("merges per-question practice records across devices without stale overwrites", async () => {
@@ -504,6 +643,7 @@ test("ships shared data, moderation, branding, and deployment material", async (
     "app/api/admin/comments/route.ts",
     "app/api/admin/ai-config/route.ts",
     "app/api/import-ai/route.ts",
+    "app/api/import-english-ai/route.ts",
     "app/admin/page.tsx",
     "app/admin/ai/page.tsx",
     "app/custom-ai/page.tsx",
@@ -540,7 +680,8 @@ test("ships shared data, moderation, branding, and deployment material", async (
   assert.match(exampleEnv, /OPENAI_API_KEY/);
   assert.match(exampleEnv, /CONFIG_ENCRYPTION_KEY/);
   assert.match(exampleEnv, /SYNC_SECRET/);
-  assert.match(exampleEnv, /SMTP_HOST/);
+  assert.match(exampleEnv, /SMTP_HOST=smtp\.qq\.com/);
+  assert.match(exampleEnv, /SMTP_PASS=replace-with-qq-mail-smtp-authorization-code/);
   assert.match(caddy, /reverse_proxy/);
   assert.match(guide, /Docker/);
   assert.match(guide, /HTTPS/);
