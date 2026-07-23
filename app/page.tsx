@@ -15,7 +15,7 @@ import { importQuestionFile, QuestionRecognitionError, type ImportUpdate } from 
 import {
   activateQuestionBank, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
   exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, mergeQuestionBankSyncBundle,
-  parseSharedQuestionBankPackage, renameQuestionBank, saveActiveBank, type SavedQuestionBank,
+  parseSharedQuestionBankPackage, saveActiveBank, updateQuestionBankDetails, type SavedQuestionBank,
 } from "./lib/local-bank";
 import { exportEnglishTestSyncBundle, mergeEnglishTestSyncBundle } from "./lib/english-test";
 import { exportEnglishPracticeSyncBundle, mergeEnglishPracticeSyncBundle } from "./lib/english-practice";
@@ -300,6 +300,7 @@ export default function HomePage() {
     const currentBank: SavedQuestionBank = savedCurrent ? { ...savedCurrent, name: bankName, questions } : {
       id: "__demo__",
       name: bankName,
+      description: "",
       questions,
       importedAt: new Date(0).toISOString(),
       updatedAt: new Date(0).toISOString(),
@@ -662,6 +663,7 @@ export default function HomePage() {
       batchController.signal.addEventListener("abort", cancelCurrentFile, { once: true });
       try {
         let importedName = file.name.replace(/\.(doc|docx|pdf|json)$/i, "");
+        let importedDescription = "";
         let importedQuestions: QuizQuestion[];
         let usedOcr = false;
         if (/\.json$/i.test(file.name)) {
@@ -670,6 +672,7 @@ export default function HomePage() {
             onTimeout: () => fileController.abort(),
           })) as unknown);
           importedName = shared.name;
+          importedDescription = shared.description ?? "";
           importedQuestions = shared.questions;
           setImportState({ phase: "正在接收分享题库", progress: 82, detail: `[${index + 1}/${batch.length}] ${file.name}` });
         } else {
@@ -683,7 +686,12 @@ export default function HomePage() {
           importedName = result.questions[0]?.category || importedName;
           usedOcr = result.usedOcr;
         }
-        const saved = await saveActiveBank({ name: importedName, questions: importedQuestions, importedAt: new Date().toISOString() });
+        const saved = await saveActiveBank({
+          name: importedName,
+          description: importedDescription,
+          questions: importedQuestions,
+          importedAt: new Date().toISOString(),
+        });
         setQuestions(saved.questions);
         setBankName(saved.name);
         setActiveBankId(saved.id);
@@ -775,11 +783,11 @@ export default function HomePage() {
     }
   }
 
-  async function renameSavedBank(id: string, name: string) {
-    const renamed = await renameQuestionBank(id, name);
-    setQuestionBanks((banks) => banks.map((bank) => bank.id === id ? renamed : bank));
-    if (activeBankId === id) setBankName(renamed.name);
-    setToast(`题库已更名为“${renamed.name}” ✍️`);
+  async function updateSavedBankDetails(id: string, name: string, description: string) {
+    const updated = await updateQuestionBankDetails(id, { name, description });
+    setQuestionBanks((banks) => banks.map((bank) => bank.id === id ? updated : bank));
+    if (activeBankId === id) setBankName(updated.name);
+    setToast(`“${updated.name}”的题库信息已保存 ✍️📚`);
     window.setTimeout(() => setToast(""), 3000);
   }
 
@@ -857,7 +865,7 @@ export default function HomePage() {
           onHome={() => setView("home")}
           onImport={() => setShowImport(true)}
           onSelect={(id) => selectQuestionBank(id, "home")}
-          onRename={renameSavedBank}
+          onUpdate={updateSavedBankDetails}
           onDelete={removeSavedBank}
           onReset={resetSavedBankProgress}
           onOpenQuestion={openSavedQuestion}
@@ -981,7 +989,7 @@ function HomeView({ bankName, questions, answered, wrong, accuracy, progress, on
   </div>;
 }
 
-function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onHome, onImport, onSelect, onRename, onDelete, onReset, onOpenQuestion }: {
+function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onHome, onImport, onSelect, onUpdate, onDelete, onReset, onOpenQuestion }: {
   banks: SavedQuestionBank[];
   activeBankId: string | null;
   progress: Progress;
@@ -990,14 +998,16 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   onHome: () => void;
   onImport: () => void;
   onSelect: (id: string) => Promise<void>;
-  onRename: (id: string, name: string) => Promise<void>;
+  onUpdate: (id: string, name: string, description: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReset: (bank: SavedQuestionBank) => Promise<void>;
   onOpenQuestion: (bank: SavedQuestionBank, questionId: string) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sharingBank, setSharingBank] = useState<SavedQuestionBank | null>(null);
   const [resettingBank, setResettingBank] = useState<SavedQuestionBank | null>(null);
@@ -1006,11 +1016,22 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   const multipleQuestions = banks.reduce((sum, bank) => sum + bank.questions.filter((question) => question.multiple).length, 0);
   const searchResults = useMemo(() => searchQuestionBanks(banks, query, 100), [banks, query]);
 
-  async function submitRename(bank: SavedQuestionBank) {
-    const name = renameValue.trim();
-    if (!name || name === bank.name) return setRenamingId(null);
-    await onRename(bank.id, name.slice(0, 60));
-    setRenamingId(null);
+  async function submitEdit(bank: SavedQuestionBank) {
+    const name = editName.trim().slice(0, 60);
+    const description = editDescription.trim().slice(0, 4_000);
+    if (!name) return;
+    if (name !== bank.name || description !== bank.description) await onUpdate(bank.id, name, description);
+    setEditingId(null);
+  }
+
+  function beginEdit(bank: SavedQuestionBank) {
+    setEditingId(bank.id);
+    setEditName(bank.name);
+    setEditDescription(bank.description);
+  }
+
+  function toggleDescription(id: string) {
+    setExpandedDescriptionIds((ids) => ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]);
   }
 
   return <div className="bank-page">
@@ -1022,13 +1043,22 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
         const singleCount = bank.questions.filter((question) => !question.multiple).length;
         const multipleCount = bank.questions.length - singleCount;
         const isActive = bank.id === activeBankId;
-        const isRenaming = renamingId === bank.id;
+        const isEditing = editingId === bank.id;
         const isDeleting = deletingId === bank.id;
+        const descriptionExpanded = expandedDescriptionIds.includes(bank.id);
+        const descriptionIsLong = bank.description.length > 120 || bank.description.includes("\n");
         return <article className={`bank-card ${isActive ? "active" : ""}`} key={bank.id}>
           <header><span className="bank-card-icon"><Database /></span>{isActive && <em><Check size={13} />当前题库</em>}</header>
-          {isRenaming ? <form className="bank-rename" onSubmit={(event) => { event.preventDefault(); void submitRename(bank); }}><input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} maxLength={60} /><div><button type="submit"><Check size={15} />保存</button><button type="button" onClick={() => setRenamingId(null)}><X size={15} />取消</button></div></form> : <><h3>{bank.name}</h3><p>{bank.questions.length} 道题 · 单选 {singleCount} · 多选 {multipleCount}</p></>}
+          {isEditing ? <form className="bank-edit" onSubmit={(event) => { event.preventDefault(); void submitEdit(bank); }}>
+            <label><span>题库名称</span><input autoFocus value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={60} /></label>
+            <label><span>题库简介</span><textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={4_000} rows={7} placeholder="可填写题库范围、章节目录、来源说明或适用考试；请勿录入患者及其他敏感信息。" /></label>
+            <small>{editDescription.length} / 4000</small>
+            <div><button type="submit" disabled={!editName.trim()}><Check size={15} />保存信息</button><button type="button" onClick={() => setEditingId(null)}><X size={15} />取消</button></div>
+          </form> : <><h3>{bank.name}</h3><p>{bank.questions.length} 道题 · 单选 {singleCount} · 多选 {multipleCount}</p>
+            {bank.description && <section className={`bank-description ${descriptionExpanded ? "expanded" : ""}`}><div><span><FileText size={14} />题库简介</span>{descriptionIsLong && <button type="button" aria-expanded={descriptionExpanded} onClick={() => toggleDescription(bank.id)}>{descriptionExpanded ? "收起" : "展开全文"}<ChevronRight size={14} /></button>}</div><p>{bank.description}</p></section>}
+          </>}
           <div className="bank-card-meta"><span>导入于 {new Date(bank.importedAt).toLocaleDateString("zh-CN")}</span><span>仅存本机</span></div>
-          {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="重命名" title="重命名" onClick={() => { setRenamingId(bank.id); setRenameValue(bank.name); }}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
+          {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
         </article>;
       })}</div> : <div className="bank-empty"><Database /><h2>题库书架还是空的</h2><p>导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。</p><button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button></div>}</section>}
     </main>
@@ -1100,7 +1130,7 @@ function ShareBankModal({ bank, onClose }: { bank: SavedQuestionBank; onClose: (
     }
   }
 
-  return <div className="modal-layer" onMouseDown={onClose}><section className="share-bank-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>SHARE WITH CARE</span><h2>分享“{bank.name}”</h2></div><button onClick={onClose}><X /></button></header><div className="share-copyright-alert"><ShieldCheck /><div><strong>分享之前，请先确认版权与隐私边界</strong><p>请确认你拥有这份题库的使用与传播权限。不要分享未经授权的教材、课程内容，也不要包含姓名、学号、患者资料或其他敏感信息。</p></div></div><div className="share-summary"><Database /><div><strong>{bank.questions.length} 道题</strong><span>文件包含题干、选项与答案，可被“红豆生南国”再次导入</span></div></div><button className={`copyright-check ${accepted ? "checked" : ""}`} role="checkbox" aria-checked={accepted} onClick={() => setAccepted((value) => !value)}><i>{accepted && <Check />}</i><span>我已确认拥有必要权限，并会尊重题库原作者与相关权利人的版权。</span></button>{message && <p className="share-message">{message}</p>}<footer><button className="ghost-action" onClick={() => accepted && downloadFile(makeFile())} disabled={!accepted}><Download />保存分享文件</button><button className="primary-action" onClick={() => void systemShare()} disabled={!accepted}><Share2 />系统分享</button></footer></section></div>;
+  return <div className="modal-layer" onMouseDown={onClose}><section className="share-bank-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>SHARE WITH CARE</span><h2>分享“{bank.name}”</h2></div><button onClick={onClose}><X /></button></header><div className="share-copyright-alert"><ShieldCheck /><div><strong>分享之前，请先确认版权与隐私边界</strong><p>请确认你拥有这份题库的使用与传播权限。不要分享未经授权的教材、课程内容，也不要包含姓名、学号、患者资料或其他敏感信息。</p></div></div><div className="share-summary"><Database /><div><strong>{bank.questions.length} 道题</strong><span>文件包含题库简介、题干、选项与答案，可被“红豆生南国”再次导入</span></div></div>{bank.description && <div className="share-bank-description"><FileText /><div><strong>随题库分享的简介</strong><p>{bank.description}</p></div></div>}<button className={`copyright-check ${accepted ? "checked" : ""}`} role="checkbox" aria-checked={accepted} onClick={() => setAccepted((value) => !value)}><i>{accepted && <Check />}</i><span>我已确认拥有必要权限，并会尊重题库原作者与相关权利人的版权。</span></button>{message && <p className="share-message">{message}</p>}<footer><button className="ghost-action" onClick={() => accepted && downloadFile(makeFile())} disabled={!accepted}><Download />保存分享文件</button><button className="primary-action" onClick={() => void systemShare()} disabled={!accepted}><Share2 />系统分享</button></footer></section></div>;
 }
 
 function QuizView(props: {

@@ -64,6 +64,9 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /function ResetBankProgressModal/);
   assert.match(page, /请谨慎操作：清空后无法撤销/);
   assert.match(page, /题库本身仍然保留/);
+  assert.match(page, /编辑题库名称与简介/);
+  assert.match(page, /题库简介/);
+  assert.match(page, /展开全文/);
   assert.match(page, /全局搜索：题库名、疾病、症状或知识点/);
   assert.match(page, /分享之前，请先确认版权与隐私边界/);
   assert.match(page, /仅做单选/);
@@ -164,7 +167,10 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /export async function listQuestionBanks/);
   assert.match(localBank, /export async function activateQuestionBank/);
   assert.match(localBank, /export async function renameQuestionBank/);
+  assert.match(localBank, /export async function updateQuestionBankDetails/);
   assert.match(localBank, /export async function deleteQuestionBank/);
+  assert.match(localBank, /description: typeof input\.description/);
+  assert.match(localBank, /bank: \{ name: bank\.name, description: bank\.description, questions: bank\.questions \}/);
   assert.match(localBank, /hongdou-question-bank/);
   assert.match(localBank, /multiple: answer\.length > 1/);
   assert.match(localBank, /Transparently migrate the single-bank format/);

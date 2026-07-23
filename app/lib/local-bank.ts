@@ -3,6 +3,7 @@ import type { QuizQuestion } from "./question-parser";
 export type SavedQuestionBank = {
   id: string;
   name: string;
+  description: string;
   questions: QuizQuestion[];
   importedAt: string;
   updatedAt: string;
@@ -11,6 +12,7 @@ export type SavedQuestionBank = {
 export type QuestionBankInput = {
   id?: string;
   name: string;
+  description?: string;
   questions: QuizQuestion[];
   importedAt: string;
   updatedAt?: string;
@@ -22,6 +24,7 @@ export type SharedQuestionBankPackage = {
   exportedAt: string;
   bank: {
     name: string;
+    description?: string;
     questions: QuizQuestion[];
   };
 };
@@ -79,6 +82,7 @@ function normalizeBank(input: QuestionBankInput): SavedQuestionBank {
   return {
     id,
     name: input.name.trim() || "未命名题库",
+    description: typeof input.description === "string" ? input.description.trim().slice(0, 4_000) : "",
     questions: input.questions.map((question, index) => normalizeQuestion({
       ...question,
       id: isNew ? `${id}:${index + 1}` : question.id,
@@ -168,9 +172,21 @@ export async function activateQuestionBank(id: string): Promise<SavedQuestionBan
 }
 
 export async function renameQuestionBank(id: string, name: string): Promise<SavedQuestionBank> {
+  return updateQuestionBankDetails(id, { name });
+}
+
+export async function updateQuestionBankDetails(
+  id: string,
+  details: { name?: string; description?: string },
+): Promise<SavedQuestionBank> {
   const bank = await loadQuestionBank(id);
-  if (!bank) throw new Error("找不到要重命名的题库");
-  return saveQuestionBank({ ...bank, name, updatedAt: new Date().toISOString() });
+  if (!bank) throw new Error("找不到要编辑的题库");
+  return saveQuestionBank({
+    ...bank,
+    name: details.name ?? bank.name,
+    description: details.description ?? bank.description,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 export async function deleteQuestionBank(id: string): Promise<void> {
@@ -222,6 +238,7 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
     await saveQuestionBank({
       id: candidate.id,
       name: typeof candidate.name === "string" ? candidate.name.slice(0, 160) : "同步题库",
+      description: typeof candidate.description === "string" ? candidate.description.slice(0, 4_000) : "",
       questions: candidate.questions,
       importedAt: typeof candidate.importedAt === "string" ? candidate.importedAt : new Date().toISOString(),
       updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : new Date().toISOString(),
@@ -238,7 +255,7 @@ export function createSharedQuestionBankPackage(bank: SavedQuestionBank): Shared
     format: "hongdou-question-bank",
     version: 1,
     exportedAt: new Date().toISOString(),
-    bank: { name: bank.name, questions: bank.questions },
+    bank: { name: bank.name, description: bank.description, questions: bank.questions },
   };
 }
 
@@ -253,6 +270,7 @@ export function parseSharedQuestionBankPackage(value: unknown): QuestionBankInpu
   if (!questions.length) throw new Error("分享文件中没有可用题目");
   return {
     name: typeof payload.bank.name === "string" ? payload.bank.name : "分享题库",
+    description: typeof payload.bank.description === "string" ? payload.bank.description.slice(0, 4_000) : "",
     questions,
     importedAt: new Date().toISOString(),
   };

@@ -58,9 +58,10 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 - Show per-file waiting, processing, success, AI-ready, failure, and timeout states.
 - Preserve every successful import in browser IndexedDB.
 - Switch the active bank without deleting learning records from other banks.
-- Rename or delete an imported bank.
+- Edit a bank’s name and up-to-4,000-character description, including multiline scope, chapter, source, and usage notes; long descriptions collapse cleanly in the library.
+- Delete an imported bank.
 - Search stems, options, categories, source numbers, and bank names across all local banks, with relevance ranking and highlighted matches.
-- Export a portable `.hongdou.json` file after a copyright and privacy confirmation.
+- Export a portable `.hongdou.json` file, including its bank description, after a copyright and privacy confirmation.
 - Reset one bank’s answers, wrong-answer state, favorites, and notes through an irreversible-action confirmation UI while preserving the bank itself.
 
 ### Practice and review
