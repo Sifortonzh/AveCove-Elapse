@@ -19,6 +19,10 @@ import {
 } from "./lib/local-bank";
 import { exportEnglishTestSyncBundle, mergeEnglishTestSyncBundle } from "./lib/english-test";
 import { exportEnglishPracticeSyncBundle, mergeEnglishPracticeSyncBundle } from "./lib/english-practice";
+import {
+  learningRecordsEqual, mergeLearningRecords, normalizeLearningRecords, stampLearningRecord,
+  type LearningRecords, type RecordLedger,
+} from "./lib/record-sync";
 import type { QuizQuestion } from "./lib/question-parser";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
@@ -143,6 +147,7 @@ export default function HomePage() {
   const [progress, setProgress] = useState<Progress>({});
   const [favorites, setFavorites] = useState<string[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [recordLedger, setRecordLedger] = useState<RecordLedger>({});
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [showSettings, setShowSettings] = useState(false);
   const [showAnswerSheet, setShowAnswerSheet] = useState(false);
@@ -187,9 +192,12 @@ export default function HomePage() {
       try {
         const savedLearningMode = localStorage.getItem("avecove-learning-mode");
         if (savedLearningMode === "english" || savedLearningMode === "medical") setLearningMode(savedLearningMode);
-        setProgress(JSON.parse(localStorage.getItem("hongdou-progress") ?? localStorage.getItem("medquiz-progress") ?? "{}"));
-        setFavorites(JSON.parse(localStorage.getItem("hongdou-favorites") ?? "[]"));
-        setNotes(JSON.parse(localStorage.getItem("hongdou-notes") ?? "{}"));
+        persistLearningRecords(normalizeLearningRecords({
+          progress: JSON.parse(localStorage.getItem("hongdou-progress") ?? localStorage.getItem("medquiz-progress") ?? "{}"),
+          favorites: JSON.parse(localStorage.getItem("hongdou-favorites") ?? "[]"),
+          notes: JSON.parse(localStorage.getItem("hongdou-notes") ?? "{}"),
+          ledger: JSON.parse(localStorage.getItem("hongdou-record-ledger") ?? "{}"),
+        }));
         setSettings(normalizeSettings(JSON.parse(localStorage.getItem("hongdou-settings") ?? "{}")));
         setNickname(localStorage.getItem("hongdou-nickname") ?? "红豆同学");
       } catch {
@@ -258,7 +266,7 @@ export default function HomePage() {
     const timer = window.setTimeout(() => { void pushRemoteState(); }, 1_200);
     return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, favorites, nickname, notes, progress, settings, syncReady, syncRevision]);
+  }, [account, favorites, nickname, notes, progress, recordLedger, settings, syncReady, syncRevision]);
 
   const current = sessionQuestions[currentIndex];
   const currentId = current?.id;
@@ -325,13 +333,29 @@ export default function HomePage() {
     }
   }
 
+  function persistLearningRecords(records: LearningRecords) {
+    setProgress(records.progress);
+    setFavorites(records.favorites);
+    setNotes(records.notes);
+    setRecordLedger(records.ledger);
+    localStorage.setItem("hongdou-progress", JSON.stringify(records.progress));
+    localStorage.setItem("hongdou-favorites", JSON.stringify(records.favorites));
+    localStorage.setItem("hongdou-notes", JSON.stringify(records.notes));
+    localStorage.setItem("hongdou-record-ledger", JSON.stringify(records.ledger));
+  }
+
   async function collectLearningState() {
     const [questionBanksBundle, englishTests] = await Promise.all([
       exportQuestionBankSyncBundle(),
       exportEnglishTestSyncBundle(),
     ]);
+    const records = normalizeLearningRecords({ progress, favorites, notes, ledger: recordLedger });
     return {
-      progress, favorites, notes, settings, nickname, bankName,
+      progress: records.progress,
+      favorites: records.favorites,
+      notes: records.notes,
+      recordLedger: records.ledger,
+      settings, nickname, bankName,
       questionBanks: questionBanksBundle,
       englishTests,
       englishPractice: exportEnglishPracticeSyncBundle(),
@@ -339,23 +363,18 @@ export default function HomePage() {
   }
 
   async function applyLearningState(state: Record<string, unknown>) {
-    if (state.progress && typeof state.progress === "object" && !Array.isArray(state.progress)) {
-      setProgress(state.progress as Progress);
-      localStorage.setItem("hongdou-progress", JSON.stringify(state.progress));
-    }
-    if (Array.isArray(state.favorites)) {
-      const next = state.favorites.filter((item): item is string => typeof item === "string");
-      setFavorites(next);
-      localStorage.setItem("hongdou-favorites", JSON.stringify(next));
-    }
-    if (state.notes && typeof state.notes === "object" && !Array.isArray(state.notes)) {
-      setNotes(state.notes as Record<string, string>);
-      localStorage.setItem("hongdou-notes", JSON.stringify(state.notes));
-    }
+    const localRecords = normalizeLearningRecords({ progress, favorites, notes, ledger: recordLedger });
+    const mergedRecords = mergeLearningRecords(
+      localRecords,
+      { progress: state.progress, favorites: state.favorites, notes: state.notes, ledger: state.recordLedger },
+    );
+    if (!learningRecordsEqual(localRecords, mergedRecords)) persistLearningRecords(mergedRecords);
     if (state.settings && typeof state.settings === "object" && !Array.isArray(state.settings)) {
       const next = normalizeSettings(state.settings);
-      setSettings(next);
-      localStorage.setItem("hongdou-settings", JSON.stringify(next));
+      if (JSON.stringify(next) !== JSON.stringify(settings)) {
+        setSettings(next);
+        localStorage.setItem("hongdou-settings", JSON.stringify(next));
+      }
     }
     if (typeof state.nickname === "string" && state.nickname.trim()) saveNickname(state.nickname);
     const bankResult = await mergeQuestionBankSyncBundle(state.questionBanks);
@@ -372,8 +391,12 @@ export default function HomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ state: await collectLearningState() }),
       });
-      const result = await response.json().catch(() => ({})) as { error?: string };
+      const result = await response.json().catch(() => ({})) as {
+        error?: string;
+        state?: { payload?: Record<string, unknown> };
+      };
       if (!response.ok) throw new Error(result.error || "sync failed");
+      if (result.state?.payload) await applyLearningState(result.state.payload);
       setSyncStatus(`题库与记录已同步 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} ☁️`);
       if (showMessage) setToast("题库、刷题记录与英文练习已安全同步 ☁️✨");
     } catch (error) {
@@ -404,7 +427,6 @@ export default function HomePage() {
     await pullRemoteState();
     setShowAccount(false);
     setToast("身份已接入 🔐☁️ 现在换台设备，也能接着上次的进度继续学 ✨");
-    window.setTimeout(() => setToast(""), 4600);
   }
 
   async function logoutAccount() {
@@ -447,7 +469,7 @@ export default function HomePage() {
     }
   }
 
-  function buildSession(custom?: Partial<Settings>) {
+  function buildSession(custom?: Partial<Settings>, limit?: number) {
     const active = { ...settings, ...custom };
     let pool = questions.filter((question) => {
       if (active.questionTypes === "single" && question.multiple) return false;
@@ -457,6 +479,7 @@ export default function HomePage() {
       return true;
     });
     if (active.questionOrder === "random") pool = shuffle(pool);
+    if (limit && limit > 0) pool = pool.slice(0, limit);
     if (active.shuffleOptions) pool = pool.map((question) => ({ ...question, options: shuffle(question.options) }));
     setSessionQuestions(pool);
     setCurrentIndex(0);
@@ -468,11 +491,11 @@ export default function HomePage() {
     setShowSettings(false);
   }
 
-  function openPractice(custom?: Partial<Settings>) {
+  function openPractice(custom?: Partial<Settings>, limit?: number) {
     if (custom) {
       const next = { ...settings, ...custom };
       saveSettings(next);
-      buildSession(custom);
+      buildSession(custom, limit);
     } else {
       setShowSettings(true);
     }
@@ -485,6 +508,22 @@ export default function HomePage() {
     setAiTexts({});
     setAiMessages([]);
     setAiMode("summary");
+  }
+
+  function goPreviousQuestion() {
+    if (currentIndex <= 0) {
+      setToast("千里之行，始于足下 ✨ 已经是本轮第一题了。");
+      return;
+    }
+    resetQuestion(currentIndex - 1);
+  }
+
+  function goNextQuestion() {
+    if (currentIndex >= sessionQuestions.length - 1) {
+      setToast("完结撒花 🎉 已经到达本轮最后一题！");
+      return;
+    }
+    resetQuestion(currentIndex + 1);
   }
 
   function openQuestion(questionId: string) {
@@ -514,29 +553,31 @@ export default function HomePage() {
     if (!current || !selected.length) return;
     const result = [...selected].sort().join("") === [...current.answer].sort().join("") ? "correct" : "wrong";
     const nextProgress = { ...progress, [current.id]: result as "correct" | "wrong" };
-    setProgress(nextProgress);
-    localStorage.setItem("hongdou-progress", JSON.stringify(nextProgress));
-    if (result === "wrong" && settings.autoFavoriteWrong && !favorites.includes(current.id)) {
-      const nextFavorites = [...favorites, current.id];
-      setFavorites(nextFavorites);
-      localStorage.setItem("hongdou-favorites", JSON.stringify(nextFavorites));
-    }
+    const shouldFavorite = result === "wrong" && settings.autoFavoriteWrong && !favorites.includes(current.id);
+    const nextFavorites = shouldFavorite ? [...favorites, current.id] : favorites;
+    const nextLedger = stampLearningRecord(recordLedger, current.id, {
+      progress: result,
+      ...(shouldFavorite ? { favorite: true } : {}),
+    });
+    persistLearningRecords({ progress: nextProgress, favorites: nextFavorites, notes, ledger: nextLedger });
     setSubmitted(true);
-    if (settings.autoNext && result === "correct") window.setTimeout(() => resetQuestion(currentIndex + 1), 700);
+    if (settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
   }
 
   function toggleFavorite() {
     if (!current) return;
     const next = isFavorite ? favorites.filter((id) => id !== current.id) : [...favorites, current.id];
-    setFavorites(next);
-    localStorage.setItem("hongdou-favorites", JSON.stringify(next));
+    const nextLedger = stampLearningRecord(recordLedger, current.id, { favorite: !isFavorite });
+    persistLearningRecords({ progress, favorites: next, notes, ledger: nextLedger });
   }
 
   function updateNote(value: string) {
     if (!current) return;
-    const next = { ...notes, [current.id]: value };
-    setNotes(next);
-    localStorage.setItem("hongdou-notes", JSON.stringify(next));
+    const next = { ...notes };
+    if (value) next[current.id] = value;
+    else delete next[current.id];
+    const nextLedger = stampLearningRecord(recordLedger, current.id, { note: value || null });
+    persistLearningRecords({ progress, favorites, notes: next, ledger: nextLedger });
   }
 
   async function askAi(mode: AiMode) {
@@ -727,7 +768,6 @@ export default function HomePage() {
     importAbortRef.current = null;
     if (successCount) {
       setToast(`${successCount} 份题库已就位 🎉 此刻就是新起点，题海有岸，胜利正在装进口袋 🫘📚🏆✨`);
-      window.setTimeout(() => setToast(""), 4600);
     }
     if (fallbackFiles.length && !cancelled) {
       setAiFallbackFiles(fallbackFiles);
@@ -768,7 +808,6 @@ export default function HomePage() {
     setBankName("演示题库");
     setActiveBankId(null);
     setToast("已恢复演示题库，随时可以重新出发");
-    window.setTimeout(() => setToast(""), 3600);
   }
 
   async function selectQuestionBank(id: string, destination: View = "home") {
@@ -788,7 +827,6 @@ export default function HomePage() {
     setQuestionBanks((banks) => banks.map((bank) => bank.id === id ? updated : bank));
     if (activeBankId === id) setBankName(updated.name);
     setToast(`“${updated.name}”的题库信息已保存 ✍️📚`);
-    window.setTimeout(() => setToast(""), 3000);
   }
 
   async function removeSavedBank(id: string) {
@@ -797,7 +835,6 @@ export default function HomePage() {
     if (activeBankId === id) await restoreDemoBank();
     else {
       setToast("题库已从本机移除，其他学习记录不受影响");
-      window.setTimeout(() => setToast(""), 3000);
     }
   }
 
@@ -806,14 +843,18 @@ export default function HomePage() {
     const nextProgress = Object.fromEntries(Object.entries(progress).filter(([id]) => !questionIds.has(id))) as Progress;
     const nextFavorites = favorites.filter((id) => !questionIds.has(id));
     const nextNotes = Object.fromEntries(Object.entries(notes).filter(([id]) => !questionIds.has(id)));
-    setProgress(nextProgress);
-    setFavorites(nextFavorites);
-    setNotes(nextNotes);
-    localStorage.setItem("hongdou-progress", JSON.stringify(nextProgress));
-    localStorage.setItem("hongdou-favorites", JSON.stringify(nextFavorites));
-    localStorage.setItem("hongdou-notes", JSON.stringify(nextNotes));
+    const resetAt = Date.now();
+    const nextLedger = { ...recordLedger };
+    for (const questionId of questionIds) {
+      nextLedger[questionId] = {
+        ...nextLedger[questionId],
+        progress: { value: null, updatedAt: resetAt },
+        favorite: { value: false, updatedAt: resetAt },
+        note: { value: null, updatedAt: resetAt },
+      };
+    }
+    persistLearningRecords({ progress: nextProgress, favorites: nextFavorites, notes: nextNotes, ledger: nextLedger });
     setToast(`“${bank.name}”的刷题记录已重置，题库本身仍然保留。`);
-    window.setTimeout(() => setToast(""), 3800);
   }
 
   async function openSavedQuestion(bank: SavedQuestionBank, questionId: string) {
@@ -896,8 +937,8 @@ export default function HomePage() {
           onHome={() => setView("home")}
           onToggleOption={toggleOption}
           onSubmit={submitAnswer}
-          onPrevious={() => resetQuestion(currentIndex - 1)}
-          onNext={() => resetQuestion(currentIndex + 1)}
+          onPrevious={goPreviousQuestion}
+          onNext={goNextQuestion}
           onFavorite={toggleFavorite}
           onAnswerSheet={() => setShowAnswerSheet(true)}
           onSettings={() => setShowSettings(true)}
@@ -950,7 +991,7 @@ function Brand({ compact = false, hideTagline = false }: { compact?: boolean; hi
 
 function HomeView({ bankName, questions, answered, wrong, accuracy, progress, onPractice, onImport, onBanks, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, quote, onAccount, onEnglish }: {
   bankName: string; questions: number; answered: number; wrong: number; accuracy: number; progress: number;
-  onPractice: (custom?: Partial<Settings>) => void; onImport: () => void; onBanks: () => void; onSearch: () => void; onNotes: () => void;
+  onPractice: (custom?: Partial<Settings>, limit?: number) => void; onImport: () => void; onBanks: () => void; onSearch: () => void; onNotes: () => void;
   onCopyright: () => void; onToggleTheme: () => void; darkMode: boolean; nickname: string;
   account: AccountSession | null; syncStatus: string; quote: (typeof homeQuotes)[number]; onAccount: () => void; onEnglish: () => void;
 }) {
@@ -976,9 +1017,9 @@ function HomeView({ bankName, questions, answered, wrong, accuracy, progress, on
       <div className="section-heading"><div><span>选择一种节奏</span><h2>开始今天的练习</h2></div><button onClick={() => onPractice()}>更多设置 <ChevronRight size={16} /></button></div>
       <section className="mode-grid">
         <button className="mode-card red" onClick={() => onPractice({ scope: "unanswered", questionOrder: "sequential" })}><span><BookOpen size={20} /></span><div><strong>顺序练习</strong><p>按原题顺序稳步推进，适合系统完成第一遍。</p></div><ChevronRight size={18} /></button>
-        <button className="mode-card green" onClick={() => onPractice({ scope: "all", questionOrder: "random" })}><span><Shuffle size={20} /></span><div><strong>随机挑战</strong><p>打乱题目位置，检验真正掌握而非顺序记忆。</p></div><ChevronRight size={18} /></button>
+        <button className="mode-card green" onClick={() => onPractice({ scope: "all", questionOrder: "random" }, 20)}><span><Shuffle size={20} /></span><div><strong>随机挑战</strong><p>从当前题库随机抽取 20 道，检验真正掌握而非顺序记忆。</p></div><ChevronRight size={18} /></button>
         <button className="mode-card gold" onClick={() => onPractice({ scope: "wrong", questionOrder: "random" })}><span><RotateCcw size={20} /></span><div><strong>错题复盘</strong><p>{wrong ? `${wrong} 道错题集中回炉，把薄弱点逐个拿下。` : "当前没有错题，可以先完成一组新练习。"}</p></div><ChevronRight size={18} /></button>
-        <button className="mode-card blue" onClick={() => onPractice({ scope: "all", questionOrder: "random", shuffleOptions: true })}><span><Clock3 size={20} /></span><div><strong>模拟考试</strong><p>题序与选项同时随机，减少提示，更接近实战。</p></div><ChevronRight size={18} /></button>
+        <button className="mode-card blue" onClick={() => onPractice({ scope: "all", questionOrder: "random", shuffleOptions: true }, 100)}><span><Clock3 size={20} /></span><div><strong>模拟考试</strong><p>从当前题库随机抽取 100 道，题序与选项同时随机，更接近实战。</p></div><ChevronRight size={18} /></button>
       </section>
       <section className="home-lower">
         <article className="insight-card"><div className="card-title"><span><Target size={18} /></span><div><strong>学习洞察</strong><p>你的个人复盘视图</p></div></div><div className="metrics"><div><b>{answered}</b><span>累计完成</span></div><div><b>{accuracy}%</b><span>正确率</span></div><div><b>{wrong}</b><span>待巩固</span></div></div><div className="tip"><Lightbulb size={17} /><p>{wrong ? "优先重做错题，比盲目刷新题更有效。" : "先完成一组题，系统就能开始生成复盘建议。"}</p></div></article>
@@ -1159,7 +1200,7 @@ function QuizView(props: {
           return <button key={option.label} className={`answer-option ${picked ? "selected" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} onClick={() => props.onToggleOption(option.label)}><span>{option.label}</span><p>{option.text}</p>{isAnswer && <Check size={18} />}{isWrong && <X size={18} />}</button>;
         })}</div></article>
         {submitted && <div className={`result-strip ${result}`}><span>{result === "correct" ? <CheckCircle2 /> : <AlertCircle />}</span><div><strong>{result === "correct" ? "答对了，知识点已加深" : "这道题值得加入复盘"}</strong><p>你的答案：{selected.join("、")} · 题库答案：{current.answer.join("、")}</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
-        <div className="quiz-actions"><button className="subtle-button" onClick={props.onPrevious} disabled={currentIndex === 0}><ChevronLeft size={17} />上一题</button>{submitted ? <button className="primary-action" onClick={props.onNext} disabled={currentIndex === total - 1}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length}>提交答案<ArrowRight size={17} /></button>}</div>
+        <div className="quiz-actions"><button className="subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>{submitted ? <button className="primary-action" onClick={props.onNext}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length}>提交答案<ArrowRight size={17} /></button>}</div>
       </section>
       <LearningPanel current={current} submitted={submitted} note={note} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} />
     </div>
@@ -1295,6 +1336,14 @@ function NotesModal({ questions, notes, onOpen, onClose }: { questions: QuizQues
 
 function SuccessToast({ message, onClose }: { message: string; onClose: () => void }) {
   const imported = message.startsWith("题库已就位");
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => closeRef.current(), 1_000);
+    return () => window.clearTimeout(timer);
+  }, [message]);
   return <div className="success-toast" role="status"><span><CheckCircle2 /></span><div><strong>{imported ? "题库导入成功 🎉" : "红豆提醒"}</strong><p>{message}</p></div><button onClick={onClose} aria-label="关闭提示"><X size={16} /></button></div>;
 }
 

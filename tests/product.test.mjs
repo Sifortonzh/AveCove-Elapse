@@ -15,6 +15,12 @@ async function loadEnglishParser() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadRecordSync() {
+  const source = await text("app/lib/record-sync.ts");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 test("ships a small, clearly labelled demo bank", async () => {
   const questions = JSON.parse(await text("app/questions.json"));
 
@@ -271,6 +277,47 @@ test("syncs imported libraries and practice records with system theme and iPad-s
   assert.match(styles, /\.annotation-layer\.active\{touch-action:pan-y pinch-zoom/);
   assert.match(styles, /\.top-actions \.profile\{display:grid!important/);
   assert.match(styles, /\.english-product\.dark/);
+});
+
+test("merges per-question practice records across devices without stale overwrites", async () => {
+  const { learningRecordsEqual, mergeLearningRecords, stampLearningRecord } = await loadRecordSync();
+  const ipadLedger = stampLearningRecord({}, "q-ipad", { progress: "wrong", favorite: true, note: "复盘重点" }, 200);
+  const macLedger = stampLearningRecord({}, "q-mac", { progress: "correct" }, 300);
+  const merged = mergeLearningRecords(
+    { progress: { "q-ipad": "wrong" }, favorites: ["q-ipad"], notes: { "q-ipad": "复盘重点" }, ledger: ipadLedger },
+    { progress: { "q-mac": "correct" }, favorites: [], notes: {}, ledger: macLedger },
+  );
+
+  assert.deepEqual(merged.progress, { "q-ipad": "wrong", "q-mac": "correct" });
+  assert.deepEqual(merged.favorites, ["q-ipad"]);
+  assert.deepEqual(merged.notes, { "q-ipad": "复盘重点" });
+  assert.equal(learningRecordsEqual(merged, { ...merged, favorites: [...merged.favorites].reverse() }), true);
+
+  const resetLedger = stampLearningRecord(merged.ledger, "q-ipad", { progress: null, favorite: false, note: null }, 500);
+  const afterReset = mergeLearningRecords(merged, { ledger: resetLedger });
+  assert.deepEqual(afterReset.progress, { "q-mac": "correct" });
+  assert.deepEqual(afterReset.favorites, []);
+  assert.deepEqual(afterReset.notes, {});
+  assert.equal(learningRecordsEqual(merged, afterReset), false);
+});
+
+test("ships bounded random sessions, boundary reminders, and one-second toast dismissal", async () => {
+  const [page, syncRoute, db] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/api/sync/route.ts"),
+    text("app/lib/server/db.ts"),
+  ]);
+
+  assert.match(page, /千里之行，始于足下/);
+  assert.match(page, /完结撒花/);
+  assert.match(page, /questionOrder: "random" \}, 20/);
+  assert.match(page, /shuffleOptions: true \}, 100/);
+  assert.match(page, /window\.setTimeout\(\(\) => closeRef\.current\(\), 1_000\)/);
+  assert.doesNotMatch(page, /setTimeout\(\(\) => setToast\(""\)/);
+  assert.match(syncRoute, /pg_advisory_xact_lock/);
+  assert.match(syncRoute, /mergeLearningRecords/);
+  assert.match(syncRoute, /recordLedger/);
+  assert.match(db, /export async function withTransaction/);
 });
 
 test("reimports a portable English Test Library share file", async () => {

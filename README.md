@@ -68,7 +68,8 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 
 - Automatically distinguish single-choice and multiple-choice questions from answer data.
 - Practice only single-choice questions or include both types.
-- Sequential and randomized question order.
+- Sequential practice, a 20-question Random Challenge, and a 100-question Mock Exam sampled from the active bank.
+- Friendly boundary reminders when navigating before the first question or beyond the final question.
 - Optional shuffled answer choices.
 - Optional auto-advance after a correct answer; wrong answers remain visible for review.
 - Unanswered, wrong-answer, and favorite scopes.
@@ -121,7 +122,8 @@ Provider URLs and model identifiers are configurable because vendors may change 
 - Student ID is transformed into an irreversible HMAC-based identifier; the raw student ID is not written to PostgreSQL.
 - Optional email verification-code login for account recovery and protected comment identity.
 - No phone number or social-platform login.
-- Sync-capable progress, favorites, notes, settings, and nickname.
+- Conflict-safe, per-question synchronization for progress, wrong answers, favorites, and notes, so activity from one device is merged instead of being overwritten by stale state from another.
+- Sync-capable settings and nickname.
 - Learning-record JSON export and import.
 - Shared comments with likes, reports, personal deletion, sensitive-word pre-review, muting, and an admin moderation console.
 - Account deletion removes associated cloud learning data and community records while retaining browser-local data.
