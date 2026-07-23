@@ -1,6 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+// The application shell changes frequently while the product is evolving.
+// Render it dynamically so returning devices always revalidate the current
+// HTML instead of keeping an old shell that points at retired asset hashes.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "红豆生南国",

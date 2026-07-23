@@ -36,6 +36,8 @@ test("includes the requested product flows and copy", async () => {
   ]);
 
   assert.match(layout, /title: "红豆生南国",/);
+  assert.match(layout, /export const dynamic = "force-dynamic"/);
+  assert.match(layout, /export const revalidate = 0/);
   assert.match(page, /题库已就位 🎉 此刻就是新起点，题海有岸，胜利正在装进口袋/);
   assert.match(page, /function SearchModal/);
   assert.match(page, /版权、免责声明与用户协议/);
