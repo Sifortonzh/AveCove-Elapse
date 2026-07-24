@@ -6,6 +6,8 @@ export type QuizQuestion = {
   stem: string;
   options: QuizOption[];
   answer: string[];
+  answerPending?: boolean;
+  draftAnswer?: string[];
   multiple: boolean;
   examProfile?: "western-medicine-306";
   questionType?: "A" | "B" | "X";

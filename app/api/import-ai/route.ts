@@ -35,16 +35,17 @@ async function recognizeChunk(input: {
   answerReference: string;
   chunkIndex: number;
   chunkCount: number;
+  allowUnanswered: boolean;
 }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 120_000);
   try {
     const content = await generateAiText(input.aiConfig, buildMedicalImportPrompt(input), {
-      maxTokens: 8_000,
+      maxTokens: input.profile === "western-medicine-306" ? 16_000 : 10_000,
       temperature: 0,
       signal: controller.signal,
     });
-    return parseMedicalAiResponse(content, input.category, input.profile);
+    return parseMedicalAiResponse(content, input.category, input.profile, { allowUnanswered: input.allowUnanswered });
   } finally {
     clearTimeout(timer);
   }
@@ -66,7 +67,12 @@ export async function POST(request: Request) {
   if (text.length < 20) return Response.json({ error: "文件中没有足够的可识别文字。" }, { status: 400 });
   const category = fileName.replace(/\.(doc|docx|pdf)$/i, "") || "AI 整理题库";
   const profile = detectMedicalExamProfile(fileName, text);
-  const chunks = splitMedicalSourceText(text);
+  const allowUnanswered = profile === "western-medicine-306";
+  // 306 papers are dense: a short source fragment can expand to many JSON records.
+  // Smaller overlapping fragments prevent a single model response from truncating after ~60 questions.
+  const chunks = profile === "western-medicine-306"
+    ? splitMedicalSourceText(text, 8_500, 42)
+    : splitMedicalSourceText(text, 18_000, 24);
   const answerReference = extractMedicalAnswerReference(text);
   const questions: QuizQuestion[] = [];
   const warnings: string[] = [];
@@ -84,6 +90,7 @@ export async function POST(request: Request) {
       answerReference,
       chunkIndex: offset + batchIndex,
       chunkCount: chunks.length,
+      allowUnanswered,
     })));
     settled.forEach((result, batchIndex) => {
       const part = offset + batchIndex + 1;
@@ -110,6 +117,12 @@ export async function POST(request: Request) {
       discarded,
       warnings,
       answerCoverage: merged.length,
+      answeredCount: merged.filter((question) => question.answer.length).length,
+      pendingAnswerCount: merged.filter((question) => !question.answer.length).length,
+      expectedQuestionCount: profile === "western-medicine-306" ? 165 : undefined,
+      missingSourceNumbers: profile === "western-medicine-306"
+        ? Array.from({ length: 165 }, (_, index) => String(index + 1)).filter((number) => !merged.some((question) => question.sourceNumber === number))
+        : [],
     },
   });
 }

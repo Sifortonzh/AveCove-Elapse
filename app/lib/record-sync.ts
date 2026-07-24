@@ -7,6 +7,7 @@ export type TimedValue<T> = {
 
 export type RecordLedgerEntry = {
   progress?: TimedValue<ProgressValue | null>;
+  firstProgress?: TimedValue<ProgressValue | null>;
   favorite?: TimedValue<boolean>;
   note?: TimedValue<string | null>;
 };
@@ -15,6 +16,7 @@ export type RecordLedger = Record<string, RecordLedgerEntry>;
 
 export type LearningRecords = {
   progress: Record<string, ProgressValue>;
+  firstProgress: Record<string, ProgressValue>;
   favorites: string[];
   notes: Record<string, string>;
   ledger: RecordLedger;
@@ -22,6 +24,7 @@ export type LearningRecords = {
 
 export type LearningRecordsInput = {
   progress?: unknown;
+  firstProgress?: unknown;
   favorites?: unknown;
   notes?: unknown;
   ledger?: unknown;
@@ -51,10 +54,12 @@ function normalizeLedger(value: unknown): RecordLedger {
     const entry = rawEntry as Record<string, unknown>;
     const progress = normalizeTimedValue(entry.progress, (candidate): candidate is ProgressValue | null =>
       candidate === "correct" || candidate === "wrong" || candidate === null);
+    const firstProgress = normalizeTimedValue(entry.firstProgress, (candidate): candidate is ProgressValue | null =>
+      candidate === "correct" || candidate === "wrong" || candidate === null);
     const favorite = normalizeTimedValue(entry.favorite, (candidate): candidate is boolean => typeof candidate === "boolean");
     const note = normalizeTimedValue(entry.note, (candidate): candidate is string | null =>
       candidate === null || typeof candidate === "string");
-    if (progress || favorite || note) result[questionId] = { progress, favorite, note };
+    if (progress || firstProgress || favorite || note) result[questionId] = { progress, firstProgress, favorite, note };
   }
   return result;
 }
@@ -66,6 +71,12 @@ function normalizeLegacyRecords(input: LearningRecordsInput) {
       if (value === "correct" || value === "wrong") progress[questionId] = value;
     }
   }
+  const firstProgress: Record<string, ProgressValue> = {};
+  if (input.firstProgress && typeof input.firstProgress === "object" && !Array.isArray(input.firstProgress)) {
+    for (const [questionId, value] of Object.entries(input.firstProgress)) {
+      if (value === "correct" || value === "wrong") firstProgress[questionId] = value;
+    }
+  }
   const favorites = Array.isArray(input.favorites)
     ? [...new Set(input.favorites.filter((item): item is string => typeof item === "string" && Boolean(item)))]
     : [];
@@ -75,7 +86,7 @@ function normalizeLegacyRecords(input: LearningRecordsInput) {
       if (typeof value === "string" && value) notes[questionId] = value;
     }
   }
-  return { progress, favorites, notes };
+  return { progress, firstProgress, favorites, notes };
 }
 
 function chooseTimedValue<T>(
@@ -90,16 +101,37 @@ function chooseTimedValue<T>(
   return { value: tieBreaker(left.value, right.value), updatedAt: left.updatedAt };
 }
 
+function chooseFirstProgress(
+  left: TimedValue<ProgressValue | null> | undefined,
+  right: TimedValue<ProgressValue | null> | undefined,
+) {
+  if (!left) return right;
+  if (!right) return left;
+  if (left.value === null || right.value === null) {
+    if (left.updatedAt > right.updatedAt) return left;
+    if (right.updatedAt > left.updatedAt) return right;
+    return left.value === null ? left : right;
+  }
+  if (left.updatedAt < right.updatedAt) return left;
+  if (right.updatedAt < left.updatedAt) return right;
+  return {
+    value: left.value === "wrong" || right.value === "wrong" ? "wrong" as const : "correct" as const,
+    updatedAt: left.updatedAt,
+  };
+}
+
 function materializeLedger(ledger: RecordLedger): LearningRecords {
   const progress: Record<string, ProgressValue> = {};
+  const firstProgress: Record<string, ProgressValue> = {};
   const favorites: string[] = [];
   const notes: Record<string, string> = {};
   for (const [questionId, entry] of Object.entries(ledger)) {
     if (entry.progress?.value === "correct" || entry.progress?.value === "wrong") progress[questionId] = entry.progress.value;
+    if (entry.firstProgress?.value === "correct" || entry.firstProgress?.value === "wrong") firstProgress[questionId] = entry.firstProgress.value;
     if (entry.favorite?.value) favorites.push(questionId);
     if (typeof entry.note?.value === "string" && entry.note.value) notes[questionId] = entry.note.value;
   }
-  return { progress, favorites, notes, ledger };
+  return { progress, firstProgress, favorites, notes, ledger };
 }
 
 export function normalizeLearningRecords(input: LearningRecordsInput): LearningRecords {
@@ -109,6 +141,18 @@ export function normalizeLearningRecords(input: LearningRecordsInput): LearningR
     ledger[questionId] = {
       ...ledger[questionId],
       progress: ledger[questionId]?.progress ?? { value, updatedAt: LEGACY_TIMESTAMP },
+    };
+  }
+  for (const [questionId, value] of Object.entries(legacy.firstProgress)) {
+    ledger[questionId] = {
+      ...ledger[questionId],
+      firstProgress: ledger[questionId]?.firstProgress ?? { value, updatedAt: LEGACY_TIMESTAMP },
+    };
+  }
+  for (const [questionId, value] of Object.entries(legacy.progress)) {
+    ledger[questionId] = {
+      ...ledger[questionId],
+      firstProgress: ledger[questionId]?.firstProgress ?? { value, updatedAt: LEGACY_TIMESTAMP },
     };
   }
   for (const questionId of legacy.favorites) {
@@ -136,6 +180,7 @@ export function mergeLearningRecords(leftInput: LearningRecordsInput, rightInput
     const rightEntry = right.ledger[questionId];
     const progress = chooseTimedValue(leftEntry?.progress, rightEntry?.progress, (leftValue, rightValue) =>
       rightValue ?? leftValue);
+    const firstProgress = chooseFirstProgress(leftEntry?.firstProgress, rightEntry?.firstProgress);
     const favorite = chooseTimedValue(leftEntry?.favorite, rightEntry?.favorite, (leftValue, rightValue) =>
       leftValue || rightValue);
     const note = chooseTimedValue(leftEntry?.note, rightEntry?.note, (leftValue, rightValue) => {
@@ -143,7 +188,7 @@ export function mergeLearningRecords(leftInput: LearningRecordsInput, rightInput
       if (rightValue === null) return leftValue;
       return rightValue.length >= leftValue.length ? rightValue : leftValue;
     });
-    ledger[questionId] = { progress, favorite, note };
+    ledger[questionId] = { progress, firstProgress, favorite, note };
   }
   return materializeLedger(ledger);
 }
@@ -158,7 +203,7 @@ export function learningRecordsEqual(leftInput: LearningRecordsInput, rightInput
     const leftEntry = left[questionId];
     const rightEntry = right[questionId];
     if (!rightEntry) return false;
-    return (["progress", "favorite", "note"] as const).every((field) => {
+    return (["progress", "firstProgress", "favorite", "note"] as const).every((field) => {
       const leftValue = leftEntry[field];
       const rightValue = rightEntry[field];
       return leftValue?.value === rightValue?.value && leftValue?.updatedAt === rightValue?.updatedAt;
@@ -169,12 +214,18 @@ export function learningRecordsEqual(leftInput: LearningRecordsInput, rightInput
 export function stampLearningRecord(
   ledger: RecordLedger,
   questionId: string,
-  patch: { progress?: ProgressValue | null; favorite?: boolean; note?: string | null },
+  patch: { progress?: ProgressValue | null; firstProgress?: ProgressValue | null; favorite?: boolean; note?: string | null },
   updatedAt = Date.now(),
 ): RecordLedger {
   const next = { ...ledger };
   const entry = { ...next[questionId] };
   if (Object.prototype.hasOwnProperty.call(patch, "progress")) entry.progress = { value: patch.progress ?? null, updatedAt };
+  if (
+    Object.prototype.hasOwnProperty.call(patch, "firstProgress")
+    && (patch.firstProgress === null || !entry.firstProgress?.value)
+  ) {
+    entry.firstProgress = { value: patch.firstProgress ?? null, updatedAt };
+  }
   if (Object.prototype.hasOwnProperty.call(patch, "favorite")) entry.favorite = { value: Boolean(patch.favorite), updatedAt };
   if (Object.prototype.hasOwnProperty.call(patch, "note")) entry.note = { value: patch.note ?? null, updatedAt };
   next[questionId] = entry;

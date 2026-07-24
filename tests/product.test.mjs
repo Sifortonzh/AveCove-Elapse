@@ -59,6 +59,13 @@ test("recovers medical questions from partially malformed AI JSON and applies 30
   });
   assert.equal(score.earned, 1.5);
   assert.equal(score.total, 3);
+  const lockedScore = western306Score(
+    parsed.questions,
+    { [parsed.questions[0].id]: "correct" },
+    { [parsed.questions[0].id]: "wrong" },
+  );
+  assert.equal(lockedScore.earned, 0);
+  assert.equal(lockedScore.answeredMaximum, 1.5);
   const fullPaper = Array.from({ length: 165 }, (_, index) => {
     const sourceNumber = String(index + 1);
     const metadata = western306Metadata(sourceNumber);
@@ -394,7 +401,7 @@ test("syncs imported libraries and practice records with system theme and iPad-s
   assert.match(styles, /\.english-product\.dark/);
 });
 
-test("keeps sync quiet and makes iPhone answer confirmation and drawer closing explicit", async () => {
+test("keeps sync quiet and gives iPhone separate answer confirmation, next navigation, and drawer closing", async () => {
   const [page, localBank, englishStore, styles] = await Promise.all([
     text("app/page.tsx"),
     text("app/lib/local-bank.ts"),
@@ -405,17 +412,46 @@ test("keeps sync quiet and makes iPhone answer confirmation and drawer closing e
   assert.match(page, /syncInFlightRef/);
   assert.match(page, /if \(showMessage\) \{\s*setManualSyncing\(true\)/);
   assert.match(page, /aria-label="立即手动同步"/);
-  assert.match(page, /className="mobile-confirm"/);
+  assert.match(page, /className="mobile-submit-bar"/);
   assert.match(page, /确认答案/);
+  assert.match(page, /className="mobile-next"/);
+  assert.doesNotMatch(page, /submitted \? <button className="mobile-next"/);
   assert.match(page, /aria-label="关闭学习区"/);
   assert.match(localBank, /current\.updatedAt >= candidate\.updatedAt/);
   assert.match(localBank, /activeBankId !== localActiveBankId/);
   assert.match(englishStore, /current\.updatedAt >= test\.updatedAt/);
   assert.match(styles, /\.sync-caption-row/);
-  assert.match(styles, /\.quiz-bottom \.mobile-confirm/);
+  assert.match(styles, /\.mobile-submit-bar/);
+  assert.match(styles, /\.quiz-bottom \.mobile-next/);
   assert.match(styles, /\.drawer-close\{position:fixed/);
   assert.match(styles, /env\(safe-area-inset-bottom\)/);
   assert.match(styles, /touch-action:manipulation/);
+});
+
+test("keeps imported explanations separate and upgrades AI-assisted notes to searchable Markdown", async () => {
+  const [page, explainRoute, medicalImport, styles] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/api/explain/route.ts"),
+    text("app/lib/medical-ai-import.ts"),
+    text("app/globals.css"),
+  ]);
+
+  assert.match(page, /className="source-explanation"/);
+  assert.match(page, /原资料解析/);
+  assert.match(page, /current\.answerSource/);
+  assert.match(page, /写入我的笔记/);
+  assert.match(page, /Markdown 编辑/);
+  assert.match(page, /function MarkdownNotePreview/);
+  assert.match(page, /parseNoteTags/);
+  assert.match(page, /搜索题目、来源、笔记正文或标签/);
+  assert.match(page, /参考框架：第十版 人卫教材/);
+  assert.match(explainRoute, /人民卫生出版社第十版医学教材/);
+  assert.match(explainRoute, /不得伪造教材引文、页码、章节/);
+  assert.match(explainRoute, /原资料解析/);
+  assert.match(medicalImport, /必须忠实提取并整理该题对应的原文解析/);
+  assert.match(styles, /\.source-explanation/);
+  assert.match(styles, /\.markdown-note-preview/);
+  assert.match(styles, /\.notes-tag-filter/);
 });
 
 test("merges per-question practice records across devices without stale overwrites", async () => {
@@ -440,6 +476,21 @@ test("merges per-question practice records across devices without stale overwrit
   assert.equal(learningRecordsEqual(merged, afterReset), false);
 });
 
+test("locks the earliest 306 result while allowing current mastery to improve", async () => {
+  const { mergeLearningRecords, normalizeLearningRecords, stampLearningRecord } = await loadRecordSync();
+  const firstAttempt = stampLearningRecord({}, "q-306", { progress: "wrong", firstProgress: "wrong" }, 100);
+  const reviewed = stampLearningRecord(firstAttempt, "q-306", { progress: "correct", firstProgress: "correct" }, 200);
+  const local = normalizeLearningRecords({ ledger: reviewed });
+
+  assert.equal(local.progress["q-306"], "correct");
+  assert.equal(local.firstProgress["q-306"], "wrong");
+
+  const otherDevice = stampLearningRecord({}, "q-306", { progress: "correct", firstProgress: "correct" }, 150);
+  const merged = mergeLearningRecords(local, { ledger: otherDevice });
+  assert.equal(merged.progress["q-306"], "correct");
+  assert.equal(merged.firstProgress["q-306"], "wrong");
+});
+
 test("ships bounded random sessions, boundary reminders, and one-second toast dismissal", async () => {
   const [page, syncRoute, db] = await Promise.all([
     text("app/page.tsx"),
@@ -449,6 +500,8 @@ test("ships bounded random sessions, boundary reminders, and one-second toast di
 
   assert.match(page, /千里之行，始于足下/);
   assert.match(page, /完结撒花/);
+  assert.match(page, /返回上一题时显示答案/);
+  assert.match(page, /首次作答得分/);
   assert.match(page, /questionOrder: "random" \}, 20/);
   assert.match(page, /shuffleOptions: true \}, 100/);
   assert.match(page, /window\.setTimeout\(\(\) => closeRef\.current\(\), 1_000\)/);

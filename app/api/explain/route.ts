@@ -5,7 +5,15 @@ import { requestFingerprint } from "@/app/lib/server/rate-limit";
 
 export async function POST(request: Request) {
   const body = await request.json() as {
-    question?: { stem?: string; options?: Array<{ label: string; text: string }>; answer?: string[] };
+    question?: {
+      stem?: string;
+      options?: Array<{ label: string; text: string }>;
+      answer?: string[];
+      explanation?: string;
+      answerSource?: string;
+      category?: string;
+      sourceNumber?: string;
+    };
     mode?: "summary" | "pitfall" | "companion";
     followUp?: string;
     history?: Array<{ role?: "user" | "assistant"; text?: string }>;
@@ -49,11 +57,17 @@ export async function POST(request: Request) {
   const prompt = [
     "你是一名谨慎、清晰的医学考试辅导老师。请用简体中文解析下面的医学题目。",
     modeInstruction,
+    "优先以人民卫生出版社第十版医学教材的知识体系、术语与常见考试口径作为校对框架。",
+    "如果你无法确认具体的第十版教材原文、章节或版本差异，必须明确提醒学习者以手中的第十版人卫教材核对；不得伪造教材引文、页码、章节或声称已经检索教材。",
     "以题库答案为起点核对逻辑。若题目或答案可能陈旧、有歧义或与现行指南不一致，必须明确指出，不要把题库答案说成绝对正确。",
+    question.explanation ? "下面还提供了导入资料自带的历史解析。它只作为对照材料，不代表最新结论；如与第十版教材框架或现行知识不一致，请分开说明差异。" : "",
     "内容仅用于学习，不给出针对个人的诊断或治疗建议。回答控制在 500 字以内，结构清楚。",
+    `题目来源：${question.category || "导入题库"} · 原题号 ${question.sourceNumber || "未知"}`,
     `题目：${question.stem}`,
     ...question.options.map((option) => `${option.label}. ${option.text}`),
     `题库答案：${question.answer.join("、")}`,
+    question.explanation ? `原资料解析：${question.explanation.slice(0, 3_000)}` : "",
+    question.answerSource ? `原解析来源：${question.answerSource.slice(0, 300)}` : "",
     ...(body.history ?? []).slice(-6).map((message) => `${message.role === "assistant" ? "学习助理" : "学习者"}：${String(message.text ?? "").slice(0, 500)}`),
     body.followUp ? `学习者继续追问：${String(body.followUp).slice(0, 500)}` : "",
     body.followUp ? "请直接回应这次追问，并与前文保持一致；不需要重复整道题的完整解析。" : "",

@@ -29,7 +29,7 @@ export async function PUT(request: Request) {
   const englishBundle = state.englishTests as { tests?: unknown[] } | undefined;
   if (bankBundle?.banks && (!Array.isArray(bankBundle.banks) || bankBundle.banks.length > 40)) return NextResponse.json({ error: "同步题库数量超出限制。" }, { status: 400 });
   if (englishBundle?.tests && (!Array.isArray(englishBundle.tests) || englishBundle.tests.length > 80)) return NextResponse.json({ error: "英文题库数量超出限制。" }, { status: 400 });
-  const allowedKeys = ["progress", "favorites", "notes", "recordLedger", "settings", "nickname", "bankName", "questionBanks", "englishTests", "englishPractice"];
+  const allowedKeys = ["progress", "firstProgress", "favorites", "notes", "recordLedger", "settings", "nickname", "bankName", "questionBanks", "englishTests", "englishPractice"];
   const allowed = Object.fromEntries(allowedKeys.filter((key) => key in state).map((key) => [key, state[key]]));
   const rows = await withTransaction(async (client) => {
     // Serialise writes for one learner so simultaneous iPad/Mac uploads cannot
@@ -43,12 +43,14 @@ export async function PUT(request: Request) {
     const records = mergeLearningRecords(
       {
         progress: currentPayload.progress,
+        firstProgress: currentPayload.firstProgress,
         favorites: currentPayload.favorites,
         notes: currentPayload.notes,
         ledger: currentPayload.recordLedger,
       },
       {
         progress: allowed.progress,
+        firstProgress: allowed.firstProgress,
         favorites: allowed.favorites,
         notes: allowed.notes,
         ledger: allowed.recordLedger,
@@ -58,6 +60,7 @@ export async function PUT(request: Request) {
       ...currentPayload,
       ...allowed,
       progress: records.progress,
+      firstProgress: records.firstProgress,
       favorites: records.favorites,
       notes: records.notes,
       recordLedger: records.ledger,

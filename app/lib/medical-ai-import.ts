@@ -12,6 +12,14 @@ type AiQuestion = {
   sharedOptionGroup?: unknown;
   explanation?: unknown;
   answerSource?: unknown;
+  answerPending?: unknown;
+};
+
+export type MedicalAnswerPatch = {
+  sourceNumber: string;
+  answer: string[];
+  explanation?: string;
+  answerSource?: string;
 };
 
 export type MedicalAiParseResult = {
@@ -39,12 +47,16 @@ export function western306Metadata(sourceNumber: string): {
   return { questionType: "X", points: 2, multiple: true };
 }
 
-export function western306Score(questions: QuizQuestion[], progress: Record<string, "correct" | "wrong">) {
+export function western306Score(
+  questions: QuizQuestion[],
+  progress: Record<string, "correct" | "wrong">,
+  firstProgress: Record<string, "correct" | "wrong"> = progress,
+) {
   return questions.reduce((score, question) => {
     const points = question.points ?? western306Metadata(question.sourceNumber).points ?? 0;
     return {
-      earned: score.earned + (progress[question.id] === "correct" ? points : 0),
-      answeredMaximum: score.answeredMaximum + (progress[question.id] ? points : 0),
+      earned: score.earned + (firstProgress[question.id] === "correct" ? points : 0),
+      answeredMaximum: score.answeredMaximum + (firstProgress[question.id] ? points : 0),
       total: score.total + points,
     };
   }, { earned: 0, answeredMaximum: 0, total: 0 });
@@ -133,7 +145,7 @@ function collectTopLevelObjects(content: string): unknown[] {
         try {
           const parsed = JSON.parse(content.slice(start, index + 1)) as Record<string, unknown>;
           if (Array.isArray(parsed.questions)) found.push(...parsed.questions);
-          else if ("stem" in parsed) found.push(parsed);
+          else if ("stem" in parsed || ("sourceNumber" in parsed && "answer" in parsed)) found.push(parsed);
         } catch {
           // The array-level recovery can still rescue valid children from a damaged wrapper.
         }
@@ -167,7 +179,7 @@ function collectRawQuestions(content: string): unknown[] {
     try {
       const parsed = JSON.parse(candidate) as { type?: unknown; questions?: unknown };
       if (Array.isArray(parsed.questions)) candidates.push(...parsed.questions);
-      else if (parsed.type === "question" || "stem" in parsed) candidates.push(parsed);
+      else if (parsed.type === "question" || "stem" in parsed || ("sourceNumber" in parsed && "answer" in parsed)) candidates.push(parsed);
     } catch {
       // Keep scanning other independently valid lines.
     }
@@ -197,6 +209,7 @@ function normalizeQuestion(
   category: string,
   profile: MedicalExamProfile,
   index: number,
+  allowUnanswered = false,
 ): QuizQuestion | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const raw = value as AiQuestion;
@@ -205,7 +218,7 @@ function normalizeQuestion(
   const labels = new Set(options.map((option) => option.label));
   const answerText = Array.isArray(raw.answer) ? raw.answer.join("") : String(raw.answer ?? "");
   const answer = [...new Set(answerText.toUpperCase().match(/[A-G]/g) ?? [])].filter((label) => labels.has(label));
-  if (!stem || options.length < 2 || !answer.length) return null;
+  if (!stem || options.length < 2 || (!answer.length && !allowUnanswered)) return null;
 
   const sourceNumber = String(raw.sourceNumber ?? index + 1).trim() || String(index + 1);
   const inferred = profile === "western-medicine-306" ? western306Metadata(sourceNumber) : {};
@@ -220,12 +233,13 @@ function normalizeQuestion(
     stem,
     options,
     answer,
+    answerPending: !answer.length,
     multiple,
     examProfile: profile === "western-medicine-306" ? profile : undefined,
     questionType,
     points: inferred.points,
     sharedOptionGroup: typeof raw.sharedOptionGroup === "string" ? raw.sharedOptionGroup.trim().slice(0, 120) || undefined : undefined,
-    explanation: typeof raw.explanation === "string" ? raw.explanation.trim().slice(0, 2_000) || undefined : undefined,
+    explanation: typeof raw.explanation === "string" ? raw.explanation.trim().slice(0, 6_000) || undefined : undefined,
     answerSource: typeof raw.answerSource === "string" ? raw.answerSource.trim().slice(0, 160) || undefined : undefined,
   };
 }
@@ -248,10 +262,11 @@ export function parseMedicalAiResponse(
   content: string,
   category: string,
   profile: MedicalExamProfile,
+  options: { allowUnanswered?: boolean } = {},
 ): MedicalAiParseResult {
   const candidates = collectRawQuestions(content);
   const normalized = candidates.flatMap((candidate, index) => {
-    const question = normalizeQuestion(candidate, category, profile, index);
+    const question = normalizeQuestion(candidate, category, profile, index, options.allowUnanswered);
     return question ? [question] : [];
   });
   const questions = deduplicateQuestions(normalized).map((question, index) => ({
@@ -302,6 +317,7 @@ export function buildMedicalImportPrompt(input: {
   profile: MedicalExamProfile;
   chunkIndex: number;
   chunkCount: number;
+  allowUnanswered?: boolean;
 }) {
   const profileRules = input.profile === "western-medicine-306" ? [
     "这是考研西医综合 306：1-115 为 A 型单选；116-135 为 B 型共用备选项单选；136-165 为 X 型多选。",
@@ -316,13 +332,59 @@ export function buildMedicalImportPrompt(input: {
     `文件：${input.fileName}；片段 ${input.chunkIndex + 1}/${input.chunkCount}。`,
     ...profileRules,
     "把题号与答案按原题号关联。答案可来自题目附近、章节答案、全书答案表或解析；answerSource 简短注明依据位置。",
-    "只输出本片段中题干和至少两个选项完整、且能从原文明确定答案的题。",
+    "若原文件带有“解析、详解、答案说明”等内容，explanation 必须忠实提取并整理该题对应的原文解析，不得用模型自己的医学知识替换、补写或更新；原文没有解析则留空。",
+    input.allowUnanswered
+      ? "输出本片段中题干和至少两个选项完整的全部题目。原文没有明确答案时 answer 必须为空数组，并设置 answerPending=true；不得因此丢弃题目。"
+      : "只输出本片段中题干和至少两个选项完整、且能从原文明确定答案的题。",
+    "若 OCR 丢失少数题号，只有在相邻题号与题目顺序能唯一确定时才补回；无法唯一确定时保留可见题号，不得随意编号。",
     "输出 NDJSON：每行一个独立 JSON 对象，不要数组、不要 Markdown、不要行内换行。坏一行不能影响其他题。",
-    "每行结构：{\"type\":\"question\",\"sourceNumber\":\"1\",\"questionType\":\"A\",\"sharedOptionGroup\":\"\",\"stem\":\"题干\",\"options\":[{\"label\":\"A\",\"text\":\"选项\"}],\"answer\":[\"A\"],\"explanation\":\"原文有则整理，无则空\",\"answerSource\":\"答案表 1-A\"}",
+    "每行结构：{\"type\":\"question\",\"sourceNumber\":\"1\",\"questionType\":\"A\",\"sharedOptionGroup\":\"\",\"stem\":\"题干\",\"options\":[{\"label\":\"A\",\"text\":\"选项\"}],\"answer\":[\"A\"],\"answerPending\":false,\"explanation\":\"原文有则整理，无则空\",\"answerSource\":\"答案表 1-A\"}",
     "单选 answer 一个字母，多选为多个字母。保留原意，删除页眉页脚、公众号、水印和排版噪声。",
     "可供关联的答案参考区：",
     input.answerReference || "（没有单独提取到答案参考区，请只用片段内明确答案）",
     "当前题目片段：",
     input.chunk,
+  ].join("\n");
+}
+
+export function parseMedicalAnswerResponse(content: string, questions: QuizQuestion[]): MedicalAnswerPatch[] {
+  const targets = new Map(questions.map((question) => [String(question.sourceNumber).trim(), question]));
+  const selected = new Map<string, MedicalAnswerPatch>();
+  for (const candidate of collectRawQuestions(content)) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const raw = candidate as AiQuestion;
+    const sourceNumber = String(raw.sourceNumber ?? "").trim();
+    const target = targets.get(sourceNumber);
+    if (!target) continue;
+    const labels = new Set(target.options.map((option) => option.label));
+    const answerText = Array.isArray(raw.answer) ? raw.answer.join("") : String(raw.answer ?? "");
+    const answer = [...new Set(answerText.toUpperCase().match(/[A-G]/g) ?? [])].filter((label) => labels.has(label));
+    if (!answer.length) continue;
+    selected.set(sourceNumber, {
+      sourceNumber,
+      answer,
+      explanation: typeof raw.explanation === "string" ? raw.explanation.trim().slice(0, 6_000) || undefined : undefined,
+      answerSource: typeof raw.answerSource === "string" ? raw.answerSource.trim().slice(0, 160) || undefined : undefined,
+    });
+  }
+  return [...selected.values()];
+}
+
+export function buildMedicalAnswerPrompt(input: {
+  fileName: string;
+  answerText: string;
+  questions: Array<Pick<QuizQuestion, "sourceNumber" | "stem" | "options">>;
+}) {
+  return [
+    "你是医学试卷答案关联助手。只能从答案文件原文中提取明确给出的答案与解析，不得用医学常识猜答案。",
+    `答案文件：${input.fileName}。`,
+    "按原题号把答案关联到下面的目标题目。若原文有解析，忠实提取到 explanation；answerSource 简短注明答案表、解析页或章节位置。",
+    "只输出 NDJSON，每行一个 JSON 对象，不要数组、Markdown 或额外说明。",
+    "每行结构：{\"sourceNumber\":\"1\",\"answer\":[\"A\"],\"explanation\":\"原文解析，无则空\",\"answerSource\":\"答案表\"}",
+    "找不到明确答案的题不要输出。多选答案必须保留原文给出的全部字母。",
+    "目标题目索引：",
+    ...input.questions.map((question) => `${question.sourceNumber}\t${question.stem.slice(0, 160)}\t选项:${question.options.map((option) => option.label).join("")}`),
+    "答案文件原文：",
+    input.answerText,
   ].join("\n");
 }
