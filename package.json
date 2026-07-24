@@ -1,6 +1,6 @@
 {
   "name": "avecove-elapse",
-  "version": "0.9.3",
+  "version": "1.0.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"

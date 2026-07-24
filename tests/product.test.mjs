@@ -410,6 +410,11 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(english, /IELTS/);
   assert.match(english, /TOEFL/);
   assert.match(english, /function ClozeExercise/);
+  assert.match(english, /function MatchingExercise/);
+  assert.match(english, /function TranslationExercise/);
+  assert.match(english, /Submit listening answer/);
+  assert.match(english, /All three answers are correct/);
+  assert.match(english, /Compare reference/);
   assert.match(english, /function ImportedClozePractice/);
   assert.match(english, /function ImportedMatchingPractice/);
   assert.match(english, /Paragraph Matching · Answer Order/);
@@ -429,6 +434,9 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(english, /CLICK-TO-TRANSLATE/);
   assert.match(english, /Add to wordbook/);
   assert.match(english, /avecove-english-vocabulary-v1/);
+  assert.match(english, /avecove-english-workspace-v1/);
+  assert.match(english, /Your imported papers are still saved/);
+  assert.match(english, /setStage\(storedStage \|\| items\[0\]\?\.stage \|\| "cet"\)/);
   assert.match(english, /Why B\?/);
   assert.match(english, /QR RESOURCE DETECTED/);
   assert.match(english, /type="file" multiple/);
