@@ -25,6 +25,7 @@ import {
 } from "./lib/record-sync";
 import type { QuizQuestion } from "./lib/question-parser";
 import { western306Score } from "./lib/medical-ai-import";
+import { suggestQuestionBankGroup } from "./lib/bank-grouping";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 
@@ -50,6 +51,9 @@ type Western306ImportReport = {
   pendingAnswerCount?: number;
   missingSourceNumbers?: string[];
   duplicateSourceNumbers?: string[];
+  reconciledAnswerCount?: number;
+  oneToOneVerified?: boolean;
+  suggestedGroupName?: string;
   warnings?: string[];
 };
 type MarkdownLineKind = "heading1" | "heading2" | "heading3" | "quote" | "list" | "paragraph" | "space";
@@ -381,9 +385,13 @@ export default function HomePage() {
     return () => { active = false; };
   }, [account, currentId]);
 
+  const activeGroupName = activeBankId ? questionBanks.find((bank) => bank.id === activeBankId)?.groupName ?? "" : "";
+  const activeGroupQuestions = activeGroupName
+    ? questionBanks.filter((bank) => bank.groupName === activeGroupName).flatMap((bank) => bank.questions)
+    : questions;
   const answered = Object.keys(progress).filter((id) => questions.some((question) => question.id === id)).length;
   const correct = questions.filter((question) => progress[question.id] === "correct").length;
-  const wrong = questions.filter((question) => progress[question.id] === "wrong").length;
+  const wrong = activeGroupQuestions.filter((question) => progress[question.id] === "wrong").length;
   const accuracy = answered ? Math.round((correct / answered) * 100) : 0;
   const examScore = questions.some((question) => question.examProfile === "western-medicine-306")
     ? western306Score(questions, progress, firstProgress)
@@ -401,19 +409,23 @@ export default function HomePage() {
   }), [questions]);
   const scopeCounts = useMemo(() => {
     const typedQuestions = settings.questionTypes === "single" ? questions.filter((question) => !question.multiple) : questions;
+    const typedGroupQuestions = settings.questionTypes === "single"
+      ? activeGroupQuestions.filter((question) => !question.multiple)
+      : activeGroupQuestions;
     return {
       all: typedQuestions.length,
       unanswered: typedQuestions.filter((question) => !progress[question.id]).length,
-      wrong: typedQuestions.filter((question) => progress[question.id] === "wrong").length,
+      wrong: typedGroupQuestions.filter((question) => progress[question.id] === "wrong").length,
       favorite: typedQuestions.filter((question) => favorites.includes(question.id)).length,
     };
-  }, [favorites, progress, questions, settings.questionTypes]);
+  }, [activeGroupQuestions, favorites, progress, questions, settings.questionTypes]);
   const searchableBanks = useMemo(() => {
     const savedCurrent = activeBankId ? questionBanks.find((bank) => bank.id === activeBankId) : undefined;
     const currentBank: SavedQuestionBank = savedCurrent ? { ...savedCurrent, name: bankName, questions } : {
       id: "__demo__",
       name: bankName,
       description: "",
+      groupName: "",
       questions,
       importedAt: new Date(0).toISOString(),
       updatedAt: new Date(0).toISOString(),
@@ -590,7 +602,8 @@ export default function HomePage() {
 
   function buildSession(custom?: Partial<Settings>, limit?: number) {
     const active = { ...settings, ...custom };
-    let pool = questions.filter((question) => {
+    const sourceQuestions = active.scope === "wrong" ? activeGroupQuestions : questions;
+    let pool = sourceQuestions.filter((question) => {
       if (active.questionTypes === "single" && question.multiple) return false;
       if (active.scope === "unanswered") return !progress[question.id];
       if (active.scope === "wrong") return progress[question.id] === "wrong";
@@ -854,6 +867,7 @@ export default function HomePage() {
       try {
         let importedName = file.name.replace(/\.(doc|docx|pdf|json)$/i, "");
         let importedDescription = "";
+        let importedGroupName = "";
         let importedQuestions: QuizQuestion[];
         let usedOcr = false;
         let answeredCount = 0;
@@ -865,6 +879,7 @@ export default function HomePage() {
           })) as unknown);
           importedName = shared.name;
           importedDescription = shared.description ?? "";
+          importedGroupName = shared.groupName ?? "";
           importedQuestions = shared.questions;
           answeredCount = importedQuestions.filter((question) => question.answer.length).length;
           pendingAnswerCount = importedQuestions.length - answeredCount;
@@ -885,6 +900,7 @@ export default function HomePage() {
         const saved = await saveActiveBank({
           name: importedName,
           description: importedDescription,
+          groupName: importedGroupName || suggestQuestionBankGroup(importedName, importedQuestions),
           questions: importedQuestions,
           importedAt: new Date().toISOString(),
         });
@@ -954,7 +970,14 @@ export default function HomePage() {
       const description = isWestern306
         ? `西医综合 306 专项题库：按 A、B、C、X 型题整理。已识别 ${result.questions.length} 题，已关联答案 ${result.report?.answeredCount ?? 0} 题，待导入答案 ${result.report?.pendingAnswerCount ?? 0} 题。请抽查原题号、共用选项与答案。`
         : "";
-      const saved = await saveActiveBank({ name: file.fileName.replace(/\.(doc|docx|pdf)$/i, ""), description, questions: result.questions, importedAt: new Date().toISOString() });
+      const importedName = file.fileName.replace(/\.(doc|docx|pdf)$/i, "");
+      const saved = await saveActiveBank({
+        name: importedName,
+        description,
+        groupName: result.report?.suggestedGroupName || suggestQuestionBankGroup(importedName, result.questions),
+        questions: result.questions,
+        importedAt: new Date().toISOString(),
+      });
       setQuestions(saved.questions);
       setBankName(saved.name);
       setActiveBankId(saved.id);
@@ -964,6 +987,8 @@ export default function HomePage() {
         setToast(`已保留 ${saved.questions.length} 道有效题；${result.report.warnings.length} 个片段未完成，可稍后拆分原文件补充。`);
       } else if ((result.report?.pendingAnswerCount ?? 0) > 0) {
         setToast(`已进入测试模式：${result.report?.pendingAnswerCount} 道题等待答案，可现在导入答案文件。`);
+      } else if (result.report?.oneToOneVerified) {
+        setToast(`原题与答案已完成一一对应校验，${saved.questions.length} 道题按普通模式保存 ✨`);
       }
       return saved.questions.length;
     } catch (error) {
@@ -983,7 +1008,13 @@ export default function HomePage() {
       `A ${counts.A ?? 0} · B ${counts.B ?? 0} · C ${counts.C ?? 0} · X ${counts.X ?? 0}`,
       `已关联答案 ${report.answeredCount ?? 0} 题 · 待答案 ${report.pendingAnswerCount ?? 0} 题`,
     ].join("；");
-    const saved = await saveActiveBank({ name, description, questions, importedAt: new Date().toISOString() });
+    const saved = await saveActiveBank({
+      name,
+      description,
+      groupName: report.suggestedGroupName || "考研西综306",
+      questions,
+      importedAt: new Date().toISOString(),
+    });
     setQuestions(saved.questions);
     setBankName(saved.name);
     setActiveBankId(saved.id);
@@ -1088,8 +1119,8 @@ export default function HomePage() {
     }
   }
 
-  async function updateSavedBankDetails(id: string, name: string, description: string) {
-    const updated = await updateQuestionBankDetails(id, { name, description });
+  async function updateSavedBankDetails(id: string, name: string, description: string, groupName: string) {
+    const updated = await updateQuestionBankDetails(id, { name, description, groupName });
     setQuestionBanks((banks) => banks.map((bank) => bank.id === id ? updated : bank));
     if (activeBankId === id) setBankName(updated.name);
     setToast(`“${updated.name}”的题库信息已保存 ✍️📚`);
@@ -1317,7 +1348,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   onImport: () => void;
   onImportAnswers: (bank: SavedQuestionBank) => void;
   onSelect: (id: string) => Promise<void>;
-  onUpdate: (id: string, name: string, description: string) => Promise<void>;
+  onUpdate: (id: string, name: string, description: string, groupName: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReset: (bank: SavedQuestionBank) => Promise<void>;
   onOpenQuestion: (bank: SavedQuestionBank, questionId: string) => Promise<void>;
@@ -1326,6 +1357,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editGroupName, setEditGroupName] = useState("");
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sharingBank, setSharingBank] = useState<SavedQuestionBank | null>(null);
@@ -1334,12 +1366,25 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   const totalQuestions = banks.reduce((sum, bank) => sum + bank.questions.length, 0);
   const multipleQuestions = banks.reduce((sum, bank) => sum + bank.questions.filter((question) => question.multiple).length, 0);
   const searchResults = useMemo(() => searchQuestionBanks(banks, query, 100), [banks, query]);
+  const groupedBanks = useMemo(() => {
+    const groups = new Map<string, SavedQuestionBank[]>();
+    for (const bank of banks) {
+      const key = bank.groupName || "未分组题库";
+      groups.set(key, [...(groups.get(key) ?? []), bank]);
+    }
+    return [...groups.entries()]
+      .sort(([left], [right]) => left === "未分组题库" ? 1 : right === "未分组题库" ? -1 : left.localeCompare(right, "zh-CN"))
+      .map(([name, entries]) => ({ name, banks: entries }));
+  }, [banks]);
 
   async function submitEdit(bank: SavedQuestionBank) {
     const name = editName.trim().slice(0, 60);
     const description = editDescription.trim().slice(0, 4_000);
+    const groupName = editGroupName.trim().slice(0, 60);
     if (!name) return;
-    if (name !== bank.name || description !== bank.description) await onUpdate(bank.id, name, description);
+    if (name !== bank.name || description !== bank.description || groupName !== bank.groupName) {
+      await onUpdate(bank.id, name, description, groupName);
+    }
     setEditingId(null);
   }
 
@@ -1347,6 +1392,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
     setEditingId(bank.id);
     setEditName(bank.name);
     setEditDescription(bank.description);
+    setEditGroupName(bank.groupName);
   }
 
   function toggleDescription(id: string) {
@@ -1358,7 +1404,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
     <main>
       <section className="bank-page-intro"><div><span className="overline"><Database size={15} /> QUESTION LIBRARY</span><h1>把散落的题目，<br />收进自己的知识书架。</h1><p>已导入题库都保存在当前浏览器。可随时切换、重命名、跨题库检索，或在确认版权边界后分享给同学。</p></div><div className="bank-overview"><article><b>{banks.length}</b><span>已导入题库</span></article><article><b>{totalQuestions}</b><span>收录题目</span></article><article><b>{multipleQuestions}</b><span>多选题</span></article></div></section>
       <label className="bank-global-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="全局搜索：题库名、疾病、症状或知识点" /><span>{keyword ? `${searchResults.length} 条结果` : "搜索全部题库"}</span></label>
-      {keyword ? <section className="bank-search-section"><div className="bank-section-title"><div><span>GLOBAL SEARCH · 按相关度排序</span><h2>全局搜索结果</h2></div><button onClick={() => setQuery("")}><X size={16} />清除搜索</button></div>{searchResults.length ? <div className="bank-question-results">{searchResults.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => onOpenQuestion(bank, question.id)}><span className={question.multiple ? "multi" : ""}>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b><i>·</i>分类：<b><HighlightMatches text={question.category} query={query} /></b><i>·</i>原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight /></button>)}</div> : <div className="bank-empty"><CircleHelp /><h2>还没有找到这条知识线索</h2><p>可输入多个关键词并用空格分隔，例如“肺炎 发热”；系统会要求每个关键词都有命中。</p></div>}</section> : <section className="bank-library-section"><div className="bank-section-title"><div><span>LOCAL COLLECTION</span><h2>已导入的题库</h2></div><p>点击“设为当前”即可回到首页继续学习</p></div>{banks.length ? <div className="bank-card-grid">{banks.map((bank) => {
+      {keyword ? <section className="bank-search-section"><div className="bank-section-title"><div><span>GLOBAL SEARCH · 按相关度排序</span><h2>全局搜索结果</h2></div><button onClick={() => setQuery("")}><X size={16} />清除搜索</button></div>{searchResults.length ? <div className="bank-question-results">{searchResults.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => onOpenQuestion(bank, question.id)}><span className={question.multiple ? "multi" : ""}>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b><i>·</i>分组：<b>{bank.groupName || "未分组"}</b><i>·</i>分类：<b><HighlightMatches text={question.category} query={query} /></b><i>·</i>原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight /></button>)}</div> : <div className="bank-empty"><CircleHelp /><h2>还没有找到这条知识线索</h2><p>可输入多个关键词并用空格分隔，例如“肺炎 发热”；系统会要求每个关键词都有命中。</p></div>}</section> : <section className="bank-library-section"><div className="bank-section-title"><div><span>LOCAL COLLECTION</span><h2>已导入的题库</h2></div><p>同组题库会共享错题复盘入口</p></div>{banks.length ? <div className="bank-group-list">{groupedBanks.map((group) => <section className="bank-group-section" key={group.name}><header className="bank-group-heading"><div><Library size={18} /><span><strong>{group.name}</strong><small>{group.banks.length} 份题库 · {group.banks.reduce((sum, bank) => sum + bank.questions.length, 0)} 道题</small></span></div><em>{group.name === "未分组题库" ? "可在编辑中设置分组" : "组内错题可跨文件复盘"}</em></header><div className="bank-card-grid">{group.banks.map((bank) => {
         const singleCount = bank.questions.filter((question) => !question.multiple).length;
         const multipleCount = bank.questions.length - singleCount;
         const isActive = bank.id === activeBankId;
@@ -1371,17 +1417,18 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
           <header><span className="bank-card-icon"><Database /></span>{isActive && <em><Check size={13} />当前题库</em>}</header>
           {isEditing ? <form className="bank-edit" onSubmit={(event) => { event.preventDefault(); void submitEdit(bank); }}>
             <label><span>题库名称</span><input autoFocus value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={60} /></label>
+            <label><span>所属分组</span><input value={editGroupName} onChange={(event) => setEditGroupName(event.target.value)} maxLength={60} list="question-bank-groups" placeholder="例如：考研西综306；留空则不分组" /><datalist id="question-bank-groups">{groupedBanks.filter((item) => item.name !== "未分组题库").map((item) => <option key={item.name} value={item.name} />)}</datalist></label>
             <label><span>题库简介</span><textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={4_000} rows={7} placeholder="可填写题库范围、章节目录、来源说明或适用考试；请勿录入患者及其他敏感信息。" /></label>
             <small>{editDescription.length} / 4000</small>
             <div><button type="submit" disabled={!editName.trim()}><Check size={15} />保存信息</button><button type="button" onClick={() => setEditingId(null)}><X size={15} />取消</button></div>
-          </form> : <><h3>{bank.name}</h3><p>{bank.questions.length} 道题 · 单选 {singleCount} · 多选 {multipleCount}</p>
+          </form> : <><span className="bank-group-chip">{bank.groupName || "未分组"}</span><h3>{bank.name}</h3><p>{bank.questions.length} 道题 · 单选 {singleCount} · 多选 {multipleCount}</p>
             {bank.description && <section className={`bank-description ${descriptionExpanded ? "expanded" : ""}`}><div><span><FileText size={14} />题库简介</span>{descriptionIsLong && <button type="button" aria-expanded={descriptionExpanded} onClick={() => toggleDescription(bank.id)}>{descriptionExpanded ? "收起" : "展开全文"}<ChevronRight size={14} /></button>}</div><p>{bank.description}</p></section>}
           </>}
           <div className="bank-card-meta"><span>导入于 {new Date(bank.importedAt).toLocaleDateString("zh-CN")}</span><span>仅存本机</span></div>
           {pendingAnswerCount > 0 && <div className="bank-answer-pending"><CircleHelp /><div><strong>测试模式 · {pendingAnswerCount} 题待答案</strong><span>可以先作答，之后导入答案文件一键核对。</span></div><button onClick={() => onImportAnswers(bank)}><Upload />导入答案</button></div>}
           {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
         </article>;
-      })}</div> : <div className="bank-empty"><Database /><h2>题库书架还是空的</h2><p>导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。</p><button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button></div>}</section>}
+      })}</div></section>)}</div> : <div className="bank-empty"><Database /><h2>题库书架还是空的</h2><p>导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。</p><button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button></div>}</section>}
     </main>
     {sharingBank && <ShareBankModal bank={sharingBank} onClose={() => setSharingBank(null)} />}
     {resettingBank && <ResetBankProgressModal bank={resettingBank} progress={progress} favorites={favorites} notes={notes} onReset={onReset} onClose={() => setResettingBank(null)} />}
@@ -1641,7 +1688,7 @@ function Western306Workbench({ onClose, onSave }: {
 
   const counts = report?.typeCounts ?? {};
   const missing = report?.missingSourceNumbers ?? [];
-  return <div className="modal-layer western306-layer" onMouseDown={() => !busy && onClose()}><section className="western306-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>WESTERN MEDICINE 306 · STANDARDIZER</span><h2>西综 306 标准化工作台</h2><p>识别现代 165 题 / 300 分结构，也兼容旧卷 A、B、C、X 型题。</p></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="western306-file-grid"><button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button><button onClick={() => answerRef.current?.click()} className={answerFile ? "selected" : ""} disabled={busy}><ListChecks /><span><strong>{answerFile?.name || "选择答案或解析（可选）"}</strong><small>空白卷可先测试；答案卷可一起做题号关联</small></span><input ref={answerRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setAnswerFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button></div><div className="western306-rules"><ShieldCheck /><div><strong>双层校验</strong><p>先按页、题号和分区做确定性切分，再让 AI 结构化；答案只能来自文件原文。C 型按“两陈述四种判定”处理，不会误当多选。</p></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={() => controllerRef.current?.abort()}><X />取消本次标准化</button>}</div>}{report && <div className="western306-report"><div className="western306-report-head"><span><strong>{report.examYear || "年份待核对"}</strong><small>{report.examFormat === "legacy-c-type" ? "旧卷 C 型结构" : "现代 165 题结构"}</small></span><span><strong>{questions.length}{report.expectedQuestionCount ? ` / ${report.expectedQuestionCount}` : ""}</strong><small>有效题目</small></span><span><strong>{report.totalPoints ? `${report.totalPoints} 分` : "依原卷"}</strong><small>总分规则</small></span></div><div className="western306-type-counts">{["A", "B", "C", "X"].map((type) => <span key={type}><b>{type}</b>{counts[type] ?? 0} 题</span>)}</div><p className={missing.length ? "warning" : "complete"}>{missing.length ? `仍缺 ${missing.length} 个原题号：${missing.slice(0, 30).join("、")}${missing.length > 30 ? "…" : ""}` : "题号连续性检查通过，可以开始抽查题干与答案。"}</p>{(report.warnings?.length ?? 0) > 0 && <p className="warning">{report.warnings?.length} 个片段未完成，已保留其他有效题，建议补传缺题页。</p>}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : "取消"}</button>{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer></section></div>;
+  return <div className="modal-layer western306-layer" onMouseDown={() => !busy && onClose()}><section className="western306-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>WESTERN MEDICINE 306 · STANDARDIZER</span><h2>西综 306 标准化工作台</h2><p>识别现代 165 题 / 300 分结构，也兼容旧卷 A、B、C、X 型题。</p></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="western306-file-grid"><button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button><button onClick={() => answerRef.current?.click()} className={answerFile ? "selected" : ""} disabled={busy}><ListChecks /><span><strong>{answerFile?.name || "选择答案或解析（可选）"}</strong><small>空白卷可先测试；答案卷可一起做题号关联</small></span><input ref={answerRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setAnswerFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button></div><div className="western306-rules"><ShieldCheck /><div><strong>跨页接缝 + 双层校验</strong><p>先按页、题号和分区切分，并补建“上一页题干＋下一页选项”接缝，再让 AI 结构化；答案只能来自文件原文。C 型按“两陈述四种判定”处理，不会误当多选。</p></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={() => controllerRef.current?.abort()}><X />取消本次标准化</button>}</div>}{report && <div className="western306-report"><div className="western306-report-head"><span><strong>{report.examYear || "年份待核对"}</strong><small>{report.examFormat === "legacy-c-type" ? "旧卷 C 型结构" : "现代 165 题结构"}</small></span><span><strong>{questions.length}{report.expectedQuestionCount ? ` / ${report.expectedQuestionCount}` : ""}</strong><small>有效题目</small></span><span><strong>{report.totalPoints ? `${report.totalPoints} 分` : "依原卷"}</strong><small>总分规则</small></span></div><div className="western306-type-counts">{["A", "B", "C", "X"].map((type) => <span key={type}><b>{type}</b>{counts[type] ?? 0} 题</span>)}</div><p className={missing.length ? "warning" : "complete"}>{missing.length ? `仍缺 ${missing.length} 个原题号：${missing.slice(0, 30).join("、")}${missing.length > 30 ? "…" : ""}` : "题号连续性检查通过，可以开始抽查题干与答案。"}</p>{report.oneToOneVerified && <p className="complete">原题与答案已完成一一对应校验；即使原卷少于标准题数 10 题以内，也会按普通模式保存。</p>}{(report.reconciledAnswerCount ?? 0) > 0 && <p className="complete">已从原卷明确答案中二次补回 {report.reconciledAnswerCount} 题。</p>}{(report.warnings?.length ?? 0) > 0 && <p className="warning">{report.warnings?.length} 个片段未完成，已保留其他有效题，建议补传缺题页。</p>}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : "取消"}</button>{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer></section></div>;
 }
 
 function AiImportFallbackModal({ files, onRecognize, onClose }: { files: AiFallbackFile[]; onRecognize: (file: AiFallbackFile) => Promise<number>; onClose: () => void }) {

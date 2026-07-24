@@ -6,6 +6,7 @@ import {
   detectWestern306Blueprint,
   extractMedicalAnswerReference,
   parseMedicalAiResponse,
+  reconcileMedicalQuestionsWithSourceAnswers,
   splitMedicalSourceText,
   splitWestern306SourceText,
   type MedicalExamProfile,
@@ -88,9 +89,10 @@ export async function POST(request: Request) {
   const warnings: string[] = [];
   let discarded = 0;
 
-  // Two concurrent fragments keep long scanned books practical without flooding a personal API account.
-  for (let offset = 0; offset < chunks.length; offset += 2) {
-    const batch = chunks.slice(offset, offset + 2);
+  // Three concurrent fragments materially shorten full 306 papers while still
+  // keeping personal-provider rate limits and retries manageable.
+  for (let offset = 0; offset < chunks.length; offset += 3) {
+    const batch = chunks.slice(offset, offset + 3);
     const settled = await Promise.allSettled(batch.map((chunk, batchIndex) => recognizeChunk({
       aiConfig,
       fileName,
@@ -114,7 +116,11 @@ export async function POST(request: Request) {
     });
   }
 
-  const merged = mergeQuestions(questions);
+  const initiallyMerged = mergeQuestions(questions);
+  const reconciliation = profile === "western-medicine-306"
+    ? reconcileMedicalQuestionsWithSourceAnswers(initiallyMerged, `${text}\n${answerText}`, blueprint?.expectedQuestionCount)
+    : { questions: initiallyMerged, reconciledCount: 0, oneToOneVerified: false };
+  const merged = reconciliation.questions;
   if (!merged.length) {
     const detail = warnings[0] ? ` ${warnings[0]}` : "";
     return Response.json({ error: `AI 仍未找到题干与选项完整的题目，请检查文件或 OCR 质量后重试。${detail}` }, { status: 422 });
@@ -134,6 +140,9 @@ export async function POST(request: Request) {
       answerCoverage: merged.length,
       answeredCount: merged.filter((question) => question.answer.length).length,
       pendingAnswerCount: merged.filter((question) => !question.answer.length).length,
+      reconciledAnswerCount: reconciliation.reconciledCount,
+      oneToOneVerified: reconciliation.oneToOneVerified,
+      suggestedGroupName: profile === "western-medicine-306" ? "考研西综306" : undefined,
       examYear: blueprint?.year,
       examFormat: blueprint?.format,
       totalPoints: blueprint?.totalPoints,

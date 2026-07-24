@@ -34,6 +34,12 @@ async function loadMedicalAiImport() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadBankGrouping() {
+  const source = (await text("app/lib/bank-grouping.ts")).replace(/^import type .*?;\n/, "");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 async function loadQuestionParser() {
   const source = await text("app/lib/question-parser.ts");
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -111,6 +117,45 @@ D.干扰信息
   assert.equal(cType.questions[0].questionType, "C");
   assert.equal(cType.questions[0].multiple, false);
   assert.equal(cType.questions[0].examFormat, "legacy-c-type");
+});
+
+test("joins cross-page 306 seams, reconciles explicit source answers, and suggests bank groups", async () => {
+  const { reconcileMedicalQuestionsWithSourceAnswers, splitWestern306SourceText } = await loadMedicalAiImport();
+  const { suggestQuestionBankGroup } = await loadBankGrouping();
+  const filler = "其他页内内容\n".repeat(1_200);
+  const source = `[[PAGE 1]]
+${filler}
+137.属于生理性抗凝物质的有
+[[PAGE 2]]
+A.蛋白质C
+B.组织因子途径抑制物
+C.纤溶酶原激活物抑制物-1
+D.肝素
+【答案】ABD
+138.下一题
+A.甲
+B.乙
+【答案】A`;
+  const chunks = splitWestern306SourceText(source, 7_200, 20);
+  const seam = chunks.find((chunk) => chunk.includes("CROSS_PAGE_SEAM"));
+  assert.ok(seam);
+  assert.match(seam, /137\.属于生理性抗凝物质/);
+  assert.match(seam, /【答案】ABD/);
+
+  const question = {
+    id: "q137",
+    sourceNumber: "137",
+    category: "2023西综306",
+    stem: "属于生理性抗凝物质的有",
+    options: ["A", "B", "C", "D"].map((label) => ({ label, text: label })),
+    answer: [],
+    multiple: true,
+    questionType: "X",
+  };
+  const reconciled = reconcileMedicalQuestionsWithSourceAnswers([question], source);
+  assert.deepEqual(reconciled.questions[0].answer, ["A", "B", "D"]);
+  assert.equal(reconciled.reconciledCount, 1);
+  assert.equal(suggestQuestionBankGroup("2025西综306考研真题", [question]), "考研西综306");
 });
 
 test("imports inline-answer Word banks and chapter-scoped medical answer tables", async () => {
@@ -338,7 +383,8 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /export async function updateQuestionBankDetails/);
   assert.match(localBank, /export async function deleteQuestionBank/);
   assert.match(localBank, /description: typeof input\.description/);
-  assert.match(localBank, /bank: \{ name: bank\.name, description: bank\.description, questions: bank\.questions \}/);
+  assert.match(localBank, /groupName: normalizeQuestionBankGroup/);
+  assert.match(localBank, /bank: \{ name: bank\.name, description: bank\.description, groupName: bank\.groupName, questions: bank\.questions \}/);
   assert.match(localBank, /hongdou-question-bank/);
   assert.match(localBank, /avecove-western-306/);
   assert.match(localBank, /multiple: question\.questionType === "X" \|\| answer\.length > 1/);

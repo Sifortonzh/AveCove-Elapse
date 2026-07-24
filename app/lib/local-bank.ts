@@ -1,9 +1,11 @@
 import type { QuizQuestion } from "./question-parser";
+import { normalizeQuestionBankGroup } from "./bank-grouping";
 
 export type SavedQuestionBank = {
   id: string;
   name: string;
   description: string;
+  groupName: string;
   questions: QuizQuestion[];
   importedAt: string;
   updatedAt: string;
@@ -13,6 +15,7 @@ export type QuestionBankInput = {
   id?: string;
   name: string;
   description?: string;
+  groupName?: string;
   questions: QuizQuestion[];
   importedAt: string;
   updatedAt?: string;
@@ -25,6 +28,7 @@ export type SharedQuestionBankPackage = {
   bank: {
     name: string;
     description?: string;
+    groupName?: string;
     questions: QuizQuestion[];
   };
 };
@@ -38,6 +42,7 @@ export type Western306StandardPackage = {
   bank: {
     name: string;
     description?: string;
+    groupName?: string;
     questions: QuizQuestion[];
   };
 };
@@ -96,6 +101,7 @@ function normalizeBank(input: QuestionBankInput): SavedQuestionBank {
     id,
     name: input.name.trim() || "未命名题库",
     description: typeof input.description === "string" ? input.description.trim().slice(0, 4_000) : "",
+    groupName: normalizeQuestionBankGroup(input.groupName),
     questions: input.questions.map((question, index) => normalizeQuestion({
       ...question,
       id: isNew ? `${id}:${index + 1}` : question.id,
@@ -190,7 +196,7 @@ export async function renameQuestionBank(id: string, name: string): Promise<Save
 
 export async function updateQuestionBankDetails(
   id: string,
-  details: { name?: string; description?: string },
+  details: { name?: string; description?: string; groupName?: string },
 ): Promise<SavedQuestionBank> {
   const bank = await loadQuestionBank(id);
   if (!bank) throw new Error("找不到要编辑的题库");
@@ -198,6 +204,7 @@ export async function updateQuestionBankDetails(
     ...bank,
     name: details.name ?? bank.name,
     description: details.description ?? bank.description,
+    groupName: details.groupName ?? bank.groupName,
     updatedAt: new Date().toISOString(),
   });
 }
@@ -252,6 +259,7 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
       id: candidate.id,
       name: typeof candidate.name === "string" ? candidate.name.slice(0, 160) : "同步题库",
       description: typeof candidate.description === "string" ? candidate.description.slice(0, 4_000) : "",
+      groupName: typeof candidate.groupName === "string" ? candidate.groupName : "",
       questions: candidate.questions,
       importedAt: typeof candidate.importedAt === "string" ? candidate.importedAt : new Date().toISOString(),
       updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : new Date().toISOString(),
@@ -269,7 +277,7 @@ export function createSharedQuestionBankPackage(bank: SavedQuestionBank): Shared
     format: "hongdou-question-bank",
     version: 1,
     exportedAt: new Date().toISOString(),
-    bank: { name: bank.name, description: bank.description, questions: bank.questions },
+    bank: { name: bank.name, description: bank.description, groupName: bank.groupName, questions: bank.questions },
   };
 }
 
@@ -285,6 +293,7 @@ export function parseSharedQuestionBankPackage(value: unknown): QuestionBankInpu
   return {
     name: typeof payload.bank.name === "string" ? payload.bank.name : "分享题库",
     description: typeof payload.bank.description === "string" ? payload.bank.description.slice(0, 4_000) : "",
+    groupName: typeof payload.bank.groupName === "string" ? payload.bank.groupName : "",
     questions,
     importedAt: new Date().toISOString(),
   };

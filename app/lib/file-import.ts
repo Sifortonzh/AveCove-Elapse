@@ -95,7 +95,10 @@ export async function importQuestionFile(
 
   assertImportActive(signal);
   onUpdate({ phase: "整理题库", progress: 92, detail: "正在识别题干、选项和答案" });
-  const questions = parseQuestionText(text, file.name.replace(/\.(doc|docx|pdf)$/i, ""));
+  const questions = parseQuestionText(
+    text.replace(/^\[\[PAGE\s+\d+\]\]\s*$/gim, ""),
+    file.name.replace(/\.(doc|docx|pdf)$/i, ""),
+  );
   if (!questions.length) {
     throw new QuestionRecognitionError(file.name, text);
   }
@@ -154,7 +157,7 @@ async function extractPdf(file: File, onUpdate: (update: ImportUpdate) => void, 
     });
   }
 
-  const extracted = pageTexts.join("\n");
+  const extracted = pageTexts.map((pageText, index) => `[[PAGE ${index + 1}]]\n${pageText}`).join("\n");
   const pagesToOcr = pageTexts.map((pageText, index) => ({ pageText, index })).filter((item) => pdfPageNeedsOcr(item.pageText));
   if (!pagesToOcr.length) {
     await closePdf();

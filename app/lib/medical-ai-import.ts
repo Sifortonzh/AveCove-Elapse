@@ -41,6 +41,12 @@ export type MedicalAiParseResult = {
   profile: MedicalExamProfile;
 };
 
+export type MedicalAnswerReconciliation = {
+  questions: QuizQuestion[];
+  reconciledCount: number;
+  oneToOneVerified: boolean;
+};
+
 const WESTERN_306_PATTERN = /(?:西医综合|西综|临床医学综合能力\s*[（(]?西医[）)]?|(?:^|\D)306(?:\D|$))/i;
 
 export function detectMedicalExamProfile(fileName: string, text = ""): MedicalExamProfile {
@@ -373,20 +379,43 @@ export function splitMedicalSourceText(text: string, maximumCharacters = 24_000,
 
 export function splitWestern306SourceText(text: string, maximumCharacters = 7_200, maximumChunks = 80) {
   const normalized = text.replace(/\r/g, "").trim();
-  const effectiveMaximum = Math.min(maximumCharacters, 4_200);
+  const effectiveMaximum = Math.max(4_800, Math.min(maximumCharacters, 8_000));
   const pageBlocks = normalized.split(/(?=\[\[PAGE\s+\d+\]\])/i).filter((block) => block.trim());
   if (pageBlocks.length > 1) {
     const chunks: string[] = [];
+    const seamBoundaries: number[] = [];
     let current = "";
-    for (const page of pageBlocks) {
+    for (let index = 0; index < pageBlocks.length; index += 1) {
+      const page = pageBlocks[index];
       if (current && current.length + page.length > effectiveMaximum) {
         chunks.push(current.trim());
+        seamBoundaries.push(index);
         current = "";
       }
       current += `${current ? "\n" : ""}${page}`;
       if (chunks.length >= maximumChunks - 1) break;
     }
     if (current.trim()) chunks.push(current.trim());
+
+    // A question may start at the foot of one PDF page while its options and
+    // explicit answer continue on the next page. Add a compact seam fragment
+    // only at chunk boundaries; the merge step removes the harmless duplicate.
+    for (const boundary of seamBoundaries) {
+      if (chunks.length >= maximumChunks) break;
+      const left = pageBlocks[boundary - 1] ?? "";
+      const right = pageBlocks[boundary] ?? "";
+      const starts = [...left.matchAll(/(?:^|\n)\s*(?:(?:19|20)\d{2}\s*N\s*)?(\d{1,3})\s*(?:[ABCX]\s*)?[.．、]/g)];
+      const lastStart = starts.at(-1)?.index ?? -1;
+      if (lastStart < 0) continue;
+      const leftTail = left.slice(lastStart).trim();
+      const rightStarts = [...right.matchAll(/(?:^|\n)\s*(?:(?:19|20)\d{2}\s*N\s*)?(\d{1,3})\s*(?:[ABCX]\s*)?[.．、]/g)];
+      const nextQuestionStart = rightStarts.find((match) => (match.index ?? 0) > 20)?.index;
+      const rightHead = right.slice(0, nextQuestionStart && nextQuestionStart > 0 ? nextQuestionStart : Math.min(right.length, 3_600)).trim();
+      const optionCount = (leftTail + "\n" + rightHead).match(/(?:^|\n)\s*[A-G]\s*[.．、]/g)?.length ?? 0;
+      const looksIncomplete = (leftTail.match(/(?:^|\n)\s*[A-G]\s*[.．、]/g)?.length ?? 0) < 2;
+      if (!looksIncomplete || optionCount < 2) continue;
+      chunks.push(`[[CROSS_PAGE_SEAM ${boundary}-${boundary + 1}]]\n${leftTail}\n${rightHead}`.trim());
+    }
     return chunks.slice(0, maximumChunks);
   }
 
@@ -411,6 +440,87 @@ export function splitWestern306SourceText(text: string, maximumCharacters = 7_20
     return chunks.slice(0, maximumChunks);
   }
   return splitMedicalSourceText(normalized, Math.min(effectiveMaximum, 3_600), maximumChunks);
+}
+
+function explicitAnswersByNumber(text: string) {
+  const normalized = text.replace(/\r/g, "");
+  const answers = new Map<string, string[]>();
+  const anchors = [...normalized.matchAll(/(?:^|\n)\s*(?:(?:19|20)\d{2}\s*N\s*)?(\d{1,3})\s*(?:[ABCX]\s*)?[.．、]/g)];
+  for (let index = 0; index < anchors.length; index += 1) {
+    const sourceNumber = String(Number.parseInt(anchors[index][1], 10));
+    const start = anchors[index].index ?? 0;
+    const end = anchors[index + 1]?.index ?? normalized.length;
+    const block = normalized.slice(start, end);
+    const match = block.match(/(?:【|\[)?\s*(?:参考)?答案\s*(?:】|\])?\s*[:：]?\s*([A-G]{1,7})(?![A-Za-z])/i);
+    if (match) answers.set(sourceNumber, [...new Set(match[1].toUpperCase().split(""))]);
+  }
+
+  // Also accept compact answer tables such as "1.A 2.B 3.ACD".
+  for (const match of normalized.matchAll(/(?:^|[\s,，;；])(\d{1,3})\s*[.、:：\-]?\s*([A-G]{1,7})(?=$|[\s,，;；])/gi)) {
+    const sourceNumber = String(Number.parseInt(match[1], 10));
+    if (!answers.has(sourceNumber)) answers.set(sourceNumber, [...new Set(match[2].toUpperCase().split(""))]);
+  }
+  return answers;
+}
+
+export function reconcileMedicalQuestionsWithSourceAnswers(
+  questions: QuizQuestion[],
+  sourceText: string,
+  expectedQuestionCount?: number,
+): MedicalAnswerReconciliation {
+  const explicit = explicitAnswersByNumber(sourceText);
+  let reconciledCount = 0;
+  let next = questions.map((question) => {
+    if (question.answer.length) return question;
+    const sourceNumber = String(Number.parseInt(question.sourceNumber.match(/\d+/)?.[0] ?? "", 10));
+    const candidate = explicit.get(sourceNumber);
+    const labels = new Set(question.options.map((option) => option.label));
+    const answer = candidate?.filter((label) => labels.has(label)) ?? [];
+    if (!answer.length) return question;
+    reconciledCount += 1;
+    return {
+      ...question,
+      answer,
+      answerPending: false,
+      multiple: question.questionType === "X" || answer.length > 1,
+      answerSource: question.answerSource || "原卷明确答案 · 题号二次校验",
+    };
+  });
+
+  const missingCount = expectedQuestionCount ? Math.max(0, expectedQuestionCount - next.length) : 0;
+  const orderedQuestions = [...next].sort((left, right) =>
+    Number.parseInt(left.sourceNumber.match(/\d+/)?.[0] ?? "", 10)
+    - Number.parseInt(right.sourceNumber.match(/\d+/)?.[0] ?? "", 10));
+  const orderedAnswers = [...explicit.entries()].sort((left, right) => Number(left[0]) - Number(right[0]));
+  const canUsePositionalPairing = missingCount < 10
+    && orderedAnswers.length === orderedQuestions.length
+    && orderedQuestions.every((question, index) => {
+      const answer = orderedAnswers[index]?.[1] ?? [];
+      const labels = new Set(question.options.map((option) => option.label));
+      return answer.length > 0 && answer.every((label) => labels.has(label));
+    });
+  if (canUsePositionalPairing) {
+    const paired = new Map(orderedQuestions.map((question, index) => [question.id, orderedAnswers[index][1]]));
+    next = next.map((question) => {
+      if (question.answer.length) return question;
+      const answer = paired.get(question.id) ?? [];
+      if (!answer.length) return question;
+      reconciledCount += 1;
+      return {
+        ...question,
+        answer,
+        answerPending: false,
+        multiple: question.questionType === "X" || answer.length > 1,
+        answerSource: question.answerSource || "原卷答案顺序 · 一一对应校验",
+      };
+    });
+  }
+
+  return {
+    questions: next,
+    reconciledCount,
+    oneToOneVerified: missingCount < 10 && next.every((question) => question.answer.length > 0),
+  };
 }
 
 export function extractMedicalAnswerReference(text: string, maximumCharacters = 18_000) {
@@ -465,6 +575,7 @@ export function buildMedicalImportPrompt(input: {
       ? "输出本片段中题干和至少两个选项完整的全部题目。原文没有明确答案时 answer 必须为空数组，并设置 answerPending=true；不得因此丢弃题目。"
       : "只输出本片段中题干和至少两个选项完整、且能从原文明确定答案的题。",
     "若 OCR 丢失少数题号，只有在相邻题号与题目顺序能唯一确定时才补回；无法唯一确定时保留可见题号，不得随意编号。",
+    "若片段带有 CROSS_PAGE_SEAM 标记，表示题干在上一页、选项或答案在下一页；必须把接缝两侧合并为同一道完整题，标记本身不是题目内容。",
     "输出 NDJSON：每行一个独立 JSON 对象，不要数组、不要 Markdown、不要行内换行。坏一行不能影响其他题。",
     `每行结构：{"type":"question","sourceNumber":"1","questionType":"A","sharedOptionGroup":"","stem":"题干","options":[{"label":"A","text":"选项"}],"answer":["A"],"answerPending":false,"explanation":"原文有则整理，无则空","answerSource":"总论 · 单选题答案表"}。questionType 只能是 A、B、C、X。`,
     "单选 answer 一个字母，多选为多个字母。保留原意，删除页眉页脚、公众号、水印和排版噪声。",

@@ -5,7 +5,7 @@ export type QuestionSearchMatch = {
   bank: SavedQuestionBank;
   question: QuizQuestion;
   score: number;
-  matchedFields: Array<"题库" | "分类" | "题干" | "选项" | "题号">;
+  matchedFields: Array<"题库" | "分组" | "分类" | "题干" | "选项" | "题号">;
   matchedOption?: string;
 };
 
@@ -25,6 +25,7 @@ export function searchQuestionBanks(banks: SavedQuestionBank[], query: string, l
 
   for (const bank of banks) {
     const bankName = normalize(bank.name);
+    const groupName = normalize(bank.groupName);
     for (const question of bank.questions) {
       const category = normalize(question.category);
       const stem = normalize(question.stem);
@@ -37,6 +38,7 @@ export function searchQuestionBanks(banks: SavedQuestionBank[], query: string, l
       for (const term of terms) {
         let best = 0;
         if (bankName.includes(term)) { best = bankName === term ? 220 : 130; matchedFields.add("题库"); }
+        if (groupName.includes(term) && best < 120) { best = groupName === term ? 150 : 120; matchedFields.add("分组"); }
         if (category.includes(term) && best < 105) { best = category === term ? 125 : 105; matchedFields.add("分类"); }
         if (stem.includes(term) && best < 95) { best = stem === term ? 130 : stem.startsWith(term) ? 115 : 95; matchedFields.add("题干"); }
         if (options.some((option) => option.text.includes(term)) && best < 55) { best = 55; matchedFields.add("选项"); }
@@ -47,6 +49,7 @@ export function searchQuestionBanks(banks: SavedQuestionBank[], query: string, l
       if (rejected) continue;
 
       if (fullQuery && bankName === fullQuery) score += 180;
+      else if (fullQuery && groupName === fullQuery) score += 120;
       else if (fullQuery && stem.includes(fullQuery)) score += 90;
       else if (fullQuery && category.includes(fullQuery)) score += 70;
 
