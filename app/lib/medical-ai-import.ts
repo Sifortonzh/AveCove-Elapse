@@ -1,7 +1,20 @@
-import type { QuizOption, QuizQuestion } from "./question-parser";
+import type { QuizOption, QuizQuestion, Western306Format } from "./question-parser";
 
 export type MedicalExamProfile = "general" | "western-medicine-306";
-export type MedicalQuestionType = "A" | "B" | "X";
+export type MedicalQuestionType = "A" | "B" | "C" | "X";
+export type Western306Section = {
+  questionType: MedicalQuestionType;
+  start: number;
+  end: number;
+  points?: number;
+};
+export type Western306Blueprint = {
+  year?: number;
+  format: Western306Format;
+  expectedQuestionCount?: number;
+  totalPoints?: number;
+  sections: Western306Section[];
+};
 
 type AiQuestion = {
   sourceNumber?: unknown;
@@ -34,17 +47,70 @@ export function detectMedicalExamProfile(fileName: string, text = ""): MedicalEx
   return WESTERN_306_PATTERN.test(`${fileName}\n${text.slice(0, 8_000)}`) ? "western-medicine-306" : "general";
 }
 
-export function western306Metadata(sourceNumber: string): {
+function detectSectionRanges(text: string): Western306Section[] {
+  const normalized = text.replace(/\r/g, "").replace(/[—–~～至]/g, "-");
+  const sections: Western306Section[] = [];
+  const pattern = /([ABCX])\s*型题[\s\S]{0,180}?(\d{1,3})\s*[-]\s*(\d{1,3})/gi;
+  for (const match of normalized.matchAll(pattern)) {
+    const start = Number.parseInt(match[2], 10);
+    const end = Number.parseInt(match[3], 10);
+    const questionType = match[1].toUpperCase() as MedicalQuestionType;
+    if (start >= 1 && end >= start && end <= 300 && !sections.some((section) => section.questionType === questionType)) {
+      sections.push({ questionType, start, end });
+    }
+  }
+  return sections.sort((left, right) => left.start - right.start);
+}
+
+export function detectWestern306Blueprint(fileName: string, text = ""): Western306Blueprint {
+  const sample = `${fileName}\n${text.slice(0, 120_000)}`;
+  const yearMatch = sample.match(/(?:19|20)\d{2}/);
+  const year = yearMatch ? Number.parseInt(yearMatch[0], 10) : undefined;
+  const detectedSections = detectSectionRanges(sample);
+  const hasLegacyC = detectedSections.some((section) => section.questionType === "C") || /C\s*型题/i.test(sample);
+  const modern = !hasLegacyC && ((year ?? 0) >= 2017 || /(?:136\s*[-—~～至]\s*165|共\s*165\s*题|满分\s*300)/i.test(sample));
+  if (modern) {
+    return {
+      year,
+      format: "modern-165",
+      expectedQuestionCount: 165,
+      totalPoints: 300,
+      sections: [
+        { questionType: "A", start: 1, end: 40, points: 1.5 },
+        { questionType: "A", start: 41, end: 115, points: 2 },
+        { questionType: "B", start: 116, end: 135, points: 1.5 },
+        { questionType: "X", start: 136, end: 165, points: 2 },
+      ],
+    };
+  }
+  if (hasLegacyC || detectedSections.length) {
+    const known1994Sections: Western306Section[] = [
+      { questionType: "A" as const, start: 1, end: 92 },
+      { questionType: "B" as const, start: 93, end: 118 },
+      { questionType: "C" as const, start: 119, end: 138 },
+      { questionType: "X" as const, start: 139, end: 160 },
+    ];
+    const sections = year === 1994 || (hasLegacyC && detectedSections.length < 3) ? known1994Sections : detectedSections;
+    return {
+      year,
+      format: "legacy-c-type",
+      expectedQuestionCount: Math.max(...sections.map((section) => section.end)),
+      sections,
+    };
+  }
+  return { year, format: "unknown-306", sections: [] };
+}
+
+export function western306Metadata(sourceNumber: string, blueprint: Western306Blueprint = detectWestern306Blueprint("2025西综306")): {
   questionType?: MedicalQuestionType;
   points?: number;
   multiple?: boolean;
 } {
   const number = Number.parseInt(sourceNumber.match(/\d+/)?.[0] ?? "", 10);
-  if (!Number.isFinite(number) || number < 1 || number > 165) return {};
-  if (number <= 40) return { questionType: "A", points: 1.5, multiple: false };
-  if (number <= 115) return { questionType: "A", points: 2, multiple: false };
-  if (number <= 135) return { questionType: "B", points: 1.5, multiple: false };
-  return { questionType: "X", points: 2, multiple: true };
+  if (!Number.isFinite(number) || number < 1) return {};
+  const section = blueprint.sections.find((candidate) => number >= candidate.start && number <= candidate.end);
+  if (!section) return {};
+  return { questionType: section.questionType, points: section.points, multiple: section.questionType === "X" };
 }
 
 export function western306Score(
@@ -53,7 +119,10 @@ export function western306Score(
   firstProgress: Record<string, "correct" | "wrong"> = progress,
 ) {
   return questions.reduce((score, question) => {
-    const points = question.points ?? western306Metadata(question.sourceNumber).points ?? 0;
+    const blueprint = question.examProfile === "western-medicine-306"
+      ? detectWestern306Blueprint(String(question.examYear ?? ""), question.examFormat === "legacy-c-type" ? "C型题" : "")
+      : undefined;
+    const points = question.points ?? western306Metadata(question.sourceNumber, blueprint).points ?? 0;
     return {
       earned: score.earned + (firstProgress[question.id] === "correct" ? points : 0),
       answeredMaximum: score.answeredMaximum + (firstProgress[question.id] ? points : 0),
@@ -210,6 +279,7 @@ function normalizeQuestion(
   profile: MedicalExamProfile,
   index: number,
   allowUnanswered = false,
+  blueprint?: Western306Blueprint,
 ): QuizQuestion | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const raw = value as AiQuestion;
@@ -221,9 +291,11 @@ function normalizeQuestion(
   if (!stem || options.length < 2 || (!answer.length && !allowUnanswered)) return null;
 
   const sourceNumber = String(raw.sourceNumber ?? index + 1).trim() || String(index + 1);
-  const inferred = profile === "western-medicine-306" ? western306Metadata(sourceNumber) : {};
-  const suppliedType = String(raw.questionType ?? "").toUpperCase().match(/[ABX]/)?.[0] as MedicalQuestionType | undefined;
-  const questionType = inferred.questionType ?? suppliedType;
+  const inferred = profile === "western-medicine-306" ? western306Metadata(sourceNumber, blueprint) : {};
+  const suppliedType = String(raw.questionType ?? "").toUpperCase().match(/[ABCX]/)?.[0] as MedicalQuestionType | undefined;
+  const questionType = blueprint?.format === "modern-165"
+    ? inferred.questionType ?? suppliedType
+    : suppliedType ?? inferred.questionType;
   const multiple = questionType === "X" || answer.length > 1;
 
   return {
@@ -236,6 +308,8 @@ function normalizeQuestion(
     answerPending: !answer.length,
     multiple,
     examProfile: profile === "western-medicine-306" ? profile : undefined,
+    examYear: profile === "western-medicine-306" ? blueprint?.year : undefined,
+    examFormat: profile === "western-medicine-306" ? blueprint?.format : undefined,
     questionType,
     points: inferred.points,
     sharedOptionGroup: typeof raw.sharedOptionGroup === "string" ? raw.sharedOptionGroup.trim().slice(0, 120) || undefined : undefined,
@@ -262,11 +336,11 @@ export function parseMedicalAiResponse(
   content: string,
   category: string,
   profile: MedicalExamProfile,
-  options: { allowUnanswered?: boolean } = {},
+  options: { allowUnanswered?: boolean; blueprint?: Western306Blueprint } = {},
 ): MedicalAiParseResult {
   const candidates = collectRawQuestions(content);
   const normalized = candidates.flatMap((candidate, index) => {
-    const question = normalizeQuestion(candidate, category, profile, index, options.allowUnanswered);
+    const question = normalizeQuestion(candidate, category, profile, index, options.allowUnanswered, options.blueprint);
     return question ? [question] : [];
   });
   const questions = deduplicateQuestions(normalized).map((question, index) => ({
@@ -297,6 +371,48 @@ export function splitMedicalSourceText(text: string, maximumCharacters = 24_000,
   return chunks.filter(Boolean);
 }
 
+export function splitWestern306SourceText(text: string, maximumCharacters = 7_200, maximumChunks = 80) {
+  const normalized = text.replace(/\r/g, "").trim();
+  const effectiveMaximum = Math.min(maximumCharacters, 4_200);
+  const pageBlocks = normalized.split(/(?=\[\[PAGE\s+\d+\]\])/i).filter((block) => block.trim());
+  if (pageBlocks.length > 1) {
+    const chunks: string[] = [];
+    let current = "";
+    for (const page of pageBlocks) {
+      if (current && current.length + page.length > effectiveMaximum) {
+        chunks.push(current.trim());
+        current = "";
+      }
+      current += `${current ? "\n" : ""}${page}`;
+      if (chunks.length >= maximumChunks - 1) break;
+    }
+    if (current.trim()) chunks.push(current.trim());
+    return chunks.slice(0, maximumChunks);
+  }
+
+  const anchors = [...normalized.matchAll(/(?:^|\n)\s*(?:(?:19|20)\d{2}\s*N\s*)?\d{1,3}\s*(?:[ABCX]\s*)?[.．、]/g)]
+    .map((match) => match.index ?? 0);
+  if (anchors.length >= 8) {
+    const units = anchors.map((start, index) => normalized.slice(start, anchors[index + 1] ?? normalized.length).trim()).filter(Boolean);
+    const chunks: string[] = [];
+    let current = "";
+    let questionCount = 0;
+    for (const unit of units) {
+      if (current && (current.length + unit.length > effectiveMaximum || questionCount >= 14)) {
+        chunks.push(current.trim());
+        current = "";
+        questionCount = 0;
+      }
+      current += `${current ? "\n" : ""}${unit}`;
+      questionCount += 1;
+      if (chunks.length >= maximumChunks - 1) break;
+    }
+    if (current.trim()) chunks.push(current.trim());
+    return chunks.slice(0, maximumChunks);
+  }
+  return splitMedicalSourceText(normalized, Math.min(effectiveMaximum, 3_600), maximumChunks);
+}
+
 export function extractMedicalAnswerReference(text: string, maximumCharacters = 18_000) {
   const normalized = text.replace(/\r/g, "");
   const lines = normalized.split("\n");
@@ -318,10 +434,19 @@ export function buildMedicalImportPrompt(input: {
   chunkIndex: number;
   chunkCount: number;
   allowUnanswered?: boolean;
+  blueprint?: Western306Blueprint;
 }) {
+  const blueprint = input.blueprint ?? detectWestern306Blueprint(input.fileName, input.chunk);
+  const sectionSummary = blueprint.sections.map((section) =>
+    `${section.start}-${section.end} 为 ${section.questionType} 型${section.points ? `，每题 ${section.points} 分` : ""}`,
+  ).join("；");
   const profileRules = input.profile === "western-medicine-306" ? [
-    "这是考研西医综合 306：1-115 为 A 型单选；116-135 为 B 型共用备选项单选；136-165 为 X 型多选。",
+    `这是考研西医综合 306，年份：${blueprint.year ?? "未确定"}，版式：${blueprint.format}。${sectionSummary || "必须依据原文标题识别 A/B/C/X 分区，不可套用错误年份的题号范围。"}。`,
+    blueprint.format === "modern-165"
+      ? "现代卷共 165 题、满分 300 分：A 型 1-115，B 型 116-135，X 型 136-165。"
+      : "旧卷可能含 C 型题。C 型题的 A/B 是两条来源陈述，答案编码为：A=仅 A 正确，B=仅 B 正确，C=两者均正确，D=两者均不正确；C 型不是多选题。",
     "B 型题必须把共用的 A-D 备选项复制到每道关联题，并为同组题填写相同 sharedOptionGroup。",
+    "C 型题必须保留两条来源陈述和 A/B/C/D 判定选项，并为同组题填写相同 sharedOptionGroup。",
     "X 型题仅记录文件明确给出的全部正确选项，不得按医学知识猜测。",
   ] : [
     "兼容章节末尾、全书末尾、题干后缀、答案表和解析标题内的答案。",
@@ -338,7 +463,7 @@ export function buildMedicalImportPrompt(input: {
       : "只输出本片段中题干和至少两个选项完整、且能从原文明确定答案的题。",
     "若 OCR 丢失少数题号，只有在相邻题号与题目顺序能唯一确定时才补回；无法唯一确定时保留可见题号，不得随意编号。",
     "输出 NDJSON：每行一个独立 JSON 对象，不要数组、不要 Markdown、不要行内换行。坏一行不能影响其他题。",
-    "每行结构：{\"type\":\"question\",\"sourceNumber\":\"1\",\"questionType\":\"A\",\"sharedOptionGroup\":\"\",\"stem\":\"题干\",\"options\":[{\"label\":\"A\",\"text\":\"选项\"}],\"answer\":[\"A\"],\"answerPending\":false,\"explanation\":\"原文有则整理，无则空\",\"answerSource\":\"答案表 1-A\"}",
+    `每行结构：{"type":"question","sourceNumber":"1","questionType":"A","sharedOptionGroup":"","stem":"题干","options":[{"label":"A","text":"选项"}],"answer":["A"],"answerPending":false,"explanation":"原文有则整理，无则空","answerSource":"答案表 1-A"}。questionType 只能是 A、B、C、X。`,
     "单选 answer 一个字母，多选为多个字母。保留原意，删除页眉页脚、公众号、水印和排版噪声。",
     "可供关联的答案参考区：",
     input.answerReference || "（没有单独提取到答案参考区，请只用片段内明确答案）",

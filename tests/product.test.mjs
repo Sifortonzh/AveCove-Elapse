@@ -34,6 +34,12 @@ async function loadMedicalAiImport() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadQuestionParser() {
+  const source = await text("app/lib/question-parser.ts");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 test("recovers medical questions from partially malformed AI JSON and applies 306 scoring", async () => {
   const {
     detectMedicalExamProfile,
@@ -72,6 +78,39 @@ test("recovers medical questions from partially malformed AI JSON and applies 30
     return { id: sourceNumber, sourceNumber, answer: ["A"], options: [], stem: "", category: "", ...metadata };
   });
   assert.equal(western306Score(fullPaper, {}).total, 300);
+});
+
+test("understands modern and legacy 306 layouts without swallowing the 2024 stem", async () => {
+  const { parseQuestionText } = await loadQuestionParser();
+  const { detectWestern306Blueprint, parseMedicalAiResponse, western306Metadata } = await loadMedicalAiImport();
+  const parsed = parseQuestionText(`2024N1A.在人体的自动控制系统中，由受控部分发出，到达控制部分的信息是
+A.偏差信息
+B.前馈信息
+C.反馈信息
+D.干扰信息
+答案：C`, "2024年西医综合");
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].sourceNumber, "1");
+  assert.equal(parsed[0].stem, "在人体的自动控制系统中，由受控部分发出，到达控制部分的信息是");
+  assert.equal(parsed[0].options.length, 4);
+  assert.equal(parsed[0].options[0].text, "偏差信息");
+  assert.equal(parsed[0].questionType, "A");
+  assert.equal(parsed[0].examYear, 2024);
+  assert.equal(parsed[0].points, 1.5);
+
+  const legacy = detectWestern306Blueprint("1994年考研西医综合真题_OCR.docx", "A型题 1-92\nB型题 93-118\nC型题 119-138\nX型题 139-160");
+  assert.equal(legacy.format, "legacy-c-type");
+  assert.equal(legacy.expectedQuestionCount, 160);
+  assert.deepEqual(western306Metadata("120", legacy), { questionType: "C", points: undefined, multiple: false });
+  const cType = parseMedicalAiResponse(
+    `{"type":"question","sourceNumber":"120","questionType":"C","stem":"A.陈述甲；B.陈述乙","options":[{"label":"A","text":"仅A正确"},{"label":"B","text":"仅B正确"},{"label":"C","text":"两者均正确"},{"label":"D","text":"两者均不正确"}],"answer":["C"]}`,
+    "1994西综",
+    "western-medicine-306",
+    { blueprint: legacy },
+  );
+  assert.equal(cType.questions[0].questionType, "C");
+  assert.equal(cType.questions[0].multiple, false);
+  assert.equal(cType.questions[0].examFormat, "legacy-c-type");
 });
 
 test("ships a small, clearly labelled demo bank", async () => {
@@ -193,6 +232,10 @@ test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recogn
   assert.match(styles, /\.search-result-location/);
   assert.match(medicalAiImport, /不得根据医学常识猜答案、改答案或补题/);
   assert.match(medicalAiImport, /答案表/);
+  assert.match(medicalAiImport, /splitWestern306SourceText/);
+  assert.match(medicalAiImport, /C 型题的 A\/B 是两条来源陈述/);
+  assert.match(page, /西综 306 标准化工作台/);
+  assert.match(page, /现代 165 题 \/ 300 分结构/);
   assert.match(aiImportRoute, /Promise\.allSettled/);
   assert.match(aiImportRoute, /480_000/);
   assert.match(emailRoute, /垃圾邮件 \/ Spam 文件夹/);
@@ -234,6 +277,7 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /description: typeof input\.description/);
   assert.match(localBank, /bank: \{ name: bank\.name, description: bank\.description, questions: bank\.questions \}/);
   assert.match(localBank, /hongdou-question-bank/);
+  assert.match(localBank, /avecove-western-306/);
   assert.match(localBank, /multiple: question\.questionType === "X" \|\| answer\.length > 1/);
   assert.match(localBank, /Transparently migrate the single-bank format/);
 });

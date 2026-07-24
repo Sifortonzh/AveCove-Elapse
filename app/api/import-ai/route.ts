@@ -3,19 +3,26 @@ import { allowRequest, requestFingerprint } from "@/app/lib/server/rate-limit";
 import {
   buildMedicalImportPrompt,
   detectMedicalExamProfile,
+  detectWestern306Blueprint,
   extractMedicalAnswerReference,
   parseMedicalAiResponse,
   splitMedicalSourceText,
+  splitWestern306SourceText,
   type MedicalExamProfile,
+  type Western306Blueprint,
 } from "@/app/lib/medical-ai-import";
 import type { QuizQuestion } from "@/app/lib/question-parser";
 
 function mergeQuestions(questions: QuizQuestion[]) {
   const selected = new Map<string, QuizQuestion>();
   for (const question of questions) {
-    const key = `${question.sourceNumber}|${question.stem.replace(/\s+/g, "").slice(0, 120)}`;
+    const key = question.examProfile === "western-medicine-306"
+      ? `306|${question.sourceNumber}`
+      : `${question.sourceNumber}|${question.stem.replace(/\s+/g, "").slice(0, 120)}`;
     const current = selected.get(key);
-    if (!current || (!current.explanation && question.explanation)) selected.set(key, question);
+    const currentQuality = current ? current.stem.length + current.options.reduce((sum, option) => sum + option.text.length, 0) + (current.answer.length ? 500 : 0) + (current.explanation?.length ?? 0) : -1;
+    const nextQuality = question.stem.length + question.options.reduce((sum, option) => sum + option.text.length, 0) + (question.answer.length ? 500 : 0) + (question.explanation?.length ?? 0);
+    if (!current || nextQuality > currentQuality) selected.set(key, question);
   }
   return [...selected.values()]
     .sort((left, right) => {
@@ -36,6 +43,7 @@ async function recognizeChunk(input: {
   chunkIndex: number;
   chunkCount: number;
   allowUnanswered: boolean;
+  blueprint?: Western306Blueprint;
 }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 120_000);
@@ -45,7 +53,7 @@ async function recognizeChunk(input: {
       temperature: 0,
       signal: controller.signal,
     });
-    return parseMedicalAiResponse(content, input.category, input.profile, { allowUnanswered: input.allowUnanswered });
+    return parseMedicalAiResponse(content, input.category, input.profile, { allowUnanswered: input.allowUnanswered, blueprint: input.blueprint });
   } finally {
     clearTimeout(timer);
   }
@@ -55,7 +63,7 @@ export async function POST(request: Request) {
   if (!allowRequest(`ai-import:${requestFingerprint(request)}`, 8, 60 * 60_000)) {
     return Response.json({ error: "AI 文件识别请求过于频繁，请稍后再试。" }, { status: 429 });
   }
-  const body = await request.json() as { fileName?: unknown; text?: unknown; personalAi?: unknown };
+  const body = await request.json() as { fileName?: unknown; text?: unknown; answerText?: unknown; personalAi?: unknown };
   const personalRequested = body.personalAi !== undefined;
   const personalConfig = resolvePersonalAiConfig(body.personalAi);
   if (personalRequested && !personalConfig) return Response.json({ error: "个人 AI 配置无效，请回到“自定义AI”重新保存。" }, { status: 400 });
@@ -64,16 +72,18 @@ export async function POST(request: Request) {
 
   const fileName = typeof body.fileName === "string" ? body.fileName.slice(0, 180) : "导入题库";
   const text = typeof body.text === "string" ? body.text.trim().slice(0, 480_000) : "";
+  const answerText = typeof body.answerText === "string" ? body.answerText.trim().slice(0, 240_000) : "";
   if (text.length < 20) return Response.json({ error: "文件中没有足够的可识别文字。" }, { status: 400 });
   const category = fileName.replace(/\.(doc|docx|pdf)$/i, "") || "AI 整理题库";
   const profile = detectMedicalExamProfile(fileName, text);
+  const blueprint = profile === "western-medicine-306" ? detectWestern306Blueprint(fileName, text) : undefined;
   const allowUnanswered = profile === "western-medicine-306";
   // 306 papers are dense: a short source fragment can expand to many JSON records.
   // Smaller overlapping fragments prevent a single model response from truncating after ~60 questions.
   const chunks = profile === "western-medicine-306"
-    ? splitMedicalSourceText(text, 8_500, 42)
+    ? splitWestern306SourceText(text, 7_200, 80)
     : splitMedicalSourceText(text, 18_000, 24);
-  const answerReference = extractMedicalAnswerReference(text);
+  const answerReference = extractMedicalAnswerReference(answerText || text, answerText ? 36_000 : 18_000);
   const questions: QuizQuestion[] = [];
   const warnings: string[] = [];
   let discarded = 0;
@@ -91,6 +101,7 @@ export async function POST(request: Request) {
       chunkIndex: offset + batchIndex,
       chunkCount: chunks.length,
       allowUnanswered,
+      blueprint,
     })));
     settled.forEach((result, batchIndex) => {
       const part = offset + batchIndex + 1;
@@ -106,8 +117,12 @@ export async function POST(request: Request) {
   const merged = mergeQuestions(questions);
   if (!merged.length) {
     const detail = warnings[0] ? ` ${warnings[0]}` : "";
-    return Response.json({ error: `AI 仍未找到带有明确答案的完整题目，请检查文件或 OCR 质量后重试。${detail}` }, { status: 422 });
+    return Response.json({ error: `AI 仍未找到题干与选项完整的题目，请检查文件或 OCR 质量后重试。${detail}` }, { status: 422 });
   }
+  const expectedQuestionCount = blueprint?.expectedQuestionCount;
+  const knownNumbers = new Set(merged.map((question) => String(Number.parseInt(question.sourceNumber.match(/\d+/)?.[0] ?? "", 10))).filter((number) => number !== "NaN"));
+  const typeCounts = Object.fromEntries(["A", "B", "C", "X"].map((type) => [type, merged.filter((question) => question.questionType === type).length]));
+  const duplicateSourceNumbers = [...new Set(questions.map((question) => question.sourceNumber).filter((number, index, all) => all.indexOf(number) !== index))];
   return Response.json({
     questions: merged,
     report: {
@@ -119,9 +134,14 @@ export async function POST(request: Request) {
       answerCoverage: merged.length,
       answeredCount: merged.filter((question) => question.answer.length).length,
       pendingAnswerCount: merged.filter((question) => !question.answer.length).length,
-      expectedQuestionCount: profile === "western-medicine-306" ? 165 : undefined,
-      missingSourceNumbers: profile === "western-medicine-306"
-        ? Array.from({ length: 165 }, (_, index) => String(index + 1)).filter((number) => !merged.some((question) => question.sourceNumber === number))
+      examYear: blueprint?.year,
+      examFormat: blueprint?.format,
+      totalPoints: blueprint?.totalPoints,
+      typeCounts,
+      duplicateSourceNumbers,
+      expectedQuestionCount,
+      missingSourceNumbers: profile === "western-medicine-306" && expectedQuestionCount
+        ? Array.from({ length: expectedQuestionCount }, (_, index) => String(index + 1)).filter((number) => !knownNumbers.has(number))
         : [],
     },
   });

@@ -39,6 +39,19 @@ type SharedComment = { id: string; nickname: string; text: string; createdAt: st
 type AccountSession = { nickname: string; email?: string; expiresAt: number };
 type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "cancelled" | "ai-ready"; detail: string };
 type AiFallbackFile = { id: string; fileName: string; extractedText: string };
+type Western306ImportReport = {
+  profile?: string;
+  examYear?: number;
+  examFormat?: string;
+  expectedQuestionCount?: number;
+  totalPoints?: number;
+  typeCounts?: Record<string, number>;
+  answeredCount?: number;
+  pendingAnswerCount?: number;
+  missingSourceNumbers?: string[];
+  duplicateSourceNumbers?: string[];
+  warnings?: string[];
+};
 type MarkdownLineKind = "heading1" | "heading2" | "heading3" | "quote" | "list" | "paragraph" | "space";
 type Settings = {
   scope: Scope;
@@ -233,6 +246,7 @@ export default function HomePage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAnswerSheet, setShowAnswerSheet] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [show306Workbench, setShow306Workbench] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
@@ -924,21 +938,12 @@ export default function HomePage() {
       const result = await response.json() as {
         questions?: QuizQuestion[];
         error?: string;
-        report?: {
-          profile?: string;
-          chunks?: number;
-          successfulChunks?: number;
-          warnings?: string[];
-          pendingAnswerCount?: number;
-          answeredCount?: number;
-          expectedQuestionCount?: number;
-          missingSourceNumbers?: string[];
-        };
+        report?: Western306ImportReport & { chunks?: number; successfulChunks?: number };
       };
       if (!response.ok || !result.questions?.length) throw new Error(result.error || "AI 没有返回可用题目");
       const isWestern306 = result.report?.profile === "western-medicine-306";
       const description = isWestern306
-        ? `西医综合 306 专项题库：按 A、B、X 型题整理。已识别 ${result.questions.length} 题，已关联答案 ${result.report?.answeredCount ?? 0} 题，待导入答案 ${result.report?.pendingAnswerCount ?? 0} 题。请抽查原题号、共用选项与答案。`
+        ? `西医综合 306 专项题库：按 A、B、C、X 型题整理。已识别 ${result.questions.length} 题，已关联答案 ${result.report?.answeredCount ?? 0} 题，待导入答案 ${result.report?.pendingAnswerCount ?? 0} 题。请抽查原题号、共用选项与答案。`
         : "";
       const saved = await saveActiveBank({ name: file.fileName.replace(/\.(doc|docx|pdf)$/i, ""), description, questions: result.questions, importedAt: new Date().toISOString() });
       setQuestions(saved.questions);
@@ -958,6 +963,25 @@ export default function HomePage() {
     } finally {
       window.clearTimeout(timer);
     }
+  }
+
+  async function save306WorkbenchResult(name: string, questions: QuizQuestion[], report: Western306ImportReport) {
+    const counts = report.typeCounts ?? {};
+    const description = [
+      `西医综合 306 标准化题库${report.examYear ? ` · ${report.examYear}` : ""}`,
+      `版式：${report.examFormat === "legacy-c-type" ? "旧卷 A/B/C/X" : "现代卷 A/B/X"}`,
+      `已识别 ${questions.length}${report.expectedQuestionCount ? `/${report.expectedQuestionCount}` : ""} 题`,
+      `A ${counts.A ?? 0} · B ${counts.B ?? 0} · C ${counts.C ?? 0} · X ${counts.X ?? 0}`,
+      `已关联答案 ${report.answeredCount ?? 0} 题 · 待答案 ${report.pendingAnswerCount ?? 0} 题`,
+    ].join("；");
+    const saved = await saveActiveBank({ name, description, questions, importedAt: new Date().toISOString() });
+    setQuestions(saved.questions);
+    setBankName(saved.name);
+    setActiveBankId(saved.id);
+    setQuestionBanks(await listQuestionBanks());
+    setShow306Workbench(false);
+    if ((report.pendingAnswerCount ?? 0) > 0) setAnswerTargetBank(saved);
+    setToast(`306 标准化完成：保留 ${saved.questions.length} 道有效题${report.missingSourceNumbers?.length ? `，仍缺 ${report.missingSourceNumbers.length} 题` : ""}。`);
   }
 
   async function mergeAnswerFile(bank: SavedQuestionBank, file: File, onUpdate: (update: ImportUpdate) => void) {
@@ -1214,8 +1238,10 @@ export default function HomePage() {
           onFiles={handleFiles}
           onCancel={cancelImport}
           onDrag={setDragActive}
+          on306={() => { setShowImport(false); setShow306Workbench(true); }}
         />
       )}
+      {show306Workbench && <Western306Workbench onClose={() => setShow306Workbench(false)} onSave={save306WorkbenchResult} />}
       {showAiImport && <AiImportFallbackModal files={aiFallbackFiles} onRecognize={recognizeFileWithAi} onClose={() => { setShowAiImport(false); setAiFallbackFiles([]); }} />}
       {answerTargetBank && <AnswerImportModal bank={answerTargetBank} onMerge={mergeAnswerFile} onClose={() => setAnswerTargetBank(null)} />}
       {showSearch && <SearchModal banks={searchableBanks} onOpen={async (bank, questionId) => { if (bank.id === "__demo__") openQuestion(questionId); else { await openSavedQuestion(bank, questionId); setShowSearch(false); } }} onClose={() => setShowSearch(false)} />}
@@ -1440,7 +1466,7 @@ function QuizView(props: {
     <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><span>{current.category}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""}</span><div><i style={{ width: `${progress}%` }} /></div><b>{currentIndex + 1} / {total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
-        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{current.questionType === "B" && <span>共用备选项{current.sharedOptionGroup ? ` · ${current.sharedOptionGroup}` : ""}</span>}</div><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已收藏" : "收藏"}</button></div>
+        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? ` · ${current.sharedOptionGroup}` : ""}</span>}</div><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已收藏" : "收藏"}</button></div>
         <article className="question-body"><h1>{current.stem}</h1><p className="choose-hint">{answerAvailable ? current.multiple ? "本题有多个正确答案，请选择所有符合项" : "请选择一个最符合题意的答案" : "答案尚未导入：先按测试模式作答，之后可在“我的题库”导入答案并一键核对"}</p><div className="answer-options">{current.options.map((option) => {
           const picked = selected.includes(option.label);
           const isAnswer = submitted && current.answer.includes(option.label);
@@ -1517,8 +1543,96 @@ function AnswerSheet({ questions, progress, currentIndex, onJump, onClose }: { q
   return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose}><X /></button></header><div className="answer-legend"><span><i className="done" />已答</span><span><i className="wrong" />错题</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => <button key={`${question.id}-${index}`} className={`${progress[question.id] ?? ""} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{index + 1}</button>)}</div></section></div>;
 }
 
-function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void }) {
-  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>批量导入 · 新版文件默认在本机处理</span><h2>导入自己的题库</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>一次拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>.docx 本机解析；旧版 .doc 由本站内存转换</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>逐个处理，单个文件最长等待 3 分钟</small></span></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={onCancel}><X />取消当前导入</button>}</div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "cancelled" ? <X /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">.docx 与 PDF 默认在浏览器本地处理；由于旧版 .doc 是二进制格式，选择后会临时发送到你部署的本站服务器内存提取文字，不落盘、不保留原文件。普通识别失败时仍会先征求同意，再决定是否交给 AI 整理。</p></section></div>;
+function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; on306: () => void }) {
+  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>批量导入 · 新版文件默认在本机处理</span><h2>导入自己的题库</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><button type="button" className="western306-entry" onClick={on306} disabled={busy}><Target /><span><strong>西综 306 标准化工作台</strong><small>专门整理 165 题新卷与含 C 型题旧卷，可配套导入答案并检查缺题</small></span><ArrowRight /></button><div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>一次拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>.docx 本机解析；旧版 .doc 由本站内存转换</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>逐个处理，单个文件最长等待 3 分钟</small></span></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={onCancel}><X />取消当前导入</button>}</div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "cancelled" ? <X /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">.docx 与 PDF 默认在浏览器本地处理；由于旧版 .doc 是二进制格式，选择后会临时发送到你部署的本站服务器内存提取文字，不落盘、不保留原文件。普通识别失败时仍会先征求同意，再决定是否交给 AI 整理。</p></section></div>;
+}
+
+function Western306Workbench({ onClose, onSave }: {
+  onClose: () => void;
+  onSave: (name: string, questions: QuizQuestion[], report: Western306ImportReport) => Promise<void>;
+}) {
+  const sourceRef = useRef<HTMLInputElement>(null);
+  const answerRef = useRef<HTMLInputElement>(null);
+  const controllerRef = useRef<AbortController | null>(null);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [answerFile, setAnswerFile] = useState<File | null>(null);
+  const [state, setState] = useState<ImportUpdate>({ phase: "等待原卷", progress: 0, detail: "建议优先使用 OCR 后的 DOCX；扫描 PDF 会在本机先做 OCR" });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [report, setReport] = useState<Western306ImportReport | null>(null);
+
+  useEffect(() => () => controllerRef.current?.abort(), []);
+
+  async function standardize() {
+    if (!sourceFile || busy) return;
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    setBusy(true);
+    setError("");
+    setQuestions([]);
+    setReport(null);
+    try {
+      const source = await extractQuestionFileText(sourceFile, (update) => setState({ ...update, detail: `原卷 · ${update.detail}` }), controller.signal);
+      let answerText = "";
+      if (answerFile) {
+        const answer = await extractQuestionFileText(answerFile, (update) => setState({ ...update, detail: `答案 · ${update.detail}` }), controller.signal);
+        answerText = answer.text;
+      }
+      setState({ phase: "AI 分区与校对", progress: 76, detail: "正在按年份、A/B/C/X 分区和原题号逐段整理；不会凭医学知识猜答案" });
+      const response = await fetch("/api/import-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          fileName: sourceFile.name,
+          text: source.text.slice(0, 480_000),
+          answerText: answerText.slice(0, 240_000),
+          personalAi: readPersonalAiConfig() ?? undefined,
+        }),
+      });
+      const result = await response.json() as { questions?: QuizQuestion[]; report?: Western306ImportReport; error?: string };
+      if (!response.ok || !result.questions?.length || !result.report) throw new Error(result.error || "没有生成可保存的 306 标准题库");
+      setQuestions(result.questions);
+      setReport(result.report);
+      setState({
+        phase: "标准化完成",
+        progress: 100,
+        detail: `识别 ${result.questions.length}${result.report.expectedQuestionCount ? ` / ${result.report.expectedQuestionCount}` : ""} 题 · 已有答案 ${result.report.answeredCount ?? 0} 题`,
+      });
+    } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") setError("本次标准化已取消，未保存半成品。");
+      else setError(caught instanceof Error ? caught.message : "306 标准化失败，请检查文件后重试。");
+    } finally {
+      controllerRef.current = null;
+      setBusy(false);
+    }
+  }
+
+  function exportStandardFile() {
+    if (!questions.length || !report) return;
+    const payload = {
+      format: "avecove-western-306",
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      source: sourceFile?.name,
+      report,
+      bank: {
+        name: sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306",
+        description: `西医综合 306 标准化题库；识别 ${questions.length}${report.expectedQuestionCount ? `/${report.expectedQuestionCount}` : ""} 题。`,
+        questions,
+      },
+    };
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    link.download = `${sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "western-306"}-standard.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  const counts = report?.typeCounts ?? {};
+  const missing = report?.missingSourceNumbers ?? [];
+  return <div className="modal-layer western306-layer" onMouseDown={() => !busy && onClose()}><section className="western306-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>WESTERN MEDICINE 306 · STANDARDIZER</span><h2>西综 306 标准化工作台</h2><p>识别现代 165 题 / 300 分结构，也兼容旧卷 A、B、C、X 型题。</p></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="western306-file-grid"><button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button><button onClick={() => answerRef.current?.click()} className={answerFile ? "selected" : ""} disabled={busy}><ListChecks /><span><strong>{answerFile?.name || "选择答案或解析（可选）"}</strong><small>空白卷可先测试；答案卷可一起做题号关联</small></span><input ref={answerRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setAnswerFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button></div><div className="western306-rules"><ShieldCheck /><div><strong>双层校验</strong><p>先按页、题号和分区做确定性切分，再让 AI 结构化；答案只能来自文件原文。C 型按“两陈述四种判定”处理，不会误当多选。</p></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={() => controllerRef.current?.abort()}><X />取消本次标准化</button>}</div>}{report && <div className="western306-report"><div className="western306-report-head"><span><strong>{report.examYear || "年份待核对"}</strong><small>{report.examFormat === "legacy-c-type" ? "旧卷 C 型结构" : "现代 165 题结构"}</small></span><span><strong>{questions.length}{report.expectedQuestionCount ? ` / ${report.expectedQuestionCount}` : ""}</strong><small>有效题目</small></span><span><strong>{report.totalPoints ? `${report.totalPoints} 分` : "依原卷"}</strong><small>总分规则</small></span></div><div className="western306-type-counts">{["A", "B", "C", "X"].map((type) => <span key={type}><b>{type}</b>{counts[type] ?? 0} 题</span>)}</div><p className={missing.length ? "warning" : "complete"}>{missing.length ? `仍缺 ${missing.length} 个原题号：${missing.slice(0, 30).join("、")}${missing.length > 30 ? "…" : ""}` : "题号连续性检查通过，可以开始抽查题干与答案。"}</p>{(report.warnings?.length ?? 0) > 0 && <p className="warning">{report.warnings?.length} 个片段未完成，已保留其他有效题，建议补传缺题页。</p>}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : "取消"}</button>{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer></section></div>;
 }
 
 function AiImportFallbackModal({ files, onRecognize, onClose }: { files: AiFallbackFile[]; onRecognize: (file: AiFallbackFile) => Promise<number>; onClose: () => void }) {
@@ -1579,7 +1693,7 @@ function AnswerImportModal({ bank, onMerge, onClose }: {
     }
   }
 
-  return <div className="modal-layer answer-import-layer" onMouseDown={() => !busy && onClose()}><section className="answer-import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>ANSWER PAIRING · TEST MODE</span><h2>{complete ? "答案已经合入题库" : "是否继续导入答案？"}</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="answer-import-summary"><ListChecks /><div><strong>{bank.name}</strong><p>共 {bank.questions.length} 题 · 待答案 {pendingCount} 题{draftCount ? ` · 已有 ${draftCount} 份测试作答待核对` : ""}</p></div></div><div className="answer-import-note"><ShieldCheck /><p>答案文件只用于按原题号匹配答案与原文解析。AI 不得凭医学常识补答案；匹配后仍建议抽查 A/B/X 分区和 B 型共用选项。</p></div>{!complete && <button className={`answer-file-picker ${file ? "selected" : ""}`} onClick={() => inputRef.current?.click()} disabled={busy}><Upload /><span><strong>{file?.name || "选择配套答案或解析文件"}</strong><small>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · 点击可更换` : "支持 Word / PDF；扫描件会先 OCR"}</small></span><input ref={inputRef} type="file" accept=".doc,.docx,.pdf,application/msword" hidden onChange={(event) => { setFile(event.target.files?.[0] ?? null); setError(""); }} /></button>}{(busy || state.progress > 0) && <div className="import-progress answer-import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p></div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<footer><button className="ghost-action" onClick={onClose} disabled={busy}>{complete ? "完成并关闭" : "稍后再导入"}</button>{!complete && <button className="primary-action" onClick={() => void begin()} disabled={!file || busy}><Sparkles />{busy ? "正在关联答案…" : "AI 关联并一键对答案"}</button>}</footer></section></div>;
+  return <div className="modal-layer answer-import-layer" onMouseDown={() => !busy && onClose()}><section className="answer-import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>ANSWER PAIRING · TEST MODE</span><h2>{complete ? "答案已经合入题库" : "是否继续导入答案？"}</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="answer-import-summary"><ListChecks /><div><strong>{bank.name}</strong><p>共 {bank.questions.length} 题 · 待答案 {pendingCount} 题{draftCount ? ` · 已有 ${draftCount} 份测试作答待核对` : ""}</p></div></div><div className="answer-import-note"><ShieldCheck /><p>答案文件只用于按原题号匹配答案与原文解析。AI 不得凭医学常识补答案；匹配后仍建议抽查 A/B/C/X 分区、B 型共用选项与 C 型两陈述判定。</p></div>{!complete && <button className={`answer-file-picker ${file ? "selected" : ""}`} onClick={() => inputRef.current?.click()} disabled={busy}><Upload /><span><strong>{file?.name || "选择配套答案或解析文件"}</strong><small>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · 点击可更换` : "支持 Word / PDF；扫描件会先 OCR"}</small></span><input ref={inputRef} type="file" accept=".doc,.docx,.pdf,application/msword" hidden onChange={(event) => { setFile(event.target.files?.[0] ?? null); setError(""); }} /></button>}{(busy || state.progress > 0) && <div className="import-progress answer-import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p></div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<footer><button className="ghost-action" onClick={onClose} disabled={busy}>{complete ? "完成并关闭" : "稍后再导入"}</button>{!complete && <button className="primary-action" onClick={() => void begin()} disabled={!file || busy}><Sparkles />{busy ? "正在关联答案…" : "AI 关联并一键对答案"}</button>}</footer></section></div>;
 }
 
 function AccountModal({ account, syncStatus, nickname: initialNickname, onClose, onAuthenticated, onLogout, onDelete, onSync, onExport, onImport }: {

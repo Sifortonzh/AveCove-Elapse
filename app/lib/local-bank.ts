@@ -29,6 +29,19 @@ export type SharedQuestionBankPackage = {
   };
 };
 
+export type Western306StandardPackage = {
+  format: "avecove-western-306";
+  version: 1;
+  generatedAt: string;
+  source?: string;
+  report?: Record<string, unknown>;
+  bank: {
+    name: string;
+    description?: string;
+    questions: QuizQuestion[];
+  };
+};
+
 export type QuestionBankSyncBundle = {
   version: 1;
   activeBankId: string | null;
@@ -261,8 +274,8 @@ export function createSharedQuestionBankPackage(bank: SavedQuestionBank): Shared
 }
 
 export function parseSharedQuestionBankPackage(value: unknown): QuestionBankInput {
-  const payload = value as Partial<SharedQuestionBankPackage>;
-  if (payload?.format !== "hongdou-question-bank" || payload.version !== 1 || !payload.bank || !Array.isArray(payload.bank.questions)) {
+  const payload = value as Partial<SharedQuestionBankPackage | Western306StandardPackage>;
+  if ((payload?.format !== "hongdou-question-bank" && payload?.format !== "avecove-western-306") || payload.version !== 1 || !payload.bank || !Array.isArray(payload.bank.questions)) {
     throw new Error("这不是可识别的红豆题库分享文件");
   }
   const questions = payload.bank.questions.filter((question): question is QuizQuestion => Boolean(

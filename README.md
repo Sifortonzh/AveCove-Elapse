@@ -67,7 +67,8 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 ### Practice and review
 
 - Automatically distinguish single-choice and multiple-choice questions from answer data.
-- Apply a dedicated Western Medicine 306 profile for A-, B-, and X-type questions, shared B-type option groups, and the official 165-question / 300-point scoring distribution.
+- Apply a year-aware Western Medicine 306 profile: modern papers use A/B/X and the 165-question / 300-point scoring distribution, while legacy papers can retain C-type two-statement questions without treating them as multiple choice.
+- Use the integrated 306 Standardization Workbench to pair a source paper with an optional answer/explanation paper, run page- and question-aware AI structuring, audit A/B/C/X counts, locate missing source numbers, and export a reusable standard JSON file.
 - Practice only single-choice questions or include both types.
 - Sequential practice, a 20-question Random Challenge, and a 100-question Mock Exam sampled from the active bank.
 - Friendly boundary reminders when navigating before the first question or beyond the final question.
