@@ -856,6 +856,8 @@ export default function HomePage() {
         let importedDescription = "";
         let importedQuestions: QuizQuestion[];
         let usedOcr = false;
+        let answeredCount = 0;
+        let pendingAnswerCount = 0;
         if (/\.json$/i.test(file.name)) {
           const shared = parseSharedQuestionBankPackage(JSON.parse(await withImportTimeout(file.text(), 30_000, {
             signal: fileController.signal,
@@ -864,6 +866,8 @@ export default function HomePage() {
           importedName = shared.name;
           importedDescription = shared.description ?? "";
           importedQuestions = shared.questions;
+          answeredCount = importedQuestions.filter((question) => question.answer.length).length;
+          pendingAnswerCount = importedQuestions.length - answeredCount;
           setImportState({ phase: "正在接收分享题库", progress: 82, detail: `[${index + 1}/${batch.length}] ${file.name}` });
         } else {
           const result = await withImportTimeout(importQuestionFile(file, (update) => {
@@ -875,6 +879,8 @@ export default function HomePage() {
           importedQuestions = result.questions;
           importedName = result.questions[0]?.category || importedName;
           usedOcr = result.usedOcr;
+          answeredCount = result.answeredCount;
+          pendingAnswerCount = result.pendingAnswerCount;
         }
         const saved = await saveActiveBank({
           name: importedName,
@@ -886,7 +892,10 @@ export default function HomePage() {
         setBankName(saved.name);
         setActiveBankId(saved.id);
         successCount += 1;
-        updateImportReport(id, { status: "success", detail: `${saved.questions.length} 道题${usedOcr ? " · OCR" : ""}` });
+        updateImportReport(id, {
+          status: "success",
+          detail: `${saved.questions.length} 道客观题 · 答案 ${answeredCount}${pendingAnswerCount ? ` · 待答案 ${pendingAnswerCount}` : ""}${usedOcr ? " · OCR" : ""}`,
+        });
       } catch (error) {
         if (batchController.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
           cancelled = true;
@@ -1544,7 +1553,7 @@ function AnswerSheet({ questions, progress, currentIndex, onJump, onClose }: { q
 }
 
 function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; on306: () => void }) {
-  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>批量导入 · 新版文件默认在本机处理</span><h2>导入自己的题库</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><button type="button" className="western306-entry" onClick={on306} disabled={busy}><Target /><span><strong>西综 306 标准化工作台</strong><small>专门整理 165 题新卷与含 C 型题旧卷，可配套导入答案并检查缺题</small></span><ArrowRight /></button><div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>一次拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>.docx 本机解析；旧版 .doc 由本站内存转换</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>逐个处理，单个文件最长等待 3 分钟</small></span></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={onCancel}><X />取消当前导入</button>}</div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "cancelled" ? <X /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">.docx 与 PDF 默认在浏览器本地处理；由于旧版 .doc 是二进制格式，选择后会临时发送到你部署的本站服务器内存提取文字，不落盘、不保留原文件。普通识别失败时仍会先征求同意，再决定是否交给 AI 整理。</p></section></div>;
+  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>批量导入 · 新版文件默认在本机处理</span><h2>导入自己的题库</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><button type="button" className="western306-entry" onClick={on306} disabled={busy}><Target /><span><strong>西综 306 标准化工作台</strong><small>专门整理 165 题新卷与含 C 型题旧卷，可配套导入答案并检查缺题</small></span><ArrowRight /></button><div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>一次拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>识别题干末尾答案、章节答案表与历年回忆题</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>按章节关联单选、多选与判断；跳过填空和问答</small></span></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={onCancel}><X />取消当前导入</button>}</div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "cancelled" ? <X /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">.docx 与 PDF 默认在浏览器本地处理；由于旧版 .doc 是二进制格式，选择后会临时发送到你部署的本站服务器内存提取文字，不落盘、不保留原文件。普通识别失败时仍会先征求同意，再决定是否交给 AI 整理。</p></section></div>;
 }
 
 function Western306Workbench({ onClose, onSave }: {

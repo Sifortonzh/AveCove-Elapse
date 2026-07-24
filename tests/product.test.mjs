@@ -113,6 +113,69 @@ D.干扰信息
   assert.equal(cType.questions[0].examFormat, "legacy-c-type");
 });
 
+test("imports inline-answer Word banks and chapter-scoped medical answer tables", async () => {
+  const { parseQuestionText } = await loadQuestionParser();
+  const inlineWord = parseQuestionText(`一、单选题
+1．全科医学学科是：A
+A 自二十世纪起源的临床专业
+B 各专科的简单相加
+C 仅提供住院服务
+D 仅提供急诊服务
+E 仅提供公共卫生服务
+2．全科医疗的基本特征不包括：E
+A 连续性服务
+B 以人为中心
+C 以社区为基础
+D 以家庭为单位
+E 仅提供家庭病床
+判断题：
+1．连续性照顾贯穿健康与疾病全过程。√
+四、填空题
+1．请填写概念____
+六、问答题
+1．请论述全科服务。`, "全科期末");
+  assert.equal(inlineWord.length, 3);
+  assert.deepEqual(inlineWord.map((question) => question.answer), [["A"], ["E"], ["A"]]);
+  assert.deepEqual(inlineWord[2].options.map((option) => option.text), ["正确", "错误"]);
+
+  const chapterBank = parseQuestionText(`第一章 总论
+一、单选题（每题仅一个最佳答案）
+1、正常范围是（ ）
+A、0、2～0、4cm
+B、0、5～0、8cm
+C、1、0～1、5cm
+D、1、6～2、0cm
+2、首选检查是（ ）
+A、CT
+B、MRI
+C、DR
+D、DSA
+二、多选题
+1、属于数字影像的是（ ）
+A、CT
+B、MRI
+C、DSA
+D、CR
+三、判断题
+1、MRI使用电离辐射。（ ）
+四、填空题
+1、检查参数是____
+六、问答题
+1、简述检查原则。
+总论 答案
+一、单选题
+1、A 2、B
+二、多选题
+1、ABCD
+三、判断题
+1、×`, "影像精品");
+  assert.equal(chapterBank.length, 4);
+  assert.deepEqual(chapterBank.map((question) => question.answer), [["A"], ["B"], ["A", "B", "C", "D"], ["B"]]);
+  assert.equal(chapterBank[2].multiple, true);
+  assert.equal(chapterBank[3].stem, "MRI使用电离辐射。");
+  assert.ok(chapterBank.every((question) => question.answerSource?.includes("总论")));
+});
+
 test("ships a small, clearly labelled demo bank", async () => {
   const questions = JSON.parse(await text("app/questions.json"));
 

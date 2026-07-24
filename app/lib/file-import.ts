@@ -84,7 +84,13 @@ export async function importQuestionFile(
   file: File,
   onUpdate: (update: ImportUpdate) => void,
   signal?: AbortSignal,
-): Promise<{ questions: QuizQuestion[]; usedOcr: boolean; rawLength: number }> {
+): Promise<{
+  questions: QuizQuestion[];
+  usedOcr: boolean;
+  rawLength: number;
+  answeredCount: number;
+  pendingAnswerCount: number;
+}> {
   const { text, usedOcr } = await extractQuestionFileText(file, onUpdate, signal);
 
   assertImportActive(signal);
@@ -93,8 +99,14 @@ export async function importQuestionFile(
   if (!questions.length) {
     throw new QuestionRecognitionError(file.name, text);
   }
-  onUpdate({ phase: "导入完成", progress: 100, detail: `成功识别 ${questions.length} 道题` });
-  return { questions, usedOcr, rawLength: text.length };
+  const answeredCount = questions.filter((question) => question.answer.length).length;
+  const pendingAnswerCount = questions.length - answeredCount;
+  onUpdate({
+    phase: "导入完成",
+    progress: 100,
+    detail: `识别 ${questions.length} 道客观题 · 已关联答案 ${answeredCount}${pendingAnswerCount ? ` · 待答案 ${pendingAnswerCount}` : ""}`,
+  });
+  return { questions, usedOcr, rawLength: text.length, answeredCount, pendingAnswerCount };
 }
 
 async function extractPdf(file: File, onUpdate: (update: ImportUpdate) => void, signal?: AbortSignal) {

@@ -55,6 +55,8 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 
 - Batch import multiple files in one selection or drag-and-drop operation.
 - Parse legacy `.doc`, modern `.docx`, text PDF, scanned PDF with browser OCR, and portable Red Bean JSON banks.
+- Recognize objective medical-bank layouts with inline answer suffixes, chapter-scoped answer tables, repeated question numbering, and separate single-choice, multiple-choice, and true/false sections.
+- Skip fill-in, terminology, essay, and case-discussion sections instead of forcing them into the choice-practice UI; unanswered objective questions remain available in test mode.
 - Show per-file waiting, processing, success, AI-ready, failure, and timeout states.
 - Preserve every successful import in browser IndexedDB.
 - Switch the active bank without deleting learning records from other banks.
