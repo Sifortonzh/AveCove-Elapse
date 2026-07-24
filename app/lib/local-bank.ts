@@ -1,5 +1,5 @@
 import type { QuizQuestion } from "./question-parser";
-import { normalizeQuestionBankGroup } from "./bank-grouping";
+import { normalizeQuestionBankGroup, suggestQuestionBankGroup } from "./bank-grouping";
 
 export type SavedQuestionBank = {
   id: string;
@@ -97,15 +97,18 @@ function normalizeBank(input: QuestionBankInput): SavedQuestionBank {
   const isNew = !input.id;
   const id = input.id ?? createBankId();
   const now = new Date().toISOString();
+  const name = input.name.trim() || "未命名题库";
+  const questions = input.questions.map((question, index) => normalizeQuestion({
+    ...question,
+    id: isNew ? `${id}:${index + 1}` : question.id,
+  }, `${id}:${index + 1}`));
+  const storedGroupName = normalizeQuestionBankGroup(input.groupName);
   return {
     id,
-    name: input.name.trim() || "未命名题库",
+    name,
     description: typeof input.description === "string" ? input.description.trim().slice(0, 4_000) : "",
-    groupName: normalizeQuestionBankGroup(input.groupName),
-    questions: input.questions.map((question, index) => normalizeQuestion({
-      ...question,
-      id: isNew ? `${id}:${index + 1}` : question.id,
-    }, `${id}:${index + 1}`)),
+    groupName: storedGroupName || (input.groupName === undefined ? suggestQuestionBankGroup(name, questions) : ""),
+    questions,
     importedAt: input.importedAt || now,
     updatedAt: input.updatedAt || now,
   };

@@ -383,7 +383,8 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /export async function updateQuestionBankDetails/);
   assert.match(localBank, /export async function deleteQuestionBank/);
   assert.match(localBank, /description: typeof input\.description/);
-  assert.match(localBank, /groupName: normalizeQuestionBankGroup/);
+  assert.match(localBank, /storedGroupName = normalizeQuestionBankGroup/);
+  assert.match(localBank, /input\.groupName === undefined \? suggestQuestionBankGroup/);
   assert.match(localBank, /bank: \{ name: bank\.name, description: bank\.description, groupName: bank\.groupName, questions: bank\.questions \}/);
   assert.match(localBank, /hongdou-question-bank/);
   assert.match(localBank, /avecove-western-306/);
