@@ -241,7 +241,7 @@ test("includes the requested product flows and copy", async () => {
     text("app/lib/server/auth.ts"),
   ]);
 
-  assert.match(layout, /title: "红豆生南国",/);
+  assert.match(layout, /title: "红豆生南国——练你所念，思你所想",/);
   assert.match(layout, /export const dynamic = "force-dynamic"/);
   assert.match(layout, /export const revalidate = 0/);
   assert.match(page, /题库已就位 🎉 此刻就是新起点，题海有岸，胜利正在装进口袋/);

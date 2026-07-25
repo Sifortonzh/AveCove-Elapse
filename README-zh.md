@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.0.0" src="https://img.shields.io/badge/version-1.0.0-b43d35" />
+  <img alt="版本 1.0.1" src="https://img.shields.io/badge/version-1.0.1-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -35,6 +35,8 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 项目不含广告，不要求手机号或微信登录。学号只用于生成不可逆的同步标识，原始学号不会写入数据库；邮箱仅在使用者主动开启验证码登录或身份保护时使用。
 
 `1.0.0` 是适合公开仓库、自行部署和录制演示的首个正式版本。项目只内置少量演示题，不附带任何完整商业题库、课程题库或其他受版权保护内容。
+
+`1.0.1` 更新浏览器标题，并增加作者博客入口。
 
 ## 核心功能
 

@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-b43d35" />
+  <img alt="Version 1.0.1" src="https://img.shields.io/badge/version-1.0.1-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -35,6 +35,8 @@ AveCove Elapse is the self-hostable edition of **红豆生南国**, initially de
 The project deliberately avoids advertising, phone-number login, and mandatory social-platform accounts. A student ID is converted into an irreversible sync identifier; the original value is not stored. Email is optional and is used only when the user enables verification-code login or identity protection.
 
 Version `1.0.0` marks the first public-source release suitable for self-hosting and demonstrations. It contains only a small demo bank—no copyrighted commercial or course bank is bundled.
+
+Version `1.0.1` adds the new browser title and a visible author-blog link.
 
 ## Highlights
 

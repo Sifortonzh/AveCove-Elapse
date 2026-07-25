@@ -1333,7 +1333,7 @@ function HomeView({ bankName, questions, answered, wrong, accuracy, progress, ex
         <article className="insight-card"><div className="card-title"><span><Target size={18} /></span><div><strong>学习洞察</strong><p>你的个人复盘视图</p></div></div><div className="metrics"><div><b>{answered}</b><span>累计完成</span></div><div><b>{accuracy}%</b><span>正确率</span></div><div><b>{wrong}</b><span>待巩固</span></div></div><div className="tip"><Lightbulb size={17} /><p>{wrong ? "优先重做错题，比盲目刷新题更有效。" : "先完成一组题，系统就能开始生成复盘建议。"}</p></div></article>
         <article className="ai-preview"><div className="ai-preview-head"><span className="ai-orb"><BrainCircuit size={22} /></span><div><small>AI 学习讨论区</small><strong>不是只给答案，而是陪你把题想明白</strong></div></div><div className="ai-chips"><span>大神总结</span><span>易错提示</span><span>知微</span></div><p>提交答案后，针对当前题目生成总结、辨析常见误区，并继续追问。</p><button onClick={() => onPractice({ scope: "unanswered" })}>去体验 <ArrowRight size={16} /></button></article>
       </section>
-      <footer className="home-footer"><span>© 2026 红豆生南国</span><button onClick={onCopyright}>版权、免责声明与用户协议 <ChevronRight size={14} /></button></footer>
+      <footer className="home-footer"><span>© 2026 红豆生南国</span><nav aria-label="站点相关链接"><a href="https://avecrouge.top/" target="_blank" rel="noreferrer">访问作者博客</a><button onClick={onCopyright}>版权、免责声明与用户协议 <ChevronRight size={14} /></button></nav></footer>
     </section>
   </div>;
 }
@@ -1921,7 +1921,7 @@ function CopyrightPage({ bankName, onHome, onRestoreDemo }: { bankName: string; 
           <button className="primary-action" onClick={onHome}>我已了解，返回学习</button>
           <button className="ghost-action" onClick={onRestoreDemo}>恢复演示题库</button>
         </div>
-        <footer><span>© 2026 红豆生南国 · 保留相关权利</span><span>AveCove Elapse v0.3 · 医学知识训练与复盘</span></footer>
+        <footer><span>© 2026 红豆生南国 · 保留相关权利</span><span><a href="https://avecrouge.top/" target="_blank" rel="noreferrer">avecrouge.top · 作者博客</a> · AveCove Elapse v1.0.1</span></footer>
       </main>
     </div>
   );
