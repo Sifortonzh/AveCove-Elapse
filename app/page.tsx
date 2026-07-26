@@ -1126,6 +1126,69 @@ export default function HomePage() {
     setToast(`“${updated.name}”的题库信息已保存 ✍️📚`);
   }
 
+  async function reviseCurrentQuestion(revision: QuizQuestion) {
+    const optionLabels = new Set(revision.options.map((option) => option.label.toUpperCase()));
+    const revisedAnswer = [...new Set(revision.answer.map((label) => label.toUpperCase()))]
+      .filter((label) => optionLabels.has(label));
+    const revisedQuestion: QuizQuestion = {
+      ...revision,
+      stem: revision.stem.trim(),
+      options: revision.options.map((option) => ({ ...option, text: option.text.trim() })),
+      answer: revisedAnswer,
+      answerPending: false,
+      multiple: revision.questionType === "X" || revisedAnswer.length > 1,
+    };
+    const replaceQuestion = (items: QuizQuestion[]) => items.map((question) => (
+      question.id === revisedQuestion.id ? revisedQuestion : question
+    ));
+    const nextQuestions = replaceQuestion(questions);
+    let saved: SavedQuestionBank;
+
+    if (activeBankId) {
+      const bank = questionBanks.find((candidate) => candidate.id === activeBankId);
+      if (!bank) throw new Error("当前题库暂时无法写入，请返回“我的题库”后重试");
+      saved = await saveQuestionBank({
+        ...bank,
+        questions: replaceQuestion(bank.questions),
+        updatedAt: new Date().toISOString(),
+      }, true);
+      setQuestionBanks((banks) => banks.map((candidate) => candidate.id === saved.id ? saved : candidate));
+    } else {
+      saved = await saveQuestionBank({
+        id: `revised-demo-${Date.now()}`,
+        name: `${bankName}（已修订）`,
+        description: "由演示题库在刷题过程中修订并保存。",
+        questions: nextQuestions,
+        importedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, true);
+      setActiveBankId(saved.id);
+      setBankName(saved.name);
+      setQuestionBanks((banks) => [saved, ...banks.filter((candidate) => candidate.id !== saved.id)]);
+    }
+
+    setQuestions(replaceQuestion(saved.questions));
+    setSessionQuestions((session) => replaceQuestion(session));
+    setAiTexts({});
+    setAiMessages([]);
+
+    const previousSelection = answerSelections[revisedQuestion.id] ?? selected;
+    if (submitted && revisedAnswer.length && previousSelection.length) {
+      const revisedResult = [...previousSelection].sort().join("") === [...revisedAnswer].sort().join("") ? "correct" : "wrong";
+      const nextProgress = { ...progress, [revisedQuestion.id]: revisedResult as "correct" | "wrong" };
+      const nextLedger = stampLearningRecord(recordLedger, revisedQuestion.id, { progress: revisedResult });
+      persistLearningRecords({
+        progress: nextProgress,
+        firstProgress,
+        favorites,
+        notes,
+        ledger: nextLedger,
+      });
+    }
+
+    setToast("题目修订已保存 ✏️✨ 当前题库、多端同步与后续分享都会使用这个版本。");
+  }
+
   async function removeSavedBank(id: string) {
     await deleteQuestionBank(id);
     setQuestionBanks((banks) => banks.filter((bank) => bank.id !== id));
@@ -1255,6 +1318,7 @@ export default function HomePage() {
           onDeleteComment={deleteComment}
           onRequireLogin={() => setShowAccount(true)}
           onMobilePanel={() => setShowMobilePanel((value) => !value)}
+          onEditQuestion={reviseCurrentQuestion}
         />
       ) : (
         <EmptySession onHome={() => setView("home")} />
@@ -1513,7 +1577,9 @@ function QuizView(props: {
   onFollowUp: (text: string) => void; onComment: (text: string) => void;
   onLikeComment: (commentId: string) => void; onReportComment: (commentId: string) => void;
   onDeleteComment: (commentId: string) => void; onRequireLogin: () => void; onMobilePanel: () => void;
+  onEditQuestion: (question: QuizQuestion) => Promise<void>;
 }) {
+  const [editingQuestion, setEditingQuestion] = useState(false);
   const { current, currentIndex, total, selected, submitted, result, favorite, note, aiMode, aiTexts, aiMessages, aiLoading, examScore } = props;
   const progress = Math.round(((currentIndex + 1) / total) * 100);
   const answerAvailable = current.answer.length > 0;
@@ -1522,7 +1588,7 @@ function QuizView(props: {
     <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><span>{current.category}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""}</span><div><i style={{ width: `${progress}%` }} /></div><b>{currentIndex + 1} / {total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
-        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? ` · ${current.sharedOptionGroup}` : ""}</span>}</div><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已收藏" : "收藏"}</button></div>
+        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? ` · ${current.sharedOptionGroup}` : ""}</span>}</div><div className="question-top-actions"><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)}><Pencil size={16} />纠错编辑</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已收藏" : "收藏"}</button></div></div>
         <article className="question-body"><h1>{current.stem}</h1><p className="choose-hint">{answerAvailable ? current.multiple ? "本题有多个正确答案，请选择所有符合项" : "请选择一个最符合题意的答案" : "答案尚未导入：先按测试模式作答，之后可在“我的题库”导入答案并一键核对"}</p><div className="answer-options">{current.options.map((option) => {
           const picked = selected.includes(option.label);
           const isAnswer = submitted && current.answer.includes(option.label);
@@ -1539,6 +1605,80 @@ function QuizView(props: {
     </div>
     <nav className="quiz-bottom"><button onClick={props.onPrevious}><ChevronLeft /><span>上一题</span></button><button onClick={props.onAnswerSheet}><ListChecks /><span>答题卡</span></button><button className={favorite ? "active" : ""} onClick={props.onFavorite}><Star fill={favorite ? "currentColor" : "none"} /><span>收藏</span></button><button onClick={props.onMobilePanel}><MessageCircle /><span>学习区</span></button><button onClick={props.onSettings}><Settings2 /><span>设置</span></button><button className="mobile-next" onClick={props.onNext}><ChevronRight /><span>下一题</span></button></nav>
       {props.mobilePanel && <div className="mobile-learning"><button className="drawer-close" aria-label="关闭学习区" onClick={props.onMobilePanel}><X /></button><LearningPanel current={current} submitted={submitted && answerAvailable} note={note} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} /></div>}
+      {editingQuestion && <QuestionCorrectionModal question={current} onSave={props.onEditQuestion} onClose={() => setEditingQuestion(false)} />}
+  </div>;
+}
+
+function QuestionCorrectionModal({ question, onSave, onClose }: {
+  question: QuizQuestion;
+  onSave: (question: QuizQuestion) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [stem, setStem] = useState(question.stem);
+  const [options, setOptions] = useState(question.options.map((option) => ({ ...option })));
+  const [answer, setAnswer] = useState([...question.answer]);
+  const [allowMultiple, setAllowMultiple] = useState(question.questionType === "X" || question.multiple);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const fixedExamType = Boolean(question.questionType);
+  const normalizedOriginalAnswer = [...question.answer].sort().join("");
+  const answerChanged = [...answer].sort().join("") !== normalizedOriginalAnswer
+    || allowMultiple !== (question.questionType === "X" || question.multiple);
+  const valid = Boolean(
+    stem.trim()
+    && options.length >= 2
+    && options.every((option) => option.text.trim())
+    && answer.length
+    && answer.every((label) => options.some((option) => option.label === label)),
+  );
+
+  const toggleAnswer = (label: string) => {
+    if (allowMultiple) {
+      setAnswer((current) => current.includes(label) ? current.filter((item) => item !== label) : [...current, label]);
+    } else {
+      setAnswer([label]);
+    }
+  };
+
+  const changeAnswerMode = (multiple: boolean) => {
+    if (fixedExamType) return;
+    setAllowMultiple(multiple);
+    if (!multiple) setAnswer((current) => current.slice(0, 1));
+  };
+
+  const save = async () => {
+    if (!valid || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await onSave({
+        ...question,
+        stem: stem.trim(),
+        options: options.map((option) => ({ ...option, text: option.text.trim() })),
+        answer: [...answer].sort(),
+        answerPending: false,
+        multiple: allowMultiple || answer.length > 1,
+      });
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "暂时无法保存修订，请稍后重试");
+      setBusy(false);
+    }
+  };
+
+  return <div className="modal-layer question-edit-layer" onMouseDown={() => !busy && onClose()}>
+    <section className="question-edit-modal" role="dialog" aria-modal="true" aria-labelledby="question-edit-title" onMouseDown={(event) => event.stopPropagation()}>
+      <header><div><span>QUESTION CORRECTION</span><h2 id="question-edit-title">修订题目与标准答案</h2><p>发现识别错字时可直接修正；保存后，题库同步与分享文件都会采用新版本。</p></div><button onClick={onClose} disabled={busy} aria-label="关闭纠错编辑"><X /></button></header>
+      <div className="question-edit-scroll">
+        <label className="question-edit-field"><span>题干</span><textarea value={stem} rows={4} onChange={(event) => setStem(event.target.value)} /></label>
+        <section className="option-edit-section"><div><strong>选项文字</strong><span>选项编号保持不变，避免影响已有作答记录</span></div>{options.map((option, index) => <label key={option.label}><b>{option.label}</b><textarea rows={2} value={option.text} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} /></label>)}</section>
+        <section className="answer-edit-section"><header><div><strong>标准答案</strong><span>{allowMultiple ? "可选择多个正确选项" : "仅选择一个正确选项"}</span></div>{!fixedExamType && <div className="answer-type-switch"><button className={!allowMultiple ? "active" : ""} onClick={() => changeAnswerMode(false)}>单选</button><button className={allowMultiple ? "active" : ""} onClick={() => changeAnswerMode(true)}>多选</button></div>}</header><div className="answer-edit-choices">{options.map((option) => <button key={option.label} className={answer.includes(option.label) ? "active" : ""} onClick={() => toggleAnswer(option.label)} aria-pressed={answer.includes(option.label)}><i>{answer.includes(option.label) && <Check size={15} />}</i><b>{option.label}</b><span>{option.text}</span></button>)}</div></section>
+        {answerChanged && <div className="answer-revision-warning"><AlertCircle /><div><strong>改标准答案前，请再核对一次 ⚠️🩺</strong><p>原文件答案可能受教材版本、指南更新或识别误差影响；但手动修订也可能出错。请对照教材、官方答案或可靠解析再次核验后再保存哦 🔎✅</p></div></div>}
+        <div className="question-edit-impact"><ShieldCheck /><p>保存后，当前题库、多端同步和后续分享均使用修订版；已有首次评分记录会保留，当前掌握状态会按新答案重新核对。</p></div>
+        {error && <p className="question-edit-error"><AlertCircle size={17} />{error}</p>}
+      </div>
+      <footer><button className="ghost-action" onClick={onClose} disabled={busy}>取消</button><button className="primary-action" onClick={() => void save()} disabled={!valid || busy}><CheckCircle2 />{busy ? "正在保存…" : "保存修订"}</button></footer>
+    </section>
   </div>;
 }
 

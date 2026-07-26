@@ -392,6 +392,24 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /Transparently migrate the single-bank format/);
 });
 
+test("persists in-practice question corrections into sync and shared banks", async () => {
+  const [page, localBank, styles] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/lib/local-bank.ts"),
+    text("app/globals.css"),
+  ]);
+
+  assert.match(page, /function QuestionCorrectionModal/);
+  assert.match(page, /修订题目与标准答案/);
+  assert.match(page, /原文件答案可能受教材版本、指南更新或识别误差影响/);
+  assert.match(page, /当前题库、多端同步与后续分享都会使用这个版本/);
+  assert.match(page, /questions: replaceQuestion\(bank\.questions\)/);
+  assert.match(page, /stampLearningRecord\(recordLedger, revisedQuestion\.id, \{ progress: revisedResult \}\)/);
+  assert.match(localBank, /questions: bank\.questions/);
+  assert.match(styles, /\.question-edit-modal/);
+  assert.match(styles, /\.answer-revision-warning/);
+});
+
 test("ships an isolated, responsive English learning demo", async () => {
   const [page, english, englishStore, englishPractice, styles, layout] = await Promise.all([
     text("app/page.tsx"),
