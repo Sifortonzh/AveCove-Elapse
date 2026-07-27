@@ -158,6 +158,34 @@ B.乙
   assert.equal(suggestQuestionBankGroup("2025西综306考研真题", [question]), "考研西综306");
 });
 
+test("standardizes a nearly complete inline-answer 306 paper locally without AI", async () => {
+  const { standardizeParsedWestern306Questions } = await loadMedicalAiImport();
+  const missing = new Set([80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 163, 164, 165]);
+  const parsed = Array.from({ length: 165 }, (_, index) => index + 1)
+    .filter((number) => !missing.has(number))
+    .map((number) => ({
+      id: `q-${number}`,
+      sourceNumber: String(number),
+      category: "2025年306真题",
+      stem: `第 ${number} 题`,
+      options: ["A", "B", "C", "D"].map((label) => ({ label, text: `${label} 选项` })),
+      answer: number >= 136 ? ["A", "C"] : ["B"],
+      multiple: number >= 136,
+    }));
+  const result = standardizeParsedWestern306Questions(
+    "2025年306真题.pdf",
+    "2025年研究生考试（306西医综合）\nA型题 1-115\nB型题 116-135\nX型题 136-165",
+    parsed,
+  );
+
+  assert.equal(result.usable, true);
+  assert.equal(result.questions.length, 152);
+  assert.equal(result.report.answeredCount, 152);
+  assert.deepEqual(result.report.missingSourceNumbers, [...missing].map(String));
+  assert.deepEqual(result.report.typeCounts, { A: 105, B: 20, C: 0, X: 27 });
+  assert.equal(result.questions.find((question) => question.sourceNumber === "136")?.multiple, true);
+});
+
 test("imports inline-answer Word banks and chapter-scoped medical answer tables", async () => {
   const { parseQuestionText } = await loadQuestionParser();
   const inlineWord = parseQuestionText(`一、单选题
@@ -343,6 +371,8 @@ test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recogn
   assert.match(medicalAiImport, /splitWestern306SourceText/);
   assert.match(medicalAiImport, /C 型题的 A\/B 是两条来源陈述/);
   assert.match(page, /西综 306 标准化工作台/);
+  assert.match(page, /本地确定性识别/);
+  assert.match(page, /AI 标准化超过了网页网关的等待时间/);
   assert.match(page, /现代 165 题 \/ 300 分结构/);
   assert.match(aiImportRoute, /Promise\.allSettled/);
   assert.match(aiImportRoute, /480_000/);

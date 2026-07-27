@@ -23,8 +23,8 @@ import {
   learningRecordsEqual, mergeLearningRecords, normalizeLearningRecords, stampLearningRecord,
   type LearningRecords, type RecordLedger,
 } from "./lib/record-sync";
-import type { QuizQuestion } from "./lib/question-parser";
-import { western306Score } from "./lib/medical-ai-import";
+import { parseQuestionText, type QuizQuestion } from "./lib/question-parser";
+import { standardizeParsedWestern306Questions, western306Score } from "./lib/medical-ai-import";
 import { suggestQuestionBankGroup } from "./lib/bank-grouping";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
@@ -42,6 +42,7 @@ type ImportReport = { id: string; name: string; status: "waiting" | "processing"
 type AiFallbackFile = { id: string; fileName: string; extractedText: string };
 type Western306ImportReport = {
   profile?: string;
+  recognitionMode?: "deterministic" | "ai";
   examYear?: number;
   examFormat?: string;
   expectedQuestionCount?: number;
@@ -56,6 +57,24 @@ type Western306ImportReport = {
   suggestedGroupName?: string;
   warnings?: string[];
 };
+
+async function readImportApiPayload<T>(response: Response): Promise<T> {
+  const raw = await response.text();
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    if (response.status === 504 || /<title>\s*504|gateway time-?out/i.test(raw)) {
+      throw new Error("AI 标准化超过了网页网关的等待时间。原文件没有损坏，请稍后重试或联系站点管理员延长 AI 导入超时。");
+    }
+    if (response.status === 502 || /<title>\s*502|bad gateway/i.test(raw)) {
+      throw new Error("AI 标准化期间上游服务暂时断开。原文件没有损坏，请检查 AI 厂商状态后重试。");
+    }
+    if (response.status === 413) {
+      throw new Error("提取出的文件内容超过了服务器接收上限，请拆分文件后重试。");
+    }
+    throw new Error(`服务器没有返回有效的题库数据${response.status ? `（HTTP ${response.status}）` : ""}，请稍后重试。`);
+  }
+}
 type MarkdownLineKind = "heading1" | "heading2" | "heading3" | "quote" | "list" | "paragraph" | "space";
 type Settings = {
   scope: Scope;
@@ -1776,6 +1795,22 @@ function Western306Workbench({ onClose, onSave }: {
         const answer = await extractQuestionFileText(answerFile, (update) => setState({ ...update, detail: `答案 · ${update.detail}` }), controller.signal);
         answerText = answer.text;
       }
+      setState({ phase: "本地结构校验", progress: 68, detail: "正在检查原题号、选项与题后明确答案；标准卷无需重复交给 AI" });
+      const locallyParsed = parseQuestionText(
+        source.text.replace(/^\[\[PAGE\s+\d+\]\]\s*$/gim, ""),
+        sourceFile.name.replace(/\.(doc|docx|pdf)$/i, ""),
+      );
+      const localStandardization = standardizeParsedWestern306Questions(sourceFile.name, source.text, locallyParsed);
+      if (localStandardization.usable && !answerFile) {
+        setQuestions(localStandardization.questions);
+        setReport(localStandardization.report);
+        setState({
+          phase: "标准化完成",
+          progress: 100,
+          detail: `本地确定性识别 ${localStandardization.questions.length}${localStandardization.report.expectedQuestionCount ? ` / ${localStandardization.report.expectedQuestionCount}` : ""} 题 · 已有答案 ${localStandardization.report.answeredCount} 题`,
+        });
+        return;
+      }
       setState({ phase: "AI 分区与校对", progress: 76, detail: "正在按年份、A/B/C/X 分区和原题号逐段整理；不会凭医学知识猜答案" });
       const response = await fetch("/api/import-ai", {
         method: "POST",
@@ -1788,7 +1823,7 @@ function Western306Workbench({ onClose, onSave }: {
           personalAi: readPersonalAiConfig() ?? undefined,
         }),
       });
-      const result = await response.json() as { questions?: QuizQuestion[]; report?: Western306ImportReport; error?: string };
+      const result = await readImportApiPayload<{ questions?: QuizQuestion[]; report?: Western306ImportReport; error?: string }>(response);
       if (!response.ok || !result.questions?.length || !result.report) throw new Error(result.error || "没有生成可保存的 306 标准题库");
       setQuestions(result.questions);
       setReport(result.report);
@@ -1829,7 +1864,7 @@ function Western306Workbench({ onClose, onSave }: {
 
   const counts = report?.typeCounts ?? {};
   const missing = report?.missingSourceNumbers ?? [];
-  return <div className="modal-layer western306-layer" onMouseDown={() => !busy && onClose()}><section className="western306-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>WESTERN MEDICINE 306 · STANDARDIZER</span><h2>西综 306 标准化工作台</h2><p>识别现代 165 题 / 300 分结构，也兼容旧卷 A、B、C、X 型题。</p></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="western306-file-grid"><button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button><button onClick={() => answerRef.current?.click()} className={answerFile ? "selected" : ""} disabled={busy}><ListChecks /><span><strong>{answerFile?.name || "选择答案或解析（可选）"}</strong><small>空白卷可先测试；答案卷可一起做题号关联</small></span><input ref={answerRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setAnswerFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button></div><div className="western306-rules"><ShieldCheck /><div><strong>跨页接缝 + 双层校验</strong><p>先按页、题号和分区切分，并补建“上一页题干＋下一页选项”接缝，再让 AI 结构化；答案只能来自文件原文。C 型按“两陈述四种判定”处理，不会误当多选。</p></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={() => controllerRef.current?.abort()}><X />取消本次标准化</button>}</div>}{report && <div className="western306-report"><div className="western306-report-head"><span><strong>{report.examYear || "年份待核对"}</strong><small>{report.examFormat === "legacy-c-type" ? "旧卷 C 型结构" : "现代 165 题结构"}</small></span><span><strong>{questions.length}{report.expectedQuestionCount ? ` / ${report.expectedQuestionCount}` : ""}</strong><small>有效题目</small></span><span><strong>{report.totalPoints ? `${report.totalPoints} 分` : "依原卷"}</strong><small>总分规则</small></span></div><div className="western306-type-counts">{["A", "B", "C", "X"].map((type) => <span key={type}><b>{type}</b>{counts[type] ?? 0} 题</span>)}</div><p className={missing.length ? "warning" : "complete"}>{missing.length ? `仍缺 ${missing.length} 个原题号：${missing.slice(0, 30).join("、")}${missing.length > 30 ? "…" : ""}` : "题号连续性检查通过，可以开始抽查题干与答案。"}</p>{report.oneToOneVerified && <p className="complete">原题与答案已完成一一对应校验；即使原卷少于标准题数 10 题以内，也会按普通模式保存。</p>}{(report.reconciledAnswerCount ?? 0) > 0 && <p className="complete">已从原卷明确答案中二次补回 {report.reconciledAnswerCount} 题。</p>}{(report.warnings?.length ?? 0) > 0 && <p className="warning">{report.warnings?.length} 个片段未完成，已保留其他有效题，建议补传缺题页。</p>}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : "取消"}</button>{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer></section></div>;
+  return <div className="modal-layer western306-layer" onMouseDown={() => !busy && onClose()}><section className="western306-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>WESTERN MEDICINE 306 · STANDARDIZER</span><h2>西综 306 标准化工作台</h2><p>识别现代 165 题 / 300 分结构，也兼容旧卷 A、B、C、X 型题。</p></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="western306-file-grid"><button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button><button onClick={() => answerRef.current?.click()} className={answerFile ? "selected" : ""} disabled={busy}><ListChecks /><span><strong>{answerFile?.name || "选择答案或解析（可选）"}</strong><small>空白卷可先测试；答案卷可一起做题号关联</small></span><input ref={answerRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setAnswerFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button></div><div className="western306-rules"><ShieldCheck /><div><strong>跨页接缝 + 双层校验</strong><p>优先在本地按题号、选项与原文答案确定性整理；只有不满足标准结构时才进入 AI 分区。AI 只做结构化，答案仍只能来自文件原文。</p></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={() => controllerRef.current?.abort()}><X />取消本次标准化</button>}</div>}{report && <div className="western306-report"><div className="western306-report-head"><span><strong>{report.examYear || "年份待核对"}</strong><small>{report.examFormat === "legacy-c-type" ? "旧卷 C 型结构" : "现代 165 题结构"}</small></span><span><strong>{questions.length}{report.expectedQuestionCount ? ` / ${report.expectedQuestionCount}` : ""}</strong><small>有效题目</small></span><span><strong>{report.totalPoints ? `${report.totalPoints} 分` : "依原卷"}</strong><small>总分规则</small></span></div><div className="western306-type-counts">{["A", "B", "C", "X"].map((type) => <span key={type}><b>{type}</b>{counts[type] ?? 0} 题</span>)}</div>{report.recognitionMode === "deterministic" && <p className="complete">题干、选项与题后答案已在本机一一核对，本次未调用 AI，也不会因网关超时中断。</p>}<p className={missing.length ? "warning" : "complete"}>{missing.length ? `原文件缺少 ${missing.length} 个完整原题号：${missing.slice(0, 30).join("、")}${missing.length > 30 ? "…" : ""}。系统不会凭空补题。` : "题号连续性检查通过，可以开始抽查题干与答案。"}</p>{report.oneToOneVerified && <p className="complete">原题与答案已完成一一对应校验；即使原卷少于标准题数 10 题以内，也会按普通模式保存。</p>}{(report.reconciledAnswerCount ?? 0) > 0 && <p className="complete">已从原卷明确答案中二次补回 {report.reconciledAnswerCount} 题。</p>}{(report.warnings?.length ?? 0) > 0 && <p className="warning">{report.warnings?.length} 个片段未完成，已保留其他有效题，建议补传缺题页。</p>}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : "取消"}</button>{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer></section></div>;
 }
 
 function AiImportFallbackModal({ files, onRecognize, onClose }: { files: AiFallbackFile[]; onRecognize: (file: AiFallbackFile) => Promise<number>; onClose: () => void }) {

@@ -133,6 +133,7 @@ export async function POST(request: Request) {
     questions: merged,
     report: {
       profile,
+      recognitionMode: "ai",
       chunks: chunks.length,
       successfulChunks: chunks.length - warnings.length,
       discarded,

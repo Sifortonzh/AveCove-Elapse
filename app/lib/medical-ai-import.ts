@@ -47,6 +47,28 @@ export type MedicalAnswerReconciliation = {
   oneToOneVerified: boolean;
 };
 
+export type Western306LocalStandardization = {
+  usable: boolean;
+  questions: QuizQuestion[];
+  report: {
+    profile: "western-medicine-306";
+    recognitionMode: "deterministic";
+    examYear?: number;
+    examFormat: Western306Format;
+    expectedQuestionCount?: number;
+    totalPoints?: number;
+    typeCounts: Record<string, number>;
+    answeredCount: number;
+    pendingAnswerCount: number;
+    missingSourceNumbers: string[];
+    duplicateSourceNumbers: string[];
+    reconciledAnswerCount: number;
+    oneToOneVerified: boolean;
+    suggestedGroupName: string;
+    warnings: string[];
+  };
+};
+
 const WESTERN_306_PATTERN = /(?:西医综合|西综|临床医学综合能力\s*[（(]?西医[）)]?|(?:^|\D)306(?:\D|$))/i;
 
 export function detectMedicalExamProfile(fileName: string, text = ""): MedicalExamProfile {
@@ -117,6 +139,89 @@ export function western306Metadata(sourceNumber: string, blueprint: Western306Bl
   const section = blueprint.sections.find((candidate) => number >= candidate.start && number <= candidate.end);
   if (!section) return {};
   return { questionType: section.questionType, points: section.points, multiple: section.questionType === "X" };
+}
+
+export function standardizeParsedWestern306Questions(
+  fileName: string,
+  text: string,
+  parsedQuestions: QuizQuestion[],
+): Western306LocalStandardization {
+  const blueprint = detectWestern306Blueprint(fileName, text);
+  const selected = new Map<string, QuizQuestion>();
+  const duplicateSourceNumbers = new Set<string>();
+
+  for (const question of parsedQuestions) {
+    const sourceNumber = String(Number.parseInt(question.sourceNumber.match(/\d+/)?.[0] ?? "", 10));
+    if (sourceNumber === "NaN") continue;
+    const numericSourceNumber = Number(sourceNumber);
+    if (numericSourceNumber < 1 || (blueprint.expectedQuestionCount && numericSourceNumber > blueprint.expectedQuestionCount)) continue;
+    const metadata = western306Metadata(sourceNumber, blueprint);
+    const optionLabels = new Set(question.options.map((option) => option.label));
+    const answer = [...new Set(question.answer)].filter((label) => optionLabels.has(label));
+    const normalized: QuizQuestion = {
+      ...question,
+      sourceNumber,
+      examProfile: "western-medicine-306",
+      examYear: blueprint.year,
+      examFormat: blueprint.format,
+      questionType: metadata.questionType,
+      points: metadata.points,
+      multiple: metadata.questionType === "X",
+      answer,
+      answerPending: answer.length === 0,
+      answerSource: question.answerSource || (answer.length ? "原卷题后参考答案" : undefined),
+    };
+    const current = selected.get(sourceNumber);
+    if (current) duplicateSourceNumbers.add(sourceNumber);
+    const currentQuality = current
+      ? current.stem.length + current.options.reduce((sum, option) => sum + option.text.length, 0) + (current.answer.length ? 500 : 0)
+      : -1;
+    const nextQuality = normalized.stem.length + normalized.options.reduce((sum, option) => sum + option.text.length, 0) + (normalized.answer.length ? 500 : 0);
+    if (!current || nextQuality > currentQuality) selected.set(sourceNumber, normalized);
+  }
+
+  const questions = [...selected.values()]
+    .sort((left, right) => Number(left.sourceNumber) - Number(right.sourceNumber))
+    .map((question, index) => ({ ...question, id: `local-306-${Date.now()}-${index + 1}` }));
+  const knownNumbers = new Set(questions.map((question) => question.sourceNumber));
+  const missingSourceNumbers = blueprint.expectedQuestionCount
+    ? Array.from({ length: blueprint.expectedQuestionCount }, (_, index) => String(index + 1)).filter((number) => !knownNumbers.has(number))
+    : [];
+  const structurallyComplete = questions.every((question) => {
+    if (!question.stem.trim() || question.options.length < 2 || !question.answer.length) return false;
+    if (question.questionType !== "X" && question.answer.length !== 1) return false;
+    const labels = new Set(question.options.map((option) => option.label));
+    return question.answer.every((label) => labels.has(label));
+  });
+  const minimumFastPathCount = blueprint.expectedQuestionCount
+    ? Math.max(40, blueprint.expectedQuestionCount - 20)
+    : 80;
+  const typeCounts = Object.fromEntries(["A", "B", "C", "X"].map((type) => [
+    type,
+    questions.filter((question) => question.questionType === type).length,
+  ]));
+
+  return {
+    usable: questions.length >= minimumFastPathCount && structurallyComplete,
+    questions,
+    report: {
+      profile: "western-medicine-306",
+      recognitionMode: "deterministic",
+      examYear: blueprint.year,
+      examFormat: blueprint.format,
+      expectedQuestionCount: blueprint.expectedQuestionCount,
+      totalPoints: blueprint.totalPoints,
+      typeCounts,
+      answeredCount: questions.filter((question) => question.answer.length).length,
+      pendingAnswerCount: questions.filter((question) => !question.answer.length).length,
+      missingSourceNumbers,
+      duplicateSourceNumbers: [...duplicateSourceNumbers],
+      reconciledAnswerCount: 0,
+      oneToOneVerified: missingSourceNumbers.length < 10 && structurallyComplete,
+      suggestedGroupName: "考研西综306",
+      warnings: [],
+    },
+  };
 }
 
 export function western306Score(
