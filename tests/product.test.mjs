@@ -401,12 +401,17 @@ test("persists in-practice question corrections into sync and shared banks", asy
 
   assert.match(page, /function QuestionCorrectionModal/);
   assert.match(page, /修订题目与标准答案/);
+  assert.match(page, /标准答案已模糊保护/);
+  assert.match(page, /显示并修订答案/);
+  assert.match(page, /const \[answerVisible, setAnswerVisible\] = useState\(false\)/);
   assert.match(page, /原文件答案可能受教材版本、指南更新或识别误差影响/);
   assert.match(page, /当前题库、多端同步与后续分享都会使用这个版本/);
   assert.match(page, /questions: replaceQuestion\(bank\.questions\)/);
   assert.match(page, /stampLearningRecord\(recordLedger, revisedQuestion\.id, \{ progress: revisedResult \}\)/);
   assert.match(localBank, /questions: bank\.questions/);
   assert.match(styles, /\.question-edit-modal/);
+  assert.match(styles, /\.answer-edit-mask/);
+  assert.match(styles, /filter:blur\(7px\)/);
   assert.match(styles, /\.answer-revision-warning/);
 });
 

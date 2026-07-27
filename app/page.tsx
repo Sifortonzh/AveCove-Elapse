@@ -5,7 +5,7 @@ import Image from "next/image";
 import {
   AlertCircle, ArrowRight, BookOpen, Bot, BrainCircuit, Check, CheckCircle2,
   ChevronLeft, ChevronRight, CircleHelp, Clock3, Cloud, Download, FileText, Flag, Home, Import,
-  Database, Languages, Library, Lightbulb, ListChecks, MessageCircle, Moon, NotebookPen, Pencil, Play,
+  Database, Eye, EyeOff, Languages, Library, Lightbulb, ListChecks, MessageCircle, Moon, NotebookPen, Pencil, Play,
   RefreshCw, RotateCcw, ScanText, Search, Send, Settings2, Share2, ShieldCheck, Shuffle, Sparkles,
   Star, Sun, Target, ThumbsUp, Trash2, Upload, UserRound, X, Zap,
 } from "lucide-react";
@@ -1135,7 +1135,7 @@ export default function HomePage() {
       stem: revision.stem.trim(),
       options: revision.options.map((option) => ({ ...option, text: option.text.trim() })),
       answer: revisedAnswer,
-      answerPending: false,
+      answerPending: revisedAnswer.length === 0,
       multiple: revision.questionType === "X" || revisedAnswer.length > 1,
     };
     const replaceQuestion = (items: QuizQuestion[]) => items.map((question) => (
@@ -1618,6 +1618,7 @@ function QuestionCorrectionModal({ question, onSave, onClose }: {
   const [options, setOptions] = useState(question.options.map((option) => ({ ...option })));
   const [answer, setAnswer] = useState([...question.answer]);
   const [allowMultiple, setAllowMultiple] = useState(question.questionType === "X" || question.multiple);
+  const [answerVisible, setAnswerVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fixedExamType = Boolean(question.questionType);
@@ -1628,7 +1629,7 @@ function QuestionCorrectionModal({ question, onSave, onClose }: {
     stem.trim()
     && options.length >= 2
     && options.every((option) => option.text.trim())
-    && answer.length
+    && (answer.length || (!question.answer.length && !answerVisible))
     && answer.every((label) => options.some((option) => option.label === label)),
   );
 
@@ -1656,7 +1657,7 @@ function QuestionCorrectionModal({ question, onSave, onClose }: {
         stem: stem.trim(),
         options: options.map((option) => ({ ...option, text: option.text.trim() })),
         answer: [...answer].sort(),
-        answerPending: false,
+        answerPending: answer.length === 0,
         multiple: allowMultiple || answer.length > 1,
       });
       onClose();
@@ -1672,7 +1673,7 @@ function QuestionCorrectionModal({ question, onSave, onClose }: {
       <div className="question-edit-scroll">
         <label className="question-edit-field"><span>题干</span><textarea value={stem} rows={4} onChange={(event) => setStem(event.target.value)} /></label>
         <section className="option-edit-section"><div><strong>选项文字</strong><span>选项编号保持不变，避免影响已有作答记录</span></div>{options.map((option, index) => <label key={option.label}><b>{option.label}</b><textarea rows={2} value={option.text} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} /></label>)}</section>
-        <section className="answer-edit-section"><header><div><strong>标准答案</strong><span>{allowMultiple ? "可选择多个正确选项" : "仅选择一个正确选项"}</span></div>{!fixedExamType && <div className="answer-type-switch"><button className={!allowMultiple ? "active" : ""} onClick={() => changeAnswerMode(false)}>单选</button><button className={allowMultiple ? "active" : ""} onClick={() => changeAnswerMode(true)}>多选</button></div>}</header><div className="answer-edit-choices">{options.map((option) => <button key={option.label} className={answer.includes(option.label) ? "active" : ""} onClick={() => toggleAnswer(option.label)} aria-pressed={answer.includes(option.label)}><i>{answer.includes(option.label) && <Check size={15} />}</i><b>{option.label}</b><span>{option.text}</span></button>)}</div></section>
+        <section className={`answer-edit-section ${answerVisible ? "revealed" : "concealed"}`}><header><div><strong>标准答案</strong><span>{answerVisible ? allowMultiple ? "可选择多个正确选项" : "仅选择一个正确选项" : "默认隐藏，避免只改文字时提前看到答案"}</span></div>{answerVisible && !fixedExamType && <div className="answer-type-switch"><button className={!allowMultiple ? "active" : ""} onClick={() => changeAnswerMode(false)}>单选</button><button className={allowMultiple ? "active" : ""} onClick={() => changeAnswerMode(true)}>多选</button></div>}</header>{answerVisible ? <div className="answer-edit-choices">{options.map((option) => <button key={option.label} className={answer.includes(option.label) ? "active" : ""} onClick={() => toggleAnswer(option.label)} aria-pressed={answer.includes(option.label)}><i>{answer.includes(option.label) && <Check size={15} />}</i><b>{option.label}</b><span>{option.text}</span></button>)}</div> : <div className="answer-edit-mask"><div className="answer-blur-preview" aria-hidden="true">{options.slice(0, 4).map((option) => <span key={option.label}><i /><b>{option.label}</b><em>{option.text}</em></span>)}</div><div className="answer-reveal-panel"><EyeOff /><div><strong>标准答案已模糊保护</strong><p>只修题干或选项时无需查看答案；确认需要纠正答案后再主动展开。</p></div><button onClick={() => setAnswerVisible(true)}><Eye size={17} />显示并修订答案</button></div></div>}</section>
         {answerChanged && <div className="answer-revision-warning"><AlertCircle /><div><strong>改标准答案前，请再核对一次 ⚠️🩺</strong><p>原文件答案可能受教材版本、指南更新或识别误差影响；但手动修订也可能出错。请对照教材、官方答案或可靠解析再次核验后再保存哦 🔎✅</p></div></div>}
         <div className="question-edit-impact"><ShieldCheck /><p>保存后，当前题库、多端同步和后续分享均使用修订版；已有首次评分记录会保留，当前掌握状态会按新答案重新核对。</p></div>
         {error && <p className="question-edit-error"><AlertCircle size={17} />{error}</p>}
