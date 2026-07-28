@@ -51,12 +51,14 @@ export type QuestionBankSyncBundle = {
   version: 1;
   activeBankId: string | null;
   banks: SavedQuestionBank[];
+  groupOrder?: string[];
 };
 
 const DB_NAME = "hongdou-local-data";
 const STORE_NAME = "question-banks";
 const LEGACY_ACTIVE_KEY = "active-bank";
 const ACTIVE_ID_KEY = "active-bank-id";
+const GROUP_ORDER_KEY = "question-bank-group-order";
 const BANK_KEY_PREFIX = "bank:";
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -122,6 +124,38 @@ async function readValue<T>(key: IDBValidKey): Promise<T | undefined> {
     request.onsuccess = () => resolve(request.result as T | undefined);
     request.onerror = () => reject(request.error ?? new Error("读取本地题库失败"));
     transaction.oncomplete = () => database.close();
+  });
+}
+
+function normalizeGroupOrder(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const result: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") continue;
+    const normalized = entry === "未分组题库" ? entry : normalizeQuestionBankGroup(entry);
+    if (!normalized || result.includes(normalized)) continue;
+    result.push(normalized.slice(0, 60));
+    if (result.length >= 80) break;
+  }
+  return result;
+}
+
+export async function loadQuestionBankGroupOrder(): Promise<string[]> {
+  return normalizeGroupOrder(await readValue<unknown>(GROUP_ORDER_KEY));
+}
+
+export async function saveQuestionBankGroupOrder(order: string[]): Promise<string[]> {
+  const normalized = normalizeGroupOrder(order);
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    transaction.objectStore(STORE_NAME).put(normalized, GROUP_ORDER_KEY);
+    transaction.oncomplete = () => {
+      database.close();
+      notifySyncChange();
+      resolve(normalized);
+    };
+    transaction.onerror = () => reject(transaction.error ?? new Error("保存题库分组顺序失败"));
   });
 }
 
@@ -244,6 +278,7 @@ export async function exportQuestionBankSyncBundle(): Promise<QuestionBankSyncBu
     version: 1,
     activeBankId: await readValue<string>(ACTIVE_ID_KEY) ?? null,
     banks: await listQuestionBanks(),
+    groupOrder: await loadQuestionBankGroupOrder(),
   };
 }
 
@@ -272,6 +307,7 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
   const activeBankId = typeof bundle.activeBankId === "string" && (await loadQuestionBank(bundle.activeBankId)) ? bundle.activeBankId : null;
   const localActiveBankId = await readValue<string>(ACTIVE_ID_KEY) ?? null;
   if (activeBankId && activeBankId !== localActiveBankId) await activateQuestionBank(activeBankId);
+  if (Array.isArray(bundle.groupOrder)) await saveQuestionBankGroupOrder(bundle.groupOrder);
   return { merged, activeBankId };
 }
 

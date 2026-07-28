@@ -405,7 +405,13 @@ test("tests personal and public AI connections without exposing saved keys", asy
 });
 
 test("keeps multiple imported banks and portable share files", async () => {
-  const localBank = await text("app/lib/local-bank.ts");
+  const [localBank, page, shareRoute, styles, schema] = await Promise.all([
+    text("app/lib/local-bank.ts"),
+    text("app/page.tsx"),
+    text("app/api/share-bank/route.ts"),
+    text("app/globals.css"),
+    text("db/init.sql"),
+  ]);
 
   assert.match(localBank, /export async function listQuestionBanks/);
   assert.match(localBank, /export async function activateQuestionBank/);
@@ -420,6 +426,23 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /avecove-western-306/);
   assert.match(localBank, /multiple: question\.questionType === "X" \|\| answer\.length > 1/);
   assert.match(localBank, /Transparently migrate the single-bank format/);
+  assert.match(localBank, /export async function loadQuestionBankGroupOrder/);
+  assert.match(localBank, /export async function saveQuestionBankGroupOrder/);
+  assert.match(localBank, /groupOrder: await loadQuestionBankGroupOrder\(\)/);
+  assert.match(localBank, /Array\.isArray\(bundle\.groupOrder\)/);
+  assert.match(page, /reconcileQuestionBankGroupOrder/);
+  assert.match(page, /draggable onDragStart/);
+  assert.match(page, /上移分组/);
+  assert.match(page, /生成导入链接/);
+  assert.match(page, /importBank/);
+  assert.match(page, /function IncomingBankShareModal/);
+  assert.match(shareRoute, /randomBytes\(24\)/);
+  assert.match(shareRoute, /7 \* 24 \* 60 \* 60_000/);
+  assert.match(shareRoute, /parseSharedQuestionBankPackage/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS shared_question_banks/);
+  assert.match(styles, /\.bank-group-order/);
+  assert.match(styles, /\.share-link-result/);
+  assert.match(styles, /\.incoming-share-modal/);
 });
 
 test("persists in-practice question corrections into sync and shared banks", async () => {

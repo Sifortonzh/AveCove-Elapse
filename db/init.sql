@@ -70,3 +70,11 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS shared_question_banks (
+  token VARCHAR(64) PRIMARY KEY,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS shared_question_banks_expiry_idx ON shared_question_banks(expires_at);

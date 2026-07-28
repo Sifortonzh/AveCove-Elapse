@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
-  AlertCircle, ArrowRight, BookOpen, Bot, BrainCircuit, Check, CheckCircle2,
+  AlertCircle, ArrowDown, ArrowRight, ArrowUp, BookOpen, Bot, BrainCircuit, Check, CheckCircle2,
   ChevronLeft, ChevronRight, CircleHelp, Clock3, Cloud, Download, FileText, Flag, Home, Import,
-  Database, Eye, EyeOff, Languages, Library, Lightbulb, ListChecks, MessageCircle, Moon, NotebookPen, Pencil, Play,
+  Copy, Database, ExternalLink, Eye, EyeOff, GripVertical, Languages, Library, Lightbulb, Link2, ListChecks, MessageCircle, Moon, NotebookPen, Pencil, Play,
   RefreshCw, RotateCcw, ScanText, Search, Send, Settings2, Share2, ShieldCheck, Shuffle, Sparkles,
   Star, Sun, Target, ThumbsUp, Trash2, Upload, UserRound, X, Zap,
 } from "lucide-react";
@@ -14,8 +14,9 @@ import EnglishLearningView from "./components/EnglishLearningView";
 import { extractQuestionFileText, importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
 import {
   activateQuestionBank, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
-  exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, mergeQuestionBankSyncBundle,
-  parseSharedQuestionBankPackage, saveActiveBank, saveQuestionBank, updateQuestionBankDetails, type SavedQuestionBank,
+  exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, loadQuestionBankGroupOrder, mergeQuestionBankSyncBundle,
+  parseSharedQuestionBankPackage, saveActiveBank, saveQuestionBank, saveQuestionBankGroupOrder,
+  updateQuestionBankDetails, type QuestionBankInput, type SavedQuestionBank,
 } from "./lib/local-bank";
 import { exportEnglishTestSyncBundle, mergeEnglishTestSyncBundle } from "./lib/english-test";
 import { exportEnglishPracticeSyncBundle, mergeEnglishPracticeSyncBundle } from "./lib/english-practice";
@@ -40,6 +41,13 @@ type SharedComment = { id: string; nickname: string; text: string; createdAt: st
 type AccountSession = { nickname: string; email?: string; expiresAt: number };
 type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "cancelled" | "ai-ready"; detail: string };
 type AiFallbackFile = { id: string; fileName: string; extractedText: string };
+type IncomingBankShare = {
+  token: string;
+  status: "loading" | "ready" | "error" | "importing";
+  bank?: QuestionBankInput;
+  expiresAt?: string;
+  error?: string;
+};
 type Western306ImportReport = {
   profile?: string;
   recognitionMode?: "deterministic" | "ai";
@@ -297,9 +305,11 @@ export default function HomePage() {
   const [localReady, setLocalReady] = useState(false);
   const [toast, setToast] = useState("");
   const [quoteIndex, setQuoteIndex] = useState(0);
+  const [incomingBankShare, setIncomingBankShare] = useState<IncomingBankShare | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const importAbortRef = useRef<AbortController | null>(null);
   const syncInFlightRef = useRef(false);
+  const shareImportCheckedRef = useRef(false);
 
   useEffect(() => () => importAbortRef.current?.abort(), []);
 
@@ -343,6 +353,32 @@ export default function HomePage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!localReady || shareImportCheckedRef.current) return;
+    const token = new URL(window.location.href).searchParams.get("importBank")?.trim() ?? "";
+    if (!token) return;
+    shareImportCheckedRef.current = true;
+    const controller = new AbortController();
+    void Promise.resolve().then(async () => {
+      if (controller.signal.aborted) return;
+      setLearningMode("medical");
+      localStorage.setItem("avecove-learning-mode", "medical");
+      setIncomingBankShare({ token, status: "loading" });
+      return fetch(`/api/share-bank?token=${encodeURIComponent(token)}`, { signal: controller.signal });
+    }).then(async (response) => {
+        if (!response) return;
+        const result = await response.json() as { package?: unknown; expiresAt?: string; error?: string };
+        if (!response.ok || !result.package) throw new Error(result.error ?? "无法读取这条题库分享链接。");
+        const bank = parseSharedQuestionBankPackage(result.package);
+        setIncomingBankShare({ token, status: "ready", bank, expiresAt: result.expiresAt });
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setIncomingBankShare({ token, status: "error", error: error instanceof Error ? error.message : "无法读取这条题库分享链接。" });
+      });
+    return () => controller.abort();
+  }, [localReady]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -466,6 +502,35 @@ export default function HomePage() {
       setQuestions(active.questions);
       setBankName(active.name);
       setActiveBankId(active.id);
+    }
+  }
+
+  function clearIncomingBankShare() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("importBank");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    setIncomingBankShare(null);
+  }
+
+  async function importIncomingBankShare() {
+    if (!incomingBankShare?.bank || incomingBankShare.status !== "ready") return;
+    setIncomingBankShare({ ...incomingBankShare, status: "importing" });
+    try {
+      const saved = await saveQuestionBank({
+        ...incomingBankShare.bank,
+        importedAt: new Date().toISOString(),
+      });
+      setQuestionBanks(await listQuestionBanks());
+      switchLearningMode("medical");
+      setView("banks");
+      clearIncomingBankShare();
+      setToast(`“${saved.name}”已通过分享链接导入题库 📚✨ 请核对题目与答案后再开始练习。`);
+    } catch (error) {
+      setIncomingBankShare({
+        ...incomingBankShare,
+        status: "error",
+        error: error instanceof Error ? error.message : "题库暂时无法保存，请稍后重试。",
+      });
     }
   }
 
@@ -1370,6 +1435,7 @@ export default function HomePage() {
       {showSearch && <SearchModal banks={searchableBanks} onOpen={async (bank, questionId) => { if (bank.id === "__demo__") openQuestion(questionId); else { await openSavedQuestion(bank, questionId); setShowSearch(false); } }} onClose={() => setShowSearch(false)} />}
       {showNotes && <NotesModal questions={questions} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
       {showAccount && <AccountModal account={account} syncStatus={syncStatus} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pushRemoteState(true)} onExport={() => { void exportLearningRecord(); }} onImport={importLearningRecord} />}
+      {incomingBankShare && <IncomingBankShareModal share={incomingBankShare} onImport={() => void importIncomingBankShare()} onClose={clearIncomingBankShare} />}
       {toast && <SuccessToast message={toast} onClose={() => setToast("")} />}
     </main>
   );
@@ -1421,6 +1487,17 @@ function HomeView({ bankName, questions, answered, wrong, accuracy, progress, ex
   </div>;
 }
 
+const UNGROUPED_BANKS = "未分组题库";
+
+function reconcileQuestionBankGroupOrder(order: string[], names: string[]) {
+  const available = new Set(names);
+  const kept = order.filter((name, index) => available.has(name) && order.indexOf(name) === index);
+  const missing = names
+    .filter((name) => !kept.includes(name))
+    .sort((left, right) => left === UNGROUPED_BANKS ? 1 : right === UNGROUPED_BANKS ? -1 : left.localeCompare(right, "zh-CN"));
+  return [...kept, ...missing];
+}
+
 function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onHome, onImport, onImportAnswers, onSelect, onUpdate, onDelete, onReset, onOpenQuestion }: {
   banks: SavedQuestionBank[];
   activeBankId: string | null;
@@ -1445,20 +1522,72 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sharingBank, setSharingBank] = useState<SavedQuestionBank | null>(null);
   const [resettingBank, setResettingBank] = useState<SavedQuestionBank | null>(null);
+  const [groupOrder, setGroupOrder] = useState<string[]>([]);
+  const [draggedGroup, setDraggedGroup] = useState<string | null>(null);
   const keyword = query.trim();
   const totalQuestions = banks.reduce((sum, bank) => sum + bank.questions.length, 0);
   const multipleQuestions = banks.reduce((sum, bank) => sum + bank.questions.filter((question) => question.multiple).length, 0);
   const searchResults = useMemo(() => searchQuestionBanks(banks, query, 100), [banks, query]);
+  const availableGroupNames = useMemo(
+    () => [...new Set(banks.map((bank) => bank.groupName || UNGROUPED_BANKS))],
+    [banks],
+  );
+
+  useEffect(() => {
+    let active = true;
+    void loadQuestionBankGroupOrder().then((savedOrder) => {
+      if (!active) return;
+      const next = reconcileQuestionBankGroupOrder(savedOrder, availableGroupNames);
+      setGroupOrder(next);
+      if (JSON.stringify(next) !== JSON.stringify(savedOrder)) void saveQuestionBankGroupOrder(next);
+    });
+    return () => { active = false; };
+  }, [availableGroupNames]);
+
   const groupedBanks = useMemo(() => {
     const groups = new Map<string, SavedQuestionBank[]>();
     for (const bank of banks) {
-      const key = bank.groupName || "未分组题库";
+      const key = bank.groupName || UNGROUPED_BANKS;
       groups.set(key, [...(groups.get(key) ?? []), bank]);
     }
+    const rank = new Map(groupOrder.map((name, index) => [name, index]));
     return [...groups.entries()]
-      .sort(([left], [right]) => left === "未分组题库" ? 1 : right === "未分组题库" ? -1 : left.localeCompare(right, "zh-CN"))
+      .sort(([left], [right]) => {
+        const leftRank = rank.get(left);
+        const rightRank = rank.get(right);
+        if (leftRank !== undefined || rightRank !== undefined) return (leftRank ?? Number.MAX_SAFE_INTEGER) - (rightRank ?? Number.MAX_SAFE_INTEGER);
+        return left === UNGROUPED_BANKS ? 1 : right === UNGROUPED_BANKS ? -1 : left.localeCompare(right, "zh-CN");
+      })
       .map(([name, entries]) => ({ name, banks: entries }));
-  }, [banks]);
+  }, [banks, groupOrder]);
+
+  function persistGroupOrder(next: string[]) {
+    setGroupOrder(next);
+    void saveQuestionBankGroupOrder(next);
+  }
+
+  function moveGroup(name: string, offset: -1 | 1) {
+    const current = reconcileQuestionBankGroupOrder(groupOrder, availableGroupNames);
+    const index = current.indexOf(name);
+    const target = index + offset;
+    if (index < 0 || target < 0 || target >= current.length) return;
+    const next = [...current];
+    [next[index], next[target]] = [next[target], next[index]];
+    persistGroupOrder(next);
+  }
+
+  function dropGroup(targetName: string) {
+    if (!draggedGroup || draggedGroup === targetName) return setDraggedGroup(null);
+    const current = reconcileQuestionBankGroupOrder(groupOrder, availableGroupNames);
+    const sourceIndex = current.indexOf(draggedGroup);
+    const targetIndex = current.indexOf(targetName);
+    if (sourceIndex < 0 || targetIndex < 0) return setDraggedGroup(null);
+    const next = [...current];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    persistGroupOrder(next);
+    setDraggedGroup(null);
+  }
 
   async function submitEdit(bank: SavedQuestionBank) {
     const name = editName.trim().slice(0, 60);
@@ -1487,7 +1616,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
     <main>
       <section className="bank-page-intro"><div><span className="overline"><Database size={15} /> QUESTION LIBRARY</span><h1>把散落的题目，<br />收进自己的知识书架。</h1><p>已导入题库都保存在当前浏览器。可随时切换、重命名、跨题库检索，或在确认版权边界后分享给同学。</p></div><div className="bank-overview"><article><b>{banks.length}</b><span>已导入题库</span></article><article><b>{totalQuestions}</b><span>收录题目</span></article><article><b>{multipleQuestions}</b><span>多选题</span></article></div></section>
       <label className="bank-global-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="全局搜索：题库名、疾病、症状或知识点" /><span>{keyword ? `${searchResults.length} 条结果` : "搜索全部题库"}</span></label>
-      {keyword ? <section className="bank-search-section"><div className="bank-section-title"><div><span>GLOBAL SEARCH · 按相关度排序</span><h2>全局搜索结果</h2></div><button onClick={() => setQuery("")}><X size={16} />清除搜索</button></div>{searchResults.length ? <div className="bank-question-results">{searchResults.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => onOpenQuestion(bank, question.id)}><span className={question.multiple ? "multi" : ""}>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b><i>·</i>分组：<b>{bank.groupName || "未分组"}</b><i>·</i>分类：<b><HighlightMatches text={question.category} query={query} /></b><i>·</i>原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight /></button>)}</div> : <div className="bank-empty"><CircleHelp /><h2>还没有找到这条知识线索</h2><p>可输入多个关键词并用空格分隔，例如“肺炎 发热”；系统会要求每个关键词都有命中。</p></div>}</section> : <section className="bank-library-section"><div className="bank-section-title"><div><span>LOCAL COLLECTION</span><h2>已导入的题库</h2></div><p>同组题库会共享错题复盘入口</p></div>{banks.length ? <div className="bank-group-list">{groupedBanks.map((group) => <section className="bank-group-section" key={group.name}><header className="bank-group-heading"><div><Library size={18} /><span><strong>{group.name}</strong><small>{group.banks.length} 份题库 · {group.banks.reduce((sum, bank) => sum + bank.questions.length, 0)} 道题</small></span></div><em>{group.name === "未分组题库" ? "可在编辑中设置分组" : "组内错题可跨文件复盘"}</em></header><div className="bank-card-grid">{group.banks.map((bank) => {
+      {keyword ? <section className="bank-search-section"><div className="bank-section-title"><div><span>GLOBAL SEARCH · 按相关度排序</span><h2>全局搜索结果</h2></div><button onClick={() => setQuery("")}><X size={16} />清除搜索</button></div>{searchResults.length ? <div className="bank-question-results">{searchResults.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => onOpenQuestion(bank, question.id)}><span className={question.multiple ? "multi" : ""}>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b><i>·</i>分组：<b>{bank.groupName || "未分组"}</b><i>·</i>分类：<b><HighlightMatches text={question.category} query={query} /></b><i>·</i>原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight /></button>)}</div> : <div className="bank-empty"><CircleHelp /><h2>还没有找到这条知识线索</h2><p>可输入多个关键词并用空格分隔，例如“肺炎 发热”；系统会要求每个关键词都有命中。</p></div>}</section> : <section className="bank-library-section"><div className="bank-section-title"><div><span>LOCAL COLLECTION</span><h2>已导入的题库</h2></div><p>分组可拖动排序；手机端可使用上下按钮</p></div>{banks.length ? <div className="bank-group-list">{groupedBanks.map((group, groupIndex) => <section className={`bank-group-section ${draggedGroup === group.name ? "dragging" : ""}`} key={group.name} draggable onDragStart={() => setDraggedGroup(group.name)} onDragEnd={() => setDraggedGroup(null)} onDragOver={(event) => event.preventDefault()} onDrop={() => dropGroup(group.name)}><header className="bank-group-heading"><div><GripVertical className="bank-group-grip" aria-hidden="true" /><Library size={18} /><span><strong>{group.name}</strong><small>{group.banks.length} 份题库 · {group.banks.reduce((sum, bank) => sum + bank.questions.length, 0)} 道题</small></span></div><div className="bank-group-order"><em>{group.name === UNGROUPED_BANKS ? "可在编辑中设置分组" : "组内错题可跨文件复盘"}</em><span><button type="button" aria-label={`上移分组 ${group.name}`} title="上移分组" disabled={groupIndex === 0} onClick={() => moveGroup(group.name, -1)}><ArrowUp /></button><button type="button" aria-label={`下移分组 ${group.name}`} title="下移分组" disabled={groupIndex === groupedBanks.length - 1} onClick={() => moveGroup(group.name, 1)}><ArrowDown /></button></span></div></header><div className="bank-card-grid">{group.banks.map((bank) => {
         const singleCount = bank.questions.filter((question) => !question.multiple).length;
         const multipleCount = bank.questions.length - singleCount;
         const isActive = bank.id === activeBankId;
@@ -1549,6 +1678,8 @@ function ResetBankProgressModal({ bank, progress, favorites, notes, onReset, onC
 function ShareBankModal({ bank, onClose }: { bank: SavedQuestionBank; onClose: () => void }) {
   const [accepted, setAccepted] = useState(false);
   const [message, setMessage] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
+  const [creatingLink, setCreatingLink] = useState(false);
 
   function makeFile() {
     const payload = createSharedQuestionBankPackage(bank);
@@ -1581,7 +1712,59 @@ function ShareBankModal({ bank, onClose }: { bank: SavedQuestionBank; onClose: (
     }
   }
 
-  return <div className="modal-layer" onMouseDown={onClose}><section className="share-bank-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>SHARE WITH CARE</span><h2>分享“{bank.name}”</h2></div><button onClick={onClose}><X /></button></header><div className="share-copyright-alert"><ShieldCheck /><div><strong>分享之前，请先确认版权与隐私边界</strong><p>请确认你拥有这份题库的使用与传播权限。不要分享未经授权的教材、课程内容，也不要包含姓名、学号、患者资料或其他敏感信息。</p></div></div><div className="share-summary"><Database /><div><strong>{bank.questions.length} 道题</strong><span>文件包含题库简介、题干、选项与答案，可被“红豆生南国”再次导入</span></div></div>{bank.description && <div className="share-bank-description"><FileText /><div><strong>随题库分享的简介</strong><p>{bank.description}</p></div></div>}<button className={`copyright-check ${accepted ? "checked" : ""}`} role="checkbox" aria-checked={accepted} onClick={() => setAccepted((value) => !value)}><i>{accepted && <Check />}</i><span>我已确认拥有必要权限，并会尊重题库原作者与相关权利人的版权。</span></button>{message && <p className="share-message">{message}</p>}<footer><button className="ghost-action" onClick={() => accepted && downloadFile(makeFile())} disabled={!accepted}><Download />保存分享文件</button><button className="primary-action" onClick={() => void systemShare()} disabled={!accepted}><Share2 />系统分享</button></footer></section></div>;
+  async function copyShareLink(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const field = document.createElement("textarea");
+      field.value = value;
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.appendChild(field);
+      field.select();
+      document.execCommand("copy");
+      field.remove();
+    }
+    setMessage("导入链接已复制 ✨ 对方打开后确认版权提示，即可收进“我的题库”。");
+  }
+
+  async function createImportLink() {
+    if (!accepted || creatingLink) return;
+    if (shareUrl) return copyShareLink(shareUrl);
+    setCreatingLink(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/share-bank", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ package: createSharedQuestionBankPackage(bank) }),
+      });
+      const result = await response.json() as { token?: string; error?: string };
+      if (!response.ok || !result.token) throw new Error(result.error ?? "暂时无法生成导入链接。");
+      const url = new URL(window.location.origin);
+      url.searchParams.set("importBank", result.token);
+      const value = url.toString();
+      setShareUrl(value);
+      await copyShareLink(value);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "暂时无法生成导入链接，请使用分享文件。");
+    } finally {
+      setCreatingLink(false);
+    }
+  }
+
+  return <div className="modal-layer" onMouseDown={onClose}><section className="share-bank-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>SHARE WITH CARE</span><h2>分享“{bank.name}”</h2></div><button onClick={onClose}><X /></button></header><div className="share-copyright-alert"><ShieldCheck /><div><strong>分享之前，请先确认版权与隐私边界</strong><p>请确认你拥有这份题库的使用与传播权限。不要分享未经授权的教材、课程内容，也不要包含姓名、学号、患者资料或其他敏感信息。</p></div></div><div className="share-summary"><Database /><div><strong>{bank.questions.length} 道题</strong><span>文件或链接都会包含题库简介、题干、选项与答案，并采用当前修订后的版本</span></div></div>{bank.description && <div className="share-bank-description"><FileText /><div><strong>随题库分享的简介</strong><p>{bank.description}</p></div></div>}<button className={`copyright-check ${accepted ? "checked" : ""}`} role="checkbox" aria-checked={accepted} onClick={() => setAccepted((value) => !value)}><i>{accepted && <Check />}</i><span>我已确认拥有必要权限，并会尊重题库原作者与相关权利人的版权。</span></button>{shareUrl && <div className="share-link-result"><Link2 /><div><strong>导入链接已生成 · 7 天有效</strong><input aria-label="题库导入链接" readOnly value={shareUrl} onFocus={(event) => event.currentTarget.select()} /></div><button type="button" aria-label="复制导入链接" onClick={() => void copyShareLink(shareUrl)}><Copy /></button><a href={shareUrl} target="_blank" rel="noreferrer" aria-label="在新窗口测试导入链接"><ExternalLink /></a></div>}{message && <p className="share-message">{message}</p>}<footer><button className="ghost-action" onClick={() => accepted && downloadFile(makeFile())} disabled={!accepted}><Download />保存分享文件</button><button className="ghost-action share-link-action" onClick={() => void createImportLink()} disabled={!accepted || creatingLink}><Link2 />{creatingLink ? "正在生成…" : shareUrl ? "复制导入链接" : "生成导入链接"}</button><button className="primary-action" onClick={() => void systemShare()} disabled={!accepted}><Share2 />系统分享</button></footer></section></div>;
+}
+
+function IncomingBankShareModal({ share, onImport, onClose }: {
+  share: IncomingBankShare;
+  onImport: () => void;
+  onClose: () => void;
+}) {
+  const loading = share.status === "loading";
+  const importing = share.status === "importing";
+  const bank = share.bank;
+  return <div className="modal-layer incoming-share-layer"><section className="incoming-share-modal"><header><div><span>QUESTION BANK INVITATION</span><h2>{loading ? "正在打开题库分享…" : share.status === "error" ? "分享链接暂时无法打开" : `收到“${bank?.name}”`}</h2></div><button onClick={onClose} disabled={importing}><X /></button></header>{loading ? <div className="incoming-share-loading"><RefreshCw className="spinning" /><p>正在安全读取题库信息，请稍候…</p></div> : share.status === "error" ? <div className="incoming-share-error"><AlertCircle /><div><strong>没有导入任何内容</strong><p>{share.error}</p></div></div> : bank && <><div className="incoming-share-summary"><Database /><div><strong>{bank.questions.length} 道题 · {bank.groupName || "未分组"}</strong><p>{bank.description || "分享者没有填写题库简介。导入后可在“我的题库”中补充。"}</p></div></div><div className="share-copyright-alert"><ShieldCheck /><div><strong>导入不代表获得转载或再分发授权</strong><p>请仅在分享者授权范围内学习和使用。导入后请抽查题干、选项与答案；不要传播含敏感信息或未经授权的内容。</p></div></div>{share.expiresAt && <p className="incoming-share-expiry">此链接有效期至 {new Date(share.expiresAt).toLocaleString("zh-CN")}。</p>}</>}<footer><button className="ghost-action" onClick={onClose} disabled={importing}>{share.status === "error" ? "关闭" : "暂不导入"}</button>{bank && <button className="primary-action" onClick={onImport} disabled={importing}><Import />{importing ? "正在导入…" : "确认并导入我的题库"}</button>}</footer></section></div>;
 }
 
 function QuizView(props: {

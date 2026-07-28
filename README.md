@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.0.1" src="https://img.shields.io/badge/version-1.0.1-b43d35" />
+  <img alt="Version 1.0.5" src="https://img.shields.io/badge/version-1.0.5-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -36,7 +36,7 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 
 Version `1.0.0` marks the first public-source release suitable for self-hosting and demonstrations. It contains only a small demo bank—no copyrighted commercial or course bank is bundled.
 
-Version `1.0.1` adds the new browser title and a visible author-blog link.
+Version `1.0.5` adds custom question-bank group ordering and expiring one-click import links.
 
 ## Highlights
 
@@ -47,8 +47,10 @@ Version `1.0.1` adds the new browser title and a visible author-blog link.
 - Rename, describe, search, share, delete, and safely reset one bank’s learning record.
 - Search bank titles, descriptions, groups, stems, options, categories, and source numbers with highlighted matches.
 - Group related banks manually or by safe keyword suggestions; yearly Western Medicine 306 papers can share one `考研西综306` group.
+- Reorder groups by drag-and-drop or accessible move buttons; the custom order is included in optional cross-device sync.
 - Review wrong questions across every bank in the active group.
 - Keep unanswered objective questions in test mode and add a matching answer file later.
+- Share the current corrected bank as a portable file or a private random import link that expires after seven days.
 
 ### Medical practice
 

@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.0.1" src="https://img.shields.io/badge/version-1.0.1-b43d35" />
+  <img alt="版本 1.0.5" src="https://img.shields.io/badge/version-1.0.5-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -47,8 +47,10 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 - 支持重命名、简介、全局搜索、分享、删除和谨慎重置学习记录。
 - 搜索范围包含题库名、简介、分组、题干、选项、分类与原题号，并高亮匹配词。
 - 支持手动分组与安全关键词建议；历年西综试卷可统一归入“考研西综306”。
+- 支持拖动或上下按钮自定义分组顺序，并可随多端同步保存。
 - 在同组任一题库中练习时，可以调出整个分组的错题。
 - 无答案的客观题可先以测试模式练习，之后再导入答案文件一键核对。
+- 可把当前修订后的题库导出为分享文件，或生成 7 天有效的随机导入链接。
 
 ### 医学刷题与复盘
 
