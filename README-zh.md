@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.0.5" src="https://img.shields.io/badge/version-1.0.5-b43d35" />
+  <img alt="版本 1.1.0" src="https://img.shields.io/badge/version-1.1.0-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -31,6 +31,8 @@
 ## 项目简介
 
 AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先面向个人医学题库训练。它可以把使用者有权使用的 Word、PDF 等资料整理成持续可用的题库书架，并提供客观题练习、错题复盘、收藏、笔记、可选 AI 解析和轻量多端同步。
+
+`1.1.0` 采用克制的 Spatial Bento 信息架构，重点重构首页、我的题库与导入工作台：常用入口更集中、学习进度更直观、导入阶段更清晰，并补齐键盘焦点、减少动态效果与多尺寸响应式体验。既有刷题、同步和西综 306 流程保持兼容。
 
 项目不含广告，不要求手机号或微信登录。学号只用于生成不可逆的同步标识，原始学号不会写入数据库；邮箱仅在使用者主动开启验证码登录或身份保护时使用。
 

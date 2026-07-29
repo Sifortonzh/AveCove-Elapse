@@ -750,6 +750,34 @@ test("ships bounded random sessions, boundary reminders, and one-second toast di
   assert.match(db, /export async function withTransaction/);
 });
 
+test("ships the v1.1 restrained Spatial Bento interface without changing study flows", async () => {
+  const [page, styles, packageJson, readme, readmeZh] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/globals.css"),
+    text("package.json"),
+    text("README.md"),
+    text("README-zh.md"),
+  ]);
+
+  assert.match(packageJson, /"version": "1\.1\.0"/);
+  assert.match(readme, /Version `1\.1\.0`/);
+  assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
+  assert.match(page, /className="home-bento"/);
+  assert.match(page, /className="hero-card bento-hero"/);
+  assert.match(page, /className="bento-progress-card"/);
+  assert.match(page, /className="bento-library-card"/);
+  assert.match(page, /className="bank-card-progress"/);
+  assert.match(page, /className="import-stage-strip"/);
+  assert.match(page, /className="import-workbench-grid"/);
+  assert.match(page, /onClick=\{on306\}/);
+  assert.match(styles, /\.home-bento\{[^}]*grid-template-columns:repeat\(12/);
+  assert.match(styles, /\.bank-card-progress/);
+  assert.match(styles, /\.spatial-import-modal/);
+  assert.match(styles, /font-variant-numeric:tabular-nums lining-nums/);
+  assert.match(styles, /@media\(prefers-reduced-motion:reduce\)/);
+  assert.doesNotMatch(packageJson, /framer-motion|tailwind/);
+});
+
 test("reimports a portable English Test Library share file", async () => {
   const { extractEnglishTestFile } = await loadEnglishParser();
   const shared = {
