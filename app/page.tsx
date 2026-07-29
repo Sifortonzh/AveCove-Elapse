@@ -1328,6 +1328,7 @@ export default function HomePage() {
           questions={questions.length}
           answered={answered}
           wrong={wrong}
+          noteCount={Object.values(notes).filter((note) => note.trim().length > 0).length}
           accuracy={accuracy}
           progress={homeProgress}
           examScore={examScore}
@@ -1445,8 +1446,8 @@ function Brand({ compact = false, hideTagline = false }: { compact?: boolean; hi
   return <div className={`brand ${compact ? "compact" : ""}`}><span className="brand-logo"><Image src="/hongdou-logo.png" alt="红豆生南国蛇形医学标识" width={48} height={48} priority /></span><div><strong>红豆生南国</strong>{!hideTagline && <small>医学知识训练与复盘</small>}</div></div>;
 }
 
-function HomeView({ bankName, questions, answered, wrong, accuracy, progress, examScore, onPractice, onImport, onBanks, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, syncing, quote, onAccount, onSync, onEnglish }: {
-  bankName: string; questions: number; answered: number; wrong: number; accuracy: number; progress: number;
+function HomeView({ bankName, questions, answered, wrong, noteCount, accuracy, progress, examScore, onPractice, onImport, onBanks, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, syncing, quote, onAccount, onSync, onEnglish }: {
+  bankName: string; questions: number; answered: number; wrong: number; noteCount: number; accuracy: number; progress: number;
   examScore?: { earned: number; answeredMaximum: number; total: number };
   onPractice: (custom?: Partial<Settings>, limit?: number) => void; onImport: () => void; onBanks: () => void; onSearch: () => void; onNotes: () => void;
   onCopyright: () => void; onToggleTheme: () => void; darkMode: boolean; nickname: string;
@@ -1461,7 +1462,7 @@ function HomeView({ bankName, questions, answered, wrong, accuracy, progress, ex
         <button onClick={() => onPractice({ scope: "all" })}><BookOpen size={19} />开始刷题</button>
         <button onClick={() => onPractice({ scope: "wrong" })}><AlertCircle size={19} />错题复盘{wrong > 0 && <em>{wrong}</em>}</button>
         <button onClick={() => onPractice({ scope: "favorite" })}><Star size={19} />收藏题目</button>
-        <button onClick={onNotes}><NotebookPen size={19} />我的笔记</button>
+        <button onClick={onNotes}><NotebookPen size={19} />我的笔记{noteCount > 0 && <em>{noteCount}</em>}</button>
       </nav>
       <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <div className="sync-caption-row"><small className="sync-caption">{syncStatus}</small><button className="sync-now" aria-label="立即手动同步" title="立即手动同步" onClick={onSync} disabled={syncing}><RefreshCw className={syncing ? "spinning" : ""} /></button></div>}<button className="import-entry" aria-label="导入题库" onClick={onImport}><Import size={18} /><span>导入题库</span></button><a className="custom-ai-entry" aria-label="自定义 AI" href="/custom-ai"><Bot size={17} /><span>自定义AI</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button><p>本地优先 · 无广告<br />.docx / PDF 本机处理 · 旧 .doc 仅内存转换</p></div>
     </aside>

@@ -274,6 +274,8 @@ test("includes the requested product flows and copy", async () => {
   assert.match(layout, /export const revalidate = 0/);
   assert.match(page, /题库已就位 🎉 此刻就是新起点，题海有岸，胜利正在装进口袋/);
   assert.match(page, /function SearchModal/);
+  assert.match(page, /noteCount=\{Object\.values\(notes\)\.filter\(\(note\) => note\.trim\(\)\.length > 0\)\.length\}/);
+  assert.match(page, /我的笔记\{noteCount > 0 && <em>\{noteCount\}<\/em>\}/);
   assert.match(page, /版权、免责声明与用户协议/);
   assert.match(page, /重要免责声明与权利义务提示/);
   assert.match(page, /你保证对上传、导入、发布或分享的内容拥有合法权利或充分授权/);
@@ -759,8 +761,8 @@ test("ships the v1.1 restrained Spatial Bento interface without changing study f
     text("README-zh.md"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.1\.0"/);
-  assert.match(readme, /Version `1\.1\.0`/);
+  assert.match(packageJson, /"version": "1\.1\.1"/);
+  assert.match(readme, /Version `1\.1\.1`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);
   assert.match(page, /className="hero-card bento-hero"/);

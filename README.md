@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.1.0" src="https://img.shields.io/badge/version-1.1.0-b43d35" />
+  <img alt="Version 1.1.1" src="https://img.shields.io/badge/version-1.1.1-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -37,6 +37,8 @@ The project deliberately avoids advertising, phone-number login, and mandatory s
 Version `1.0.0` marks the first public-source release suitable for self-hosting and demonstrations. It contains only a small demo bank—no copyrighted commercial or course bank is bundled.
 
 Version `1.1.0` introduces a restrained Spatial Bento interface for the home dashboard, Question Library, and import workbench. The release keeps the established quiz, sync, and Western Medicine 306 workflows intact while improving information hierarchy, progress visibility, keyboard focus, reduced-motion support, and responsive layouts.
+
+Version `1.1.1` adds a live non-empty note count to the home navigation, including notes restored through cross-device sync.
 
 ## Highlights
 
