@@ -34,6 +34,7 @@ type Progress = Record<string, "correct" | "wrong">;
 type Scope = "all" | "unanswered" | "wrong" | "favorite";
 type QuestionTypeScope = "single" | "all";
 type ThemeMode = "system" | "light" | "dark";
+type StudyMode = "standard" | "blind" | "memorize";
 type AiMode = "summary" | "pitfall" | "companion";
 type View = "home" | "quiz" | "banks" | "copyright";
 type AiMessage = { role: "user" | "assistant"; text: string };
@@ -88,6 +89,7 @@ type Settings = {
   scope: Scope;
   questionTypes: QuestionTypeScope;
   questionOrder: "sequential" | "random";
+  studyMode: StudyMode;
   shuffleOptions: boolean;
   autoNext: boolean;
   showAnswerOnReturn: boolean;
@@ -100,6 +102,7 @@ const defaultSettings: Settings = {
   scope: "all",
   questionTypes: "all",
   questionOrder: "sequential",
+  studyMode: "standard",
   shuffleOptions: false,
   autoNext: false,
   showAnswerOnReturn: false,
@@ -111,10 +114,11 @@ const defaultSettings: Settings = {
 function normalizeSettings(value: unknown): Settings {
   if (!value || typeof value !== "object" || Array.isArray(value)) return defaultSettings;
   const stored = value as Partial<Settings>;
+  const studyMode: StudyMode = stored.studyMode === "blind" || stored.studyMode === "memorize" ? stored.studyMode : "standard";
   const themeMode: ThemeMode = stored.themeMode === "light" || stored.themeMode === "dark" || stored.themeMode === "system"
     ? stored.themeMode
     : stored.darkMode ? "dark" : "system";
-  return { ...defaultSettings, ...stored, themeMode, darkMode: themeMode === "dark" };
+  return { ...defaultSettings, ...stored, studyMode, themeMode, darkMode: themeMode === "dark" };
 }
 
 const homeQuotes = [
@@ -267,6 +271,8 @@ export default function HomePage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [sessionStudyMode, setSessionStudyMode] = useState<StudyMode>("standard");
+  const [revealedAnswers, setRevealedAnswers] = useState<string[]>([]);
   const [progress, setProgress] = useState<Progress>({});
   const [firstProgress, setFirstProgress] = useState<Progress>({});
   const [answerSelections, setAnswerSelections] = useState<Record<string, string[]>>({});
@@ -697,10 +703,14 @@ export default function HomePage() {
     if (active.questionOrder === "random") pool = shuffle(pool);
     if (limit && limit > 0) pool = pool.slice(0, limit);
     if (active.shuffleOptions) pool = pool.map((question) => ({ ...question, options: shuffle(question.options) }));
+    const firstQuestion = pool[0];
+    const memorizing = active.studyMode === "memorize";
     setSessionQuestions(pool);
+    setSessionStudyMode(active.studyMode);
+    setRevealedAnswers([]);
     setCurrentIndex(0);
-    setSelected([]);
-    setSubmitted(false);
+    setSelected(memorizing ? [...(firstQuestion?.answer ?? [])] : []);
+    setSubmitted(memorizing);
     setAnswerSelections({});
     setAiTexts({});
     setAiMessages([]);
@@ -721,15 +731,19 @@ export default function HomePage() {
   function resetQuestion(nextIndex: number, revealAnswer = false) {
     const boundedIndex = Math.max(0, Math.min(nextIndex, sessionQuestions.length - 1));
     const target = sessionQuestions[boundedIndex];
-    const shouldReveal = Boolean(
-      revealAnswer
+    const memorizing = sessionStudyMode === "memorize";
+    const blindRevealed = Boolean(target && sessionStudyMode === "blind" && revealedAnswers.includes(target.id));
+    const shouldRevealPrevious = Boolean(
+      sessionStudyMode === "standard"
+      && revealAnswer
       && target
       && (progress[target.id] || target.draftAnswer?.length)
       && target.answer.length,
     );
+    const restoredSelection = target ? [...(answerSelections[target.id] ?? target.draftAnswer ?? [])] : [];
     setCurrentIndex(boundedIndex);
-    setSelected(shouldReveal ? [...(answerSelections[target.id] ?? target.draftAnswer ?? [])] : []);
-    setSubmitted(shouldReveal);
+    setSelected(memorizing ? [...(target?.answer ?? [])] : sessionStudyMode === "blind" || shouldRevealPrevious ? restoredSelection : []);
+    setSubmitted(memorizing || blindRevealed || shouldRevealPrevious);
     setAiTexts({});
     setAiMessages([]);
     setAiMode("summary");
@@ -755,6 +769,8 @@ export default function HomePage() {
     const index = questions.findIndex((question) => question.id === questionId);
     if (index < 0) return;
     setSessionQuestions(questions);
+    setSessionStudyMode("standard");
+    setRevealedAnswers([]);
     setCurrentIndex(index);
     setSelected([]);
     setSubmitted(false);
@@ -767,16 +783,23 @@ export default function HomePage() {
 
   function toggleOption(label: string) {
     if (!current || submitted) return;
-    if (current.multiple) {
-      setSelected((value) => value.includes(label) ? value.filter((item) => item !== label) : [...value, label]);
-    } else {
-      setSelected([label]);
-    }
+    setSelected((value) => {
+      const next = current.multiple
+        ? value.includes(label) ? value.filter((item) => item !== label) : [...value, label]
+        : [label];
+      if (sessionStudyMode === "blind") {
+        setAnswerSelections((answers) => ({ ...answers, [current.id]: next }));
+      }
+      return next;
+    });
   }
 
   function submitAnswer() {
     if (!current || !selected.length) return;
     setAnswerSelections((value) => ({ ...value, [current.id]: [...selected] }));
+    if (sessionStudyMode === "blind") {
+      setRevealedAnswers((value) => value.includes(current.id) ? value : [...value, current.id]);
+    }
     if (!current.answer.length) {
       setSubmitted(true);
       setSessionQuestions((value) => value.map((question) => question.id === current.id ? { ...question, draftAnswer: [...selected] } : question));
@@ -807,7 +830,7 @@ export default function HomePage() {
     });
     persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites: nextFavorites, notes, ledger: nextLedger });
     setSubmitted(true);
-    if (settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
+    if (sessionStudyMode === "standard" && settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
   }
 
   function toggleFavorite() {
@@ -1257,7 +1280,7 @@ export default function HomePage() {
     setAiMessages([]);
 
     const previousSelection = answerSelections[revisedQuestion.id] ?? selected;
-    if (submitted && revisedAnswer.length && previousSelection.length) {
+    if (sessionStudyMode !== "memorize" && submitted && revisedAnswer.length && previousSelection.length) {
       const revisedResult = [...previousSelection].sort().join("") === [...revisedAnswer].sort().join("") ? "correct" : "wrong";
       const nextProgress = { ...progress, [revisedQuestion.id]: revisedResult as "correct" | "wrong" };
       const nextLedger = stampLearningRecord(recordLedger, revisedQuestion.id, { progress: revisedResult });
@@ -1307,6 +1330,8 @@ export default function HomePage() {
     await selectQuestionBank(bank.id, "quiz");
     const index = bank.questions.findIndex((question) => question.id === questionId);
     setSessionQuestions(bank.questions);
+    setSessionStudyMode("standard");
+    setRevealedAnswers([]);
     setCurrentIndex(Math.max(0, index));
     setSelected([]);
     setSubmitted(false);
@@ -1332,7 +1357,7 @@ export default function HomePage() {
           accuracy={accuracy}
           progress={homeProgress}
           examScore={examScore}
-          onPractice={openPractice}
+          onPractice={(custom, limit) => openPractice(custom ? { ...custom, studyMode: "standard" } : undefined, limit)}
           onImport={() => setShowImport(true)}
           onBanks={() => setView("banks")}
           onSearch={() => setShowSearch(true)}
@@ -1375,6 +1400,7 @@ export default function HomePage() {
           examScore={sessionExamScore}
           selected={selected}
           submitted={submitted}
+          studyMode={sessionStudyMode}
           result={progress[current.id]}
           favorite={isFavorite}
           note={notes[current.id] ?? ""}
@@ -1413,7 +1439,7 @@ export default function HomePage() {
         <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
-        <AnswerSheet questions={sessionQuestions} progress={progress} currentIndex={currentIndex} onJump={(next) => { resetQuestion(next); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
+        <AnswerSheet questions={sessionQuestions} progress={progress} answerSelections={answerSelections} currentIndex={currentIndex} onJump={(next) => { resetQuestion(next); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
       )}
       {showImport && (
         <ImportModal
@@ -1782,7 +1808,7 @@ function IncomingBankShareModal({ share, onImport, onClose }: {
 }
 
 function QuizView(props: {
-  current: QuizQuestion; currentIndex: number; total: number; selected: string[]; submitted: boolean;
+  current: QuizQuestion; currentIndex: number; total: number; selected: string[]; submitted: boolean; studyMode: StudyMode;
   examScore?: { earned: number; answeredMaximum: number; total: number };
   result?: "correct" | "wrong"; favorite: boolean; note: string; aiMode: AiMode;
   aiTexts: Partial<Record<AiMode, string>>; aiMessages: AiMessage[]; aiLoading: boolean; mobilePanel: boolean;
@@ -1796,26 +1822,35 @@ function QuizView(props: {
   onEditQuestion: (question: QuizQuestion) => Promise<void>;
 }) {
   const [editingQuestion, setEditingQuestion] = useState(false);
-  const { current, currentIndex, total, selected, submitted, result, favorite, note, aiMode, aiTexts, aiMessages, aiLoading, examScore } = props;
+  const { current, currentIndex, total, selected, submitted, studyMode, result, favorite, note, aiMode, aiTexts, aiMessages, aiLoading, examScore } = props;
   const progress = Math.round(((currentIndex + 1) / total) * 100);
   const answerAvailable = current.answer.length > 0;
-  const questionKind = `${current.questionType ? `${current.questionType} 型题` : current.multiple ? "多选题" : "单选题"}${answerAvailable ? "" : " · 测试模式"}`;
+  const memorizing = studyMode === "memorize";
+  const blind = studyMode === "blind";
+  const modeSuffix = blind ? " · 盲刷" : memorizing ? " · 背题" : "";
+  const questionKind = `${current.questionType ? `${current.questionType} 型题` : current.multiple ? "多选题" : "单选题"}${answerAvailable ? modeSuffix : " · 测试模式"}`;
+  const chooseHint = memorizing
+    ? answerAvailable ? "标准答案已直接展开；结合题干与原资料解析快速记忆" : "当前题库没有提供标准答案，暂时只能查看题干与选项"
+    : blind
+      ? answerAvailable ? "选择后不会立即判题；可继续下一题，想核对时再点“对答案”" : "答案尚未导入：选择会先保留，之后可导入答案统一核对"
+      : answerAvailable ? current.multiple ? "本题有多个正确答案，请选择所有符合项" : "请选择一个最符合题意的答案" : "答案尚未导入：先按测试模式作答，之后可在“我的题库”导入答案并一键核对";
   return <div className="quiz-shell">
     <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><span>{current.category}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""}</span><div><i style={{ width: `${progress}%` }} /></div><b>{currentIndex + 1} / {total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
         <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? ` · ${current.sharedOptionGroup}` : ""}</span>}</div><div className="question-top-actions"><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)}><Pencil size={16} />纠错编辑</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已收藏" : "收藏"}</button></div></div>
-        <article className="question-body"><h1>{current.stem}</h1><p className="choose-hint">{answerAvailable ? current.multiple ? "本题有多个正确答案，请选择所有符合项" : "请选择一个最符合题意的答案" : "答案尚未导入：先按测试模式作答，之后可在“我的题库”导入答案并一键核对"}</p><div className="answer-options">{current.options.map((option) => {
+        <article className="question-body"><h1>{current.stem}</h1><p className="choose-hint">{chooseHint}</p><div className="answer-options">{current.options.map((option) => {
           const picked = selected.includes(option.label);
           const isAnswer = submitted && current.answer.includes(option.label);
           const isWrong = submitted && picked && !current.answer.includes(option.label);
           return <button key={option.label} className={`answer-option ${picked ? "selected" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} onClick={() => props.onToggleOption(option.label)}><span>{option.label}</span><p>{option.text}</p>{isAnswer && <Check size={18} />}{isWrong && <X size={18} />}</button>;
         })}</div></article>
-        {submitted && answerAvailable && <div className={`result-strip ${result}`}><span>{result === "correct" ? <CheckCircle2 /> : <AlertCircle />}</span><div><strong>{result === "correct" ? "答对了，知识点已加深" : "这道题值得加入复盘"}</strong><p>你的答案：{selected.join("、")} · 题库答案：{current.answer.join("、")}</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
-        {submitted && !answerAvailable && <div className="result-strip pending-answer"><span><Clock3 /></span><div><strong>本题选择已锁定，等待答案</strong><p>你的选择：{selected.join("、")} · 导入答案后会自动核对</p></div></div>}
+        {memorizing && answerAvailable && <div className="result-strip memorize-answer"><span><Eye /></span><div><strong>标准答案已展开</strong><p>题库答案：{current.answer.join("、")} · 背题模式不会计入对错记录</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
+        {!memorizing && submitted && answerAvailable && <div className={`result-strip ${result}`}><span>{result === "correct" ? <CheckCircle2 /> : <AlertCircle />}</span><div><strong>{result === "correct" ? "答对了，知识点已加深" : "这道题值得加入复盘"}</strong><p>你的答案：{selected.join("、")} · 题库答案：{current.answer.join("、")}</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
+        {submitted && !answerAvailable && <div className="result-strip pending-answer"><span><Clock3 /></span><div><strong>{memorizing ? "本题暂无标准答案" : "本题选择已锁定，等待答案"}</strong><p>{memorizing ? "导入答案后再使用背题模式，即可直接查看。" : `你的选择：${selected.join("、")} · 导入答案后会自动核对`}</p></div></div>}
         {submitted && current.explanation && <section className="source-explanation"><header><span><FileText size={17} /></span><div><strong>原资料解析</strong><small>随导入资料提取 · 可能存在版本时效差异</small></div></header><MarkdownNotePreview value={current.explanation} /><footer>解析来源：{current.answerSource || "导入文件中的答案或解析部分"}</footer></section>}
-        {!submitted && <div className="mobile-submit-bar"><button onClick={props.onSubmit} disabled={!selected.length}><CheckCircle2 size={18} />{answerAvailable ? "确认答案" : "锁定作答"}</button><small>{selected.length ? `已选择 ${selected.join("、")}` : "选择答案后再确认"}</small></div>}
-        <div className="quiz-actions"><button className="subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>{submitted ? <button className="primary-action" onClick={props.onNext}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length}>{answerAvailable ? "提交答案" : "锁定作答"}<ArrowRight size={17} /></button>}</div>
+        {!memorizing && !submitted && <div className={`mobile-submit-bar ${blind ? "blind" : ""}`}><button onClick={props.onSubmit} disabled={!selected.length}>{blind ? <Eye size={18} /> : <CheckCircle2 size={18} />}{blind && answerAvailable ? "对答案" : answerAvailable ? "确认答案" : "锁定作答"}</button><small>{selected.length ? `已选择 ${selected.join("、")}` : blind ? "可先选答案并继续做题" : "选择答案后再确认"}</small></div>}
+        <div className={`quiz-actions ${blind && !submitted ? "blind-actions" : ""}`}>{blind && !submitted ? <button className="blind-check-action" onClick={props.onSubmit} disabled={!selected.length}><Eye size={17} />{answerAvailable ? "对答案" : "锁定作答"}</button> : <button className="subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>}{submitted || memorizing || blind ? <button className="primary-action" onClick={props.onNext}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length}>{answerAvailable ? "提交答案" : "锁定作答"}<ArrowRight size={17} /></button>}</div>
       </section>
       <LearningPanel current={current} submitted={submitted && answerAvailable} note={note} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} />
     </div>
@@ -1943,7 +1978,7 @@ function LearningPanel({ current, submitted, note, aiMode, aiTexts, aiMessages, 
 
 function SettingsModal({ settings, counts, typeCounts, onChange, onClose, onStart }: { settings: Settings; counts: Record<Scope, number>; typeCounts: { single: number; multiple: number; all: number }; onChange: (settings: Settings) => void; onClose: () => void; onStart: () => void }) {
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
-  return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>开始之前</span><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
+  return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>开始之前</span><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section study-mode-section"><label>刷题模式</label><div className="study-mode-grid"><button className={settings.studyMode === "standard" ? "active" : ""} onClick={() => update("studyMode", "standard")}><Target size={19} /><strong>标准练习</strong><span>提交后立即判题并记录对错</span></button><button className={settings.studyMode === "blind" ? "active" : ""} onClick={() => update("studyMode", "blind")}><EyeOff size={19} /><strong>盲刷</strong><span>先连续作答，需要时再对答案</span></button><button className={settings.studyMode === "memorize" ? "active" : ""} onClick={() => update("studyMode", "memorize")}><Eye size={19} /><strong>背题</strong><span>进入后直接展开标准答案</span></button></div>{settings.studyMode !== "standard" && <p className="study-mode-note">{settings.studyMode === "blind" ? "盲刷会保留每题选择，但在点击“对答案”前不判分、不显示正误。" : "背题只用于快速记忆，不会把浏览行为计入做题数、正确率或首次得分。"}</p>}</div><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
     ["all", "全部题目", Library], ["unanswered", "未练题目", Zap], ["wrong", "错题复盘", RotateCcw], ["favorite", "收藏题目", Star],
   ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div><div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋多选</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
 }
@@ -1952,8 +1987,8 @@ function SwitchRow({ label, detail, value, onChange }: { label: string; detail: 
   return <button className="switch-row" onClick={() => onChange(!value)}><div><strong>{label}</strong><span>{detail}</span></div><i className={value ? "on" : ""}><b /></i></button>;
 }
 
-function AnswerSheet({ questions, progress, currentIndex, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; currentIndex: number; onJump: (index: number) => void; onClose: () => void }) {
-  return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose}><X /></button></header><div className="answer-legend"><span><i className="done" />已答</span><span><i className="wrong" />错题</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => <button key={`${question.id}-${index}`} className={`${progress[question.id] ?? ""} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{index + 1}</button>)}</div></section></div>;
+function AnswerSheet({ questions, progress, answerSelections, currentIndex, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; answerSelections: Record<string, string[]>; currentIndex: number; onJump: (index: number) => void; onClose: () => void }) {
+  return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose}><X /></button></header><div className="answer-legend"><span><i className="done" />已答</span><span><i className="wrong" />错题</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => <button key={`${question.id}-${index}`} className={`${progress[question.id] ?? (answerSelections[question.id]?.length ? "done" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{index + 1}</button>)}</div></section></div>;
 }
 
 function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; on306: () => void }) {

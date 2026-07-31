@@ -560,4 +560,28 @@ input,textarea,select{padding-block:12px}
   .bank-page-intro{padding:22px 18px;border-radius:21px}.bank-overview{grid-template-columns:repeat(3,1fr)}.bank-overview article{padding:10px 5px;border-right:1px solid var(--line);border-bottom:0}.bank-overview article:last-child{border-right:0}.bank-overview b{font-size:1.35rem!important}.bank-overview span{font-size:.64rem!important}
   .spatial-import-modal{padding:19px 14px}.import-stage-strip{grid-template-columns:1fr 1fr}.import-workbench-grid .drop-zone{min-height:230px;padding:26px 16px}.import-capability-panel{padding:14px}
 }
+
+/* Practice-only study modes: standard, blind review and answer-first memorization. */
+.study-mode-section{margin-top:22px;padding:15px;border:1px solid var(--line);border-radius:16px;background:var(--surface-2)}
+.study-mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.study-mode-grid>button{min-width:0;min-height:104px;padding:13px 12px;border:1px solid var(--line);border-radius:13px;color:var(--muted);background:var(--surface);display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:8px;align-content:center;text-align:left;cursor:pointer}
+.study-mode-grid>button>svg{grid-row:1/3;color:var(--green)}
+.study-mode-grid>button>strong{color:var(--ink);font-size:.88rem!important}
+.study-mode-grid>button>span{margin-top:4px;font-size:.7rem!important;line-height:1.5}
+.study-mode-grid>button.active{border-color:color-mix(in srgb,var(--bean) 50%,var(--line));background:var(--bean-soft);box-shadow:0 5px 16px rgba(72,41,36,.07)}
+.study-mode-grid>button.active>svg,.study-mode-grid>button.active>strong{color:var(--bean)}
+.study-mode-note{margin:10px 2px 0;color:var(--muted);font-size:.72rem!important;line-height:1.6}
+.blind-check-action{padding:10px 16px;border:1px solid color-mix(in srgb,var(--bean) 48%,var(--line));border-radius:10px;color:var(--bean);background:var(--bean-soft);display:flex;align-items:center;gap:7px;cursor:pointer;font-size:1rem}
+.blind-check-action:disabled{cursor:not-allowed;opacity:.45}
+.result-strip.memorize-answer{background:var(--green-soft);border-color:var(--green)}
+.result-strip.memorize-answer>span{color:var(--green)}
+.number-grid button.done{color:#fff;background:var(--green);border-color:var(--green)}
+.dark .study-mode-section{background:color-mix(in srgb,var(--surface-2) 82%,transparent)}
+.dark .study-mode-grid>button.active{background:color-mix(in srgb,var(--bean-soft) 70%,var(--surface))}
+
+@media(max-width:620px){
+  .study-mode-grid{grid-template-columns:1fr}
+  .study-mode-grid>button{min-height:76px}
+  .mobile-submit-bar.blind button{color:var(--bean);border:1px solid color-mix(in srgb,var(--bean) 45%,var(--line));background:var(--bean-soft)}
+}
 @media(prefers-reduced-motion:reduce){html:focus-within{scroll-behavior:auto}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

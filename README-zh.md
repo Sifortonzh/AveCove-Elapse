@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.1.1" src="https://img.shields.io/badge/version-1.1.1-b43d35" />
+  <img alt="版本 1.2.0" src="https://img.shields.io/badge/version-1.2.0-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -35,6 +35,8 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 `1.1.0` 采用克制的 Spatial Bento 信息架构，重点重构首页、我的题库与导入工作台：常用入口更集中、学习进度更直观、导入阶段更清晰，并补齐键盘焦点、减少动态效果与多尺寸响应式体验。既有刷题、同步和西综 306 流程保持兼容。
 
 `1.1.1` 为首页“我的笔记”增加非空笔记实时计数，多端同步恢复的笔记也会纳入统计。
+
+`1.2.0` 新增仅在练习设置中选择的“盲刷”和“背题”模式：盲刷可连续作答并保留选项，按需再对答案；背题会直接展开原文件标准答案，浏览过程不计入做题数、正确率或首次得分。
 
 项目不含广告，不要求手机号或微信登录。学号只用于生成不可逆的同步标识，原始学号不会写入数据库；邮箱仅在使用者主动开启验证码登录或身份保护时使用。
 
@@ -62,6 +64,7 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 - 顺序练习、20 题随机挑战和 100 题模拟考试。
 - 错题复盘、收藏、答题卡、笔记和分题库学习进度。
 - 可选返回上一题时显示答案、选项随机、错题自动收藏、答对自动下一题。
+- 练习设置提供标准练习、延迟判定的盲刷和不计分的背题三种模式。
 - 第一题与最后一题继续越界操作时显示友好提示。
 - 文件自带解析与 AI 解析彼此独立，答题后都可保留显示。
 - AI 学习区内容可快速写入 Markdown 笔记，并记录题目来源、教材参考提示、标签和搜索信息。

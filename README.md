@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.1.1" src="https://img.shields.io/badge/version-1.1.1-b43d35" />
+  <img alt="Version 1.2.0" src="https://img.shields.io/badge/version-1.2.0-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -40,6 +40,8 @@ Version `1.1.0` introduces a restrained Spatial Bento interface for the home das
 
 Version `1.1.1` adds a live non-empty note count to the home navigation, including notes restored through cross-device sync.
 
+Version `1.2.0` adds settings-only **Blind Review** and **Answer-first Memorization** modes. Blind Review preserves selections across navigation without judging them until requested; Answer-first Memorization reveals the source answer immediately without changing practice statistics.
+
 ## Highlights
 
 ### Import and organize your own banks
@@ -60,6 +62,7 @@ Version `1.1.1` adds a live non-empty note count to the home navigation, includi
 - Sequential practice, 20-question random challenge, and 100-question mock exam.
 - Wrong-answer review, favorites, answer sheet, notes, and per-bank progress.
 - Optional answer-on-return, option shuffling, auto-favorite, and correct-answer auto-advance.
+- Three practice modes in practice settings: standard grading, deferred-answer Blind Review, and non-scoring Answer-first Memorization.
 - Friendly first/last-question boundary messages.
 - Source explanations remain visible below the question independently of AI output.
 - AI learning content can be written into Markdown notes with source, textbook-reference reminder, search, and tags.

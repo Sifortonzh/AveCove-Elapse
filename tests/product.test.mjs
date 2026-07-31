@@ -652,7 +652,7 @@ test("keeps sync quiet and gives iPhone separate answer confirmation, next navig
   assert.match(page, /syncInFlightRef/);
   assert.match(page, /if \(showMessage\) \{\s*setManualSyncing\(true\)/);
   assert.match(page, /aria-label="立即手动同步"/);
-  assert.match(page, /className="mobile-submit-bar"/);
+  assert.match(page, /mobile-submit-bar/);
   assert.match(page, /确认答案/);
   assert.match(page, /className="mobile-next"/);
   assert.doesNotMatch(page, /submitted \? <button className="mobile-next"/);
@@ -752,7 +752,32 @@ test("ships bounded random sessions, boundary reminders, and one-second toast di
   assert.match(db, /export async function withTransaction/);
 });
 
-test("ships the v1.1 restrained Spatial Bento interface without changing study flows", async () => {
+test("ships blind review and answer-first memorization only in practice settings", async () => {
+  const [page, styles] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/globals.css"),
+  ]);
+  const homeView = page.slice(page.indexOf("function HomeView"), page.indexOf("function QuestionBankPage"));
+  const settingsModal = page.slice(page.indexOf("function SettingsModal"), page.indexOf("function SwitchRow"));
+
+  assert.match(page, /type StudyMode = "standard" \| "blind" \| "memorize"/);
+  assert.match(settingsModal, /<strong>盲刷<\/strong>/);
+  assert.match(settingsModal, /<strong>背题<\/strong>/);
+  assert.match(settingsModal, /点击“对答案”前不判分、不显示正误/);
+  assert.match(settingsModal, /不会把浏览行为计入做题数、正确率或首次得分/);
+  assert.doesNotMatch(homeView, /<strong>盲刷<\/strong>|<strong>背题<\/strong>/);
+  assert.match(page, /sessionStudyMode === "blind"/);
+  assert.match(page, /setSelected\(memorizing \? \[\.\.\.\(target\?\.answer \?\? \[\]\)\]/);
+  assert.match(page, /sessionStudyMode === "standard" && settings\.autoNext/);
+  assert.match(page, /背题模式不会计入对错记录/);
+  assert.match(page, /className="blind-check-action"/);
+  assert.match(page, /answerSelections=\{answerSelections\}/);
+  assert.match(styles, /\.study-mode-grid/);
+  assert.match(styles, /\.blind-check-action/);
+  assert.match(styles, /\.number-grid button\.done/);
+});
+
+test("ships the v1.2 study modes on the restrained Spatial Bento interface", async () => {
   const [page, styles, packageJson, readme, readmeZh] = await Promise.all([
     text("app/page.tsx"),
     text("app/globals.css"),
@@ -761,8 +786,8 @@ test("ships the v1.1 restrained Spatial Bento interface without changing study f
     text("README-zh.md"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.1\.1"/);
-  assert.match(readme, /Version `1\.1\.1`/);
+  assert.match(packageJson, /"version": "1\.2\.0"/);
+  assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);
   assert.match(page, /className="hero-card bento-hero"/);
