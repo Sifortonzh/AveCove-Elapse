@@ -6,6 +6,7 @@ export type SavedQuestionBank = {
   name: string;
   description: string;
   groupName: string;
+  featured: boolean;
   questions: QuizQuestion[];
   importedAt: string;
   updatedAt: string;
@@ -16,6 +17,7 @@ export type QuestionBankInput = {
   name: string;
   description?: string;
   groupName?: string;
+  featured?: boolean;
   questions: QuizQuestion[];
   importedAt: string;
   updatedAt?: string;
@@ -110,6 +112,7 @@ function normalizeBank(input: QuestionBankInput): SavedQuestionBank {
     name,
     description: typeof input.description === "string" ? input.description.trim().slice(0, 4_000) : "",
     groupName: storedGroupName || (input.groupName === undefined ? suggestQuestionBankGroup(name, questions) : ""),
+    featured: input.featured === true,
     questions,
     importedAt: input.importedAt || now,
     updatedAt: input.updatedAt || now,
@@ -233,7 +236,7 @@ export async function renameQuestionBank(id: string, name: string): Promise<Save
 
 export async function updateQuestionBankDetails(
   id: string,
-  details: { name?: string; description?: string; groupName?: string },
+  details: { name?: string; description?: string; groupName?: string; featured?: boolean },
 ): Promise<SavedQuestionBank> {
   const bank = await loadQuestionBank(id);
   if (!bank) throw new Error("找不到要编辑的题库");
@@ -242,6 +245,7 @@ export async function updateQuestionBankDetails(
     name: details.name ?? bank.name,
     description: details.description ?? bank.description,
     groupName: details.groupName ?? bank.groupName,
+    featured: details.featured ?? bank.featured,
     updatedAt: new Date().toISOString(),
   });
 }
@@ -298,6 +302,7 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
       name: typeof candidate.name === "string" ? candidate.name.slice(0, 160) : "同步题库",
       description: typeof candidate.description === "string" ? candidate.description.slice(0, 4_000) : "",
       groupName: typeof candidate.groupName === "string" ? candidate.groupName : "",
+      featured: candidate.featured === true,
       questions: candidate.questions,
       importedAt: typeof candidate.importedAt === "string" ? candidate.importedAt : new Date().toISOString(),
       updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : new Date().toISOString(),

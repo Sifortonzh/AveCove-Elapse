@@ -421,6 +421,7 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /export async function updateQuestionBankDetails/);
   assert.match(localBank, /export async function deleteQuestionBank/);
   assert.match(localBank, /description: typeof input\.description/);
+  assert.match(localBank, /featured: input\.featured === true/);
   assert.match(localBank, /storedGroupName = normalizeQuestionBankGroup/);
   assert.match(localBank, /input\.groupName === undefined \? suggestQuestionBankGroup/);
   assert.match(localBank, /bank: \{ name: bank\.name, description: bank\.description, groupName: bank\.groupName, questions: bank\.questions \}/);
@@ -432,7 +433,12 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /export async function saveQuestionBankGroupOrder/);
   assert.match(localBank, /groupOrder: await loadQuestionBankGroupOrder\(\)/);
   assert.match(localBank, /Array\.isArray\(bundle\.groupOrder\)/);
+  assert.match(localBank, /featured: candidate\.featured === true/);
   assert.match(page, /reconcileQuestionBankGroupOrder/);
+  assert.match(page, /function toggleSavedBankFeatured/);
+  assert.match(page, /精选试卷/);
+  assert.match(page, /className="featured-bank-section"/);
+  assert.match(page, /aria-pressed=\{bank\.featured\}/);
   assert.match(page, /draggable onDragStart/);
   assert.match(page, /上移分组/);
   assert.match(page, /生成导入链接/);
@@ -443,6 +449,8 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(shareRoute, /parseSharedQuestionBankPackage/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS shared_question_banks/);
   assert.match(styles, /\.bank-group-order/);
+  assert.match(styles, /\.featured-bank-grid/);
+  assert.match(styles, /\.bank-feature-toggle/);
   assert.match(styles, /\.share-link-result/);
   assert.match(styles, /\.incoming-share-modal/);
 });
@@ -786,7 +794,7 @@ test("ships the v1.2 study modes on the restrained Spatial Bento interface", asy
     text("README-zh.md"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.2\.0"/);
+  assert.match(packageJson, /"version": "1\.2\.1"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);

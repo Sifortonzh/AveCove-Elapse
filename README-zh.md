@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.2.0" src="https://img.shields.io/badge/version-1.2.0-b43d35" />
+  <img alt="版本 1.2.1" src="https://img.shields.io/badge/version-1.2.1-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -38,6 +38,8 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 
 `1.2.0` 新增仅在练习设置中选择的“盲刷”和“背题”模式：盲刷可连续作答并保留选项，按需再对答案；背题会直接展开原文件标准答案，浏览过程不计入做题数、正确率或首次得分。
 
+`1.2.1` 新增独立“精选试卷”模块：任意已导入题库均可通过星标加入或移出精选，同时保留原有分组；精选状态、当前题库状态与学习进度支持本机持久化及可选多端同步。
+
 项目不含广告，不要求手机号或微信登录。学号只用于生成不可逆的同步标识，原始学号不会写入数据库；邮箱仅在使用者主动开启验证码登录或身份保护时使用。
 
 `1.0.0` 是适合公开仓库、自行部署和录制演示的首个正式版本。项目只内置少量演示题，不附带任何完整商业题库、课程题库或其他受版权保护内容。
@@ -51,6 +53,7 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 - 批量导入 `.doc`、`.docx`、文字 PDF、扫描 PDF 和 AveCove 便携 JSON。
 - 每份成功导入的题库自动保存在浏览器本地题库书架。
 - 支持重命名、简介、全局搜索、分享、删除和谨慎重置学习记录。
+- 支持把重点试卷设为精选，并在独立“精选试卷”模块集中展示，同时保留原有分组关系。
 - 搜索范围包含题库名、简介、分组、题干、选项、分类与原题号，并高亮匹配词。
 - 支持手动分组与安全关键词建议；历年西综试卷可统一归入“考研西综306”。
 - 支持拖动或上下按钮自定义分组顺序，并可随多端同步保存。

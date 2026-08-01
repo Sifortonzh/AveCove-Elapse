@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.2.0" src="https://img.shields.io/badge/version-1.2.0-b43d35" />
+  <img alt="Version 1.2.1" src="https://img.shields.io/badge/version-1.2.1-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -42,6 +42,8 @@ Version `1.1.1` adds a live non-empty note count to the home navigation, includi
 
 Version `1.2.0` adds settings-only **Blind Review** and **Answer-first Memorization** modes. Blind Review preserves selections across navigation without judging them until requested; Answer-first Memorization reveals the source answer immediately without changing practice statistics.
 
+Version `1.2.1` adds a dedicated **Featured Papers** section. Any imported bank can be pinned or unpinned without leaving its original group, and the curated card keeps its progress, active state, local persistence, and optional cross-device synchronization.
+
 ## Highlights
 
 ### Import and organize your own banks
@@ -49,6 +51,7 @@ Version `1.2.0` adds settings-only **Blind Review** and **Answer-first Memorizat
 - Import multiple `.doc`, `.docx`, text PDF, scanned PDF, and portable AveCove JSON files.
 - Keep every successful import in a browser-local library.
 - Rename, describe, search, share, delete, and safely reset one bank’s learning record.
+- Mark priority papers as featured and keep them in a dedicated curated section without removing them from their original groups.
 - Search bank titles, descriptions, groups, stems, options, categories, and source numbers with highlighted matches.
 - Group related banks manually or by safe keyword suggestions; yearly Western Medicine 306 papers can share one `考研西综306` group.
 - Reorder groups by drag-and-drop or accessible move buttons; the custom order is included in optional cross-device sync.
