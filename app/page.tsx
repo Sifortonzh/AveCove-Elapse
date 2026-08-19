@@ -25,7 +25,10 @@ import {
   type LearningRecords, type RecordLedger,
 } from "./lib/record-sync";
 import { parseQuestionText, type QuizQuestion } from "./lib/question-parser";
-import { standardizeParsedWestern306Questions, western306Score } from "./lib/medical-ai-import";
+import {
+  standardizeParsedWestern306Questions, WESTERN_306_SUBJECTS, western306Score,
+  western306SubjectForQuestion, type Western306Subject,
+} from "./lib/medical-ai-import";
 import { suggestQuestionBankGroup } from "./lib/bank-grouping";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
@@ -33,6 +36,7 @@ import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 type Progress = Record<string, "correct" | "wrong">;
 type Scope = "all" | "unanswered" | "wrong" | "favorite";
 type QuestionTypeScope = "single" | "all";
+type Western306SubjectScope = "all" | Western306Subject;
 type ThemeMode = "system" | "light" | "dark";
 type StudyMode = "standard" | "blind" | "memorize";
 type AiMode = "summary" | "pitfall" | "companion";
@@ -88,6 +92,7 @@ type MarkdownLineKind = "heading1" | "heading2" | "heading3" | "quote" | "list" 
 type Settings = {
   scope: Scope;
   questionTypes: QuestionTypeScope;
+  western306Subject: Western306SubjectScope;
   questionOrder: "sequential" | "random";
   studyMode: StudyMode;
   shuffleOptions: boolean;
@@ -101,6 +106,7 @@ type Settings = {
 const defaultSettings: Settings = {
   scope: "all",
   questionTypes: "all",
+  western306Subject: "all",
   questionOrder: "sequential",
   studyMode: "standard",
   shuffleOptions: false,
@@ -115,10 +121,17 @@ function normalizeSettings(value: unknown): Settings {
   if (!value || typeof value !== "object" || Array.isArray(value)) return defaultSettings;
   const stored = value as Partial<Settings>;
   const studyMode: StudyMode = stored.studyMode === "blind" || stored.studyMode === "memorize" ? stored.studyMode : "standard";
+  const western306Subject: Western306SubjectScope = stored.western306Subject === "physiology"
+    || stored.western306Subject === "biochemistry"
+    || stored.western306Subject === "pathology"
+    || stored.western306Subject === "internal-medicine"
+    || stored.western306Subject === "surgery"
+    ? stored.western306Subject
+    : "all";
   const themeMode: ThemeMode = stored.themeMode === "light" || stored.themeMode === "dark" || stored.themeMode === "system"
     ? stored.themeMode
     : stored.darkMode ? "dark" : "system";
-  return { ...defaultSettings, ...stored, studyMode, themeMode, darkMode: themeMode === "dark" };
+  return { ...defaultSettings, ...stored, studyMode, western306Subject, themeMode, darkMode: themeMode === "dark" };
 }
 
 const homeQuotes = [
@@ -463,23 +476,38 @@ export default function HomePage() {
   const isFavorite = current ? favorites.includes(current.id) : false;
 
   const homeProgress = Math.min(100, Math.round((answered / Math.max(questions.length, 1)) * 100));
+  const hasModernWestern306 = questions.some((question) => question.examProfile === "western-medicine-306"
+    && (question.examFormat === "modern-165" || (question.examYear ?? 0) >= 2017));
+  const subjectFilteredQuestions = settings.western306Subject !== "all" && hasModernWestern306
+    ? questions.filter((question) => western306SubjectForQuestion(question) === settings.western306Subject)
+    : questions;
+  const subjectFilteredGroupQuestions = settings.western306Subject !== "all" && hasModernWestern306
+    ? activeGroupQuestions.filter((question) => western306SubjectForQuestion(question) === settings.western306Subject)
+    : activeGroupQuestions;
+  const western306SubjectCounts = useMemo(() => Object.fromEntries([
+    ["all", questions.length],
+    ...WESTERN_306_SUBJECTS.map((subject) => [
+      subject.id,
+      questions.filter((question) => western306SubjectForQuestion(question) === subject.id).length,
+    ]),
+  ]) as Record<Western306SubjectScope, number>, [questions]);
   const typeCounts = useMemo(() => ({
-    single: questions.filter((question) => !question.multiple).length,
-    multiple: questions.filter((question) => question.multiple).length,
-    all: questions.length,
-  }), [questions]);
+    single: subjectFilteredQuestions.filter((question) => !question.multiple).length,
+    multiple: subjectFilteredQuestions.filter((question) => question.multiple).length,
+    all: subjectFilteredQuestions.length,
+  }), [subjectFilteredQuestions]);
   const scopeCounts = useMemo(() => {
-    const typedQuestions = settings.questionTypes === "single" ? questions.filter((question) => !question.multiple) : questions;
+    const typedQuestions = settings.questionTypes === "single" ? subjectFilteredQuestions.filter((question) => !question.multiple) : subjectFilteredQuestions;
     const typedGroupQuestions = settings.questionTypes === "single"
-      ? activeGroupQuestions.filter((question) => !question.multiple)
-      : activeGroupQuestions;
+      ? subjectFilteredGroupQuestions.filter((question) => !question.multiple)
+      : subjectFilteredGroupQuestions;
     return {
       all: typedQuestions.length,
       unanswered: typedQuestions.filter((question) => !progress[question.id]).length,
       wrong: typedGroupQuestions.filter((question) => progress[question.id] === "wrong").length,
       favorite: typedQuestions.filter((question) => favorites.includes(question.id)).length,
     };
-  }, [activeGroupQuestions, favorites, progress, questions, settings.questionTypes]);
+  }, [favorites, progress, settings.questionTypes, subjectFilteredGroupQuestions, subjectFilteredQuestions]);
   const searchableBanks = useMemo(() => {
     const savedCurrent = activeBankId ? questionBanks.find((bank) => bank.id === activeBankId) : undefined;
     const currentBank: SavedQuestionBank = savedCurrent ? { ...savedCurrent, name: bankName, questions } : {
@@ -694,7 +722,12 @@ export default function HomePage() {
   function buildSession(custom?: Partial<Settings>, limit?: number) {
     const active = { ...settings, ...custom };
     const sourceQuestions = active.scope === "wrong" ? activeGroupQuestions : questions;
-    let pool = sourceQuestions.filter((question) => {
+    const sourceHasModernWestern306 = sourceQuestions.some((question) => question.examProfile === "western-medicine-306"
+      && (question.examFormat === "modern-165" || (question.examYear ?? 0) >= 2017));
+    const subjectQuestions = active.western306Subject !== "all" && sourceHasModernWestern306
+      ? sourceQuestions.filter((question) => western306SubjectForQuestion(question) === active.western306Subject)
+      : sourceQuestions;
+    let pool = subjectQuestions.filter((question) => {
       if (active.questionTypes === "single" && question.multiple) return false;
       if (active.scope === "unanswered") return !progress[question.id];
       if (active.scope === "wrong") return progress[question.id] === "wrong";
@@ -1444,7 +1477,7 @@ export default function HomePage() {
       )}
 
       {showSettings && (
-        <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
+        <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} western306SubjectCounts={western306SubjectCounts} showWestern306Subjects={hasModernWestern306} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
         <AnswerSheet questions={sessionQuestions} progress={progress} answerSelections={answerSelections} currentIndex={currentIndex} onJump={(next) => { resetQuestion(next); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
@@ -1994,11 +2027,20 @@ function LearningPanel({ current, submitted, note, aiMode, aiTexts, aiMessages, 
   </aside>;
 }
 
-function SettingsModal({ settings, counts, typeCounts, onChange, onClose, onStart }: { settings: Settings; counts: Record<Scope, number>; typeCounts: { single: number; multiple: number; all: number }; onChange: (settings: Settings) => void; onClose: () => void; onStart: () => void }) {
+function SettingsModal({ settings, counts, typeCounts, western306SubjectCounts, showWestern306Subjects, onChange, onClose, onStart }: {
+  settings: Settings;
+  counts: Record<Scope, number>;
+  typeCounts: { single: number; multiple: number; all: number };
+  western306SubjectCounts: Record<Western306SubjectScope, number>;
+  showWestern306Subjects: boolean;
+  onChange: (settings: Settings) => void;
+  onClose: () => void;
+  onStart: () => void;
+}) {
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
   return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>开始之前</span><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section study-mode-section"><label>刷题模式</label><div className="study-mode-grid"><button className={settings.studyMode === "standard" ? "active" : ""} onClick={() => update("studyMode", "standard")}><Target size={19} /><strong>标准练习</strong><span>提交后立即判题并记录对错</span></button><button className={settings.studyMode === "blind" ? "active" : ""} onClick={() => update("studyMode", "blind")}><EyeOff size={19} /><strong>盲刷</strong><span>先连续作答，需要时再对答案</span></button><button className={settings.studyMode === "memorize" ? "active" : ""} onClick={() => update("studyMode", "memorize")}><Eye size={19} /><strong>背题</strong><span>进入后直接展开标准答案</span></button></div>{settings.studyMode !== "standard" && <p className="study-mode-note">{settings.studyMode === "blind" ? "盲刷会保留每题选择，但在点击“对答案”前不判分、不显示正误。" : "背题只用于快速记忆，不会把浏览行为计入做题数、正确率或首次得分。"}</p>}</div><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
     ["all", "全部题目", Library], ["unanswered", "未练题目", Zap], ["wrong", "错题复盘", RotateCcw], ["favorite", "收藏题目", Star],
-  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div><div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋多选</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
+  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div>{showWestern306Subjects && <div className="setting-section western306-subject-section"><label>西综 306 · 只练某一科</label><div className="western306-subject-grid"><button className={settings.western306Subject === "all" ? "active" : ""} onClick={() => update("western306Subject", "all")}><strong>全部科目</strong><em>{western306SubjectCounts.all} 道</em></button>{WESTERN_306_SUBJECTS.map((subject) => <button key={subject.id} className={settings.western306Subject === subject.id ? "active" : ""} onClick={() => update("western306Subject", subject.id)}><strong>{subject.label}</strong><em>{western306SubjectCounts[subject.id]} 道</em></button>)}</div><p className="western306-subject-note">按现代 165 题固定题号分布筛选；单科练习不包含第 108–115 题医学人文。</p></div>}<div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋多选</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
 }
 
 function SwitchRow({ label, detail, value, onChange }: { label: string; detail: string; value: boolean; onChange: (value: boolean) => void }) {

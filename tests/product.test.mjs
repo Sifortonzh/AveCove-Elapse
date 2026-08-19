@@ -86,6 +86,32 @@ test("recovers medical questions from partially malformed AI JSON and applies 30
   assert.equal(western306Score(fullPaper, {}).total, 300);
 });
 
+test("maps every modern 306 question to the five subject-only practice ranges", async () => {
+  const { WESTERN_306_SUBJECTS, western306SubjectForQuestion } = await loadMedicalAiImport();
+  const expected = {
+    physiology: 26,
+    biochemistry: 22,
+    pathology: 22,
+    "internal-medicine": 51,
+    surgery: 36,
+  };
+  const counts = Object.fromEntries(WESTERN_306_SUBJECTS.map((subject) => [subject.id, 0]));
+  for (let sourceNumber = 1; sourceNumber <= 165; sourceNumber += 1) {
+    const subject = western306SubjectForQuestion({
+      sourceNumber: String(sourceNumber),
+      examProfile: "western-medicine-306",
+      examFormat: "modern-165",
+    });
+    if (subject) counts[subject] += 1;
+  }
+
+  assert.deepEqual(counts, expected);
+  assert.equal(Object.values(counts).reduce((sum, value) => sum + value, 0), 157);
+  assert.equal(western306SubjectForQuestion({ sourceNumber: "108", examProfile: "western-medicine-306", examFormat: "modern-165" }), undefined);
+  assert.equal(western306SubjectForQuestion({ sourceNumber: "115", examProfile: "western-medicine-306", examFormat: "modern-165" }), undefined);
+  assert.equal(western306SubjectForQuestion({ sourceNumber: "1", examProfile: "general", examFormat: "modern-165" }), undefined);
+});
+
 test("understands modern and legacy 306 layouts without swallowing the 2024 stem", async () => {
   const { parseQuestionText } = await loadQuestionParser();
   const { detectWestern306Blueprint, parseMedicalAiResponse, western306Metadata } = await loadMedicalAiImport();
@@ -785,6 +811,21 @@ test("ships blind review and answer-first memorization only in practice settings
   assert.match(styles, /\.number-grid button\.done/);
 });
 
+test("offers five-subject filtering only for modern Western Medicine 306 banks", async () => {
+  const [page, styles] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/globals.css"),
+  ]);
+  const settingsModal = page.slice(page.indexOf("function SettingsModal"), page.indexOf("function SwitchRow"));
+
+  assert.match(page, /western306Subject: Western306SubjectScope/);
+  assert.match(page, /western306SubjectForQuestion\(question\) === active\.western306Subject/);
+  assert.match(settingsModal, /西综 306 · 只练某一科/);
+  assert.match(settingsModal, /单科练习不包含第 108–115 题医学人文/);
+  assert.match(settingsModal, /showWestern306Subjects &&/);
+  assert.match(styles, /\.western306-subject-grid/);
+});
+
 test("ships the v1.2 study modes on the restrained Spatial Bento interface", async () => {
   const [page, styles, packageJson, readme, readmeZh] = await Promise.all([
     text("app/page.tsx"),
@@ -794,7 +835,7 @@ test("ships the v1.2 study modes on the restrained Spatial Bento interface", asy
     text("README-zh.md"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.2\.1"/);
+  assert.match(packageJson, /"version": "1\.2\.2"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);

@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.2.1" src="https://img.shields.io/badge/version-1.2.1-b43d35" />
+  <img alt="版本 1.2.2" src="https://img.shields.io/badge/version-1.2.2-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -39,6 +39,8 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 `1.2.0` 新增仅在练习设置中选择的“盲刷”和“背题”模式：盲刷可连续作答并保留选项，按需再对答案；背题会直接展开原文件标准答案，浏览过程不计入做题数、正确率或首次得分。
 
 `1.2.1` 新增独立“精选试卷”模块：任意已导入题库均可通过星标加入或移出精选，同时保留原有分组；精选状态、当前题库状态与学习进度支持本机持久化及可选多端同步。
+
+`1.2.2` 为现代 165 题西综 306 试卷新增“只练某一科”：可在练习设置中保留全卷，或单独练习生理学、生物化学、病理学、内科学和外科学。
 
 项目不含广告，不要求手机号或微信登录。学号只用于生成不可逆的同步标识，原始学号不会写入数据库；邮箱仅在使用者主动开启验证码登录或身份保护时使用。
 
@@ -75,6 +77,7 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 ### 西医综合 306 工作台
 
 - 支持现代 165 题、300 分的 A/B/X 型结构，也兼容旧题中的 C 型题。
+- 按现代试卷固定题号分布选择只练生理学、生物化学、病理学、内科学或外科学。
 - 可同时导入原卷和答案/解析卷。
 - 页面感知切分、跨页题干与选项拼接、答案表确定性回填以及 AI 结构化。
 - 检查预期题数、A/B/C/X 分布、重复题号、缺失题号和答案覆盖率。

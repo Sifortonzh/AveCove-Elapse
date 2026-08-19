@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.2.1" src="https://img.shields.io/badge/version-1.2.1-b43d35" />
+  <img alt="Version 1.2.2" src="https://img.shields.io/badge/version-1.2.2-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -43,6 +43,8 @@ Version `1.1.1` adds a live non-empty note count to the home navigation, includi
 Version `1.2.0` adds settings-only **Blind Review** and **Answer-first Memorization** modes. Blind Review preserves selections across navigation without judging them until requested; Answer-first Memorization reveals the source answer immediately without changing practice statistics.
 
 Version `1.2.1` adds a dedicated **Featured Papers** section. Any imported bank can be pinned or unpinned without leaving its original group, and the curated card keeps its progress, active state, local persistence, and optional cross-device synchronization.
+
+Version `1.2.2` adds subject-only practice for modern 165-question Western Medicine 306 papers. Learners can keep the complete paper or focus on Physiology, Biochemistry, Pathology, Internal Medicine, or Surgery from the practice settings.
 
 ## Highlights
 
@@ -73,6 +75,7 @@ Version `1.2.1` adds a dedicated **Featured Papers** section. Any imported bank 
 ### Western Medicine 306 workbench
 
 - Modern 165-question / 300-point A/B/X profile and legacy C-type support.
+- Subject-only practice for Physiology, Biochemistry, Pathology, Internal Medicine, and Surgery, using the modern paper's official question-number layout.
 - Source-paper plus answer/explanation-paper pairing.
 - Page-aware extraction, cross-page seam recovery, deterministic answer-table reconciliation, and AI structuring.
 - Audits expected question count, A/B/C/X distribution, duplicates, missing source numbers, and answer coverage.

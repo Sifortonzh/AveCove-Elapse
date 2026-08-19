@@ -573,6 +573,14 @@ input,textarea,select{padding-block:12px}
 .study-mode-grid>button.active{border-color:color-mix(in srgb,var(--bean) 50%,var(--line));background:var(--bean-soft);box-shadow:0 5px 16px rgba(72,41,36,.07)}
 .study-mode-grid>button.active>svg,.study-mode-grid>button.active>strong{color:var(--bean)}
 .study-mode-note{margin:10px 2px 0;color:var(--muted);font-size:.72rem!important;line-height:1.6}
+.western306-subject-section{padding:15px;border:1px solid color-mix(in srgb,var(--green) 25%,var(--line));border-radius:16px;background:var(--green-soft)}
+.western306-subject-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.western306-subject-grid>button{min-width:0;min-height:66px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;color:var(--muted);background:var(--surface);display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;cursor:pointer;text-align:left}
+.western306-subject-grid>button strong{color:var(--ink);font-size:.8rem!important}
+.western306-subject-grid>button em{font-size:.68rem!important;font-style:normal}
+.western306-subject-grid>button.active{border-color:color-mix(in srgb,var(--green) 55%,var(--line));background:var(--green);color:#fff;box-shadow:0 6px 16px rgba(20,76,64,.13)}
+.western306-subject-grid>button.active strong{color:#fff}
+.western306-subject-note{margin:10px 2px 0;color:var(--muted);font-size:.7rem!important;line-height:1.55}
 .blind-check-action{padding:10px 16px;border:1px solid color-mix(in srgb,var(--bean) 48%,var(--line));border-radius:10px;color:var(--bean);background:var(--bean-soft);display:flex;align-items:center;gap:7px;cursor:pointer;font-size:1rem}
 .blind-check-action:disabled{cursor:not-allowed;opacity:.45}
 .result-strip.memorize-answer{background:var(--green-soft);border-color:var(--green)}
@@ -580,10 +588,12 @@ input,textarea,select{padding-block:12px}
 .number-grid button.done{color:#fff;background:var(--green);border-color:var(--green)}
 .dark .study-mode-section{background:color-mix(in srgb,var(--surface-2) 82%,transparent)}
 .dark .study-mode-grid>button.active{background:color-mix(in srgb,var(--bean-soft) 70%,var(--surface))}
+.dark .western306-subject-section{background:color-mix(in srgb,var(--green-soft) 70%,var(--surface))}
 
 @media(max-width:620px){
   .study-mode-grid{grid-template-columns:1fr}
   .study-mode-grid>button{min-height:76px}
+  .western306-subject-grid{grid-template-columns:1fr 1fr}
   .mobile-submit-bar.blind button{color:var(--bean);border:1px solid color-mix(in srgb,var(--bean) 45%,var(--line));background:var(--bean-soft)}
 }
 @media(prefers-reduced-motion:reduce){html:focus-within{scroll-behavior:auto}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

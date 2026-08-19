@@ -2,6 +2,14 @@ import type { QuizOption, QuizQuestion, Western306Format } from "./question-pars
 
 export type MedicalExamProfile = "general" | "western-medicine-306";
 export type MedicalQuestionType = "A" | "B" | "C" | "X";
+export type Western306Subject = "physiology" | "biochemistry" | "pathology" | "internal-medicine" | "surgery";
+export const WESTERN_306_SUBJECTS: Array<{ id: Western306Subject; label: string; ranges: Array<[number, number]> }> = [
+  { id: "physiology", label: "生理学", ranges: [[1, 16], [116, 119], [136, 141]] },
+  { id: "biochemistry", label: "生物化学", ranges: [[17, 28], [120, 123], [142, 147]] },
+  { id: "pathology", label: "病理学", ranges: [[29, 40], [124, 127], [148, 153]] },
+  { id: "internal-medicine", label: "内科学", ranges: [[41, 56], [68, 92], [128, 131], [154, 159]] },
+  { id: "surgery", label: "外科学", ranges: [[57, 67], [93, 107], [132, 135], [160, 165]] },
+];
 export type Western306Section = {
   questionType: MedicalQuestionType;
   start: number;
@@ -139,6 +147,15 @@ export function western306Metadata(sourceNumber: string, blueprint: Western306Bl
   const section = blueprint.sections.find((candidate) => number >= candidate.start && number <= candidate.end);
   if (!section) return {};
   return { questionType: section.questionType, points: section.points, multiple: section.questionType === "X" };
+}
+
+export function western306SubjectForQuestion(question: QuizQuestion): Western306Subject | undefined {
+  if (question.examProfile !== "western-medicine-306") return undefined;
+  const isModern = question.examFormat === "modern-165" || (question.examYear ?? 0) >= 2017;
+  if (!isModern) return undefined;
+  const number = Number.parseInt(question.sourceNumber.match(/\d+/)?.[0] ?? "", 10);
+  if (!Number.isFinite(number)) return undefined;
+  return WESTERN_306_SUBJECTS.find((subject) => subject.ranges.some(([start, end]) => number >= start && number <= end))?.id;
 }
 
 export function standardizeParsedWestern306Questions(
