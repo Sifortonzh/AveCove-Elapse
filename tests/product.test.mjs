@@ -827,15 +827,17 @@ test("offers five-subject filtering only for modern Western Medicine 306 banks",
 });
 
 test("ships the v1.2 study modes on the restrained Spatial Bento interface", async () => {
-  const [page, styles, packageJson, readme, readmeZh] = await Promise.all([
+  const [page, styles, packageJson, readme, readmeZh, nextConfig, dockerfile] = await Promise.all([
     text("app/page.tsx"),
     text("app/globals.css"),
     text("package.json"),
     text("README.md"),
     text("README-zh.md"),
+    text("next.config.ts"),
+    text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.2\.2"/);
+  assert.match(packageJson, /"version": "1\.2\.3"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);
@@ -851,6 +853,9 @@ test("ships the v1.2 study modes on the restrained Spatial Bento interface", asy
   assert.match(styles, /\.spatial-import-modal/);
   assert.match(styles, /font-variant-numeric:tabular-nums lining-nums/);
   assert.match(styles, /@media\(prefers-reduced-motion:reduce\)/);
+  assert.match(packageJson, /next build --webpack/);
+  assert.match(nextConfig, /webpackMemoryOptimizations: true/);
+  assert.match(dockerfile, /NODE_OPTIONS=--max-old-space-size=768/);
   assert.doesNotMatch(packageJson, /framer-motion|tailwind/);
 });
 

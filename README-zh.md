@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.2.2" src="https://img.shields.io/badge/version-1.2.2-b43d35" />
+  <img alt="版本 1.2.3" src="https://img.shields.io/badge/version-1.2.3-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -41,6 +41,8 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 `1.2.1` 新增独立“精选试卷”模块：任意已导入题库均可通过星标加入或移出精选，同时保留原有分组；精选状态、当前题库状态与学习进度支持本机持久化及可选多端同步。
 
 `1.2.2` 为现代 165 题西综 306 试卷新增“只练某一科”：可在练习设置中保留全卷，或单独练习生理学、生物化学、病理学、内科学和外科学。
+
+`1.2.3` 优化小内存服务器的生产构建：启用 Next.js Webpack 内存优化工作进程，并限制 Node.js 构建堆，降低 Docker 更新时拖慢整机的风险。
 
 项目不含广告，不要求手机号或微信登录。学号只用于生成不可逆的同步标识，原始学号不会写入数据库；邮箱仅在使用者主动开启验证码登录或身份保护时使用。
 
