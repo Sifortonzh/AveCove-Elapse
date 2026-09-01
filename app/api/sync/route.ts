@@ -5,6 +5,64 @@ import { mergeLearningRecords } from "@/app/lib/record-sync";
 
 type StateRow = { payload: Record<string, unknown>; version: number; updated_at: Date };
 
+type SyncBank = { id: string; updatedAt?: string; [key: string]: unknown };
+type BankBundle = {
+  version?: number;
+  activeBankId?: string | null;
+  banks?: unknown[];
+  groupOrder?: unknown;
+  bankOrder?: unknown;
+  sortMode?: unknown;
+  deletedBanks?: unknown;
+  preferencesUpdatedAt?: unknown;
+};
+
+function validTimestamp(value: unknown) {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : new Date(0).toISOString();
+}
+
+function normalizeDeletions(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {} as Record<string, string>;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([id, timestamp]) => id.length > 0 && id.length <= 160 && validTimestamp(timestamp) !== new Date(0).toISOString())
+    .sort(([, left], [, right]) => validTimestamp(right).localeCompare(validTimestamp(left)))
+    .slice(0, 200)
+    .map(([id, timestamp]) => [id, validTimestamp(timestamp)])) as Record<string, string>;
+}
+
+function mergeQuestionBankBundles(currentValue: unknown, incomingValue: unknown) {
+  const current = currentValue && typeof currentValue === "object" && !Array.isArray(currentValue) ? currentValue as BankBundle : {};
+  const incoming = incomingValue && typeof incomingValue === "object" && !Array.isArray(incomingValue) ? incomingValue as BankBundle : {};
+  const banks = new Map<string, SyncBank>();
+  for (const candidate of [...(Array.isArray(current.banks) ? current.banks : []), ...(Array.isArray(incoming.banks) ? incoming.banks : [])]) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const bank = candidate as SyncBank;
+    if (typeof bank.id !== "string" || bank.id.length > 160) continue;
+    const existing = banks.get(bank.id);
+    if (!existing || validTimestamp(bank.updatedAt) > validTimestamp(existing.updatedAt)) banks.set(bank.id, bank);
+  }
+  const deletedBanks = normalizeDeletions(current.deletedBanks);
+  for (const [id, deletedAt] of Object.entries(normalizeDeletions(incoming.deletedBanks))) {
+    if (!deletedBanks[id] || deletedAt > deletedBanks[id]) deletedBanks[id] = deletedAt;
+  }
+  for (const [id, bank] of banks) {
+    if (deletedBanks[id] && deletedBanks[id] >= validTimestamp(bank.updatedAt)) banks.delete(id);
+  }
+  const preferenceSource = validTimestamp(incoming.preferencesUpdatedAt) >= validTimestamp(current.preferencesUpdatedAt) ? incoming : current;
+  const activeCandidates = [incoming.activeBankId, current.activeBankId];
+  const activeBankId = activeCandidates.find((id): id is string => typeof id === "string" && banks.has(id)) ?? null;
+  return {
+    version: 2,
+    activeBankId,
+    banks: [...banks.values()].sort((left, right) => validTimestamp(right.updatedAt).localeCompare(validTimestamp(left.updatedAt))).slice(0, 40),
+    deletedBanks,
+    groupOrder: Array.isArray(preferenceSource.groupOrder) ? preferenceSource.groupOrder : [],
+    bankOrder: Array.isArray(preferenceSource.bankOrder) ? preferenceSource.bankOrder : [],
+    sortMode: typeof preferenceSource.sortMode === "string" ? preferenceSource.sortMode : "imported-desc",
+    preferencesUpdatedAt: validTimestamp(preferenceSource.preferencesUpdatedAt),
+  };
+}
+
 export async function GET(request: Request) {
   const session = readSession(request);
   if (!session) return NextResponse.json({ error: "请先登录。" }, { status: 401 });
@@ -30,7 +88,7 @@ export async function PUT(request: Request) {
   if (bankBundle?.banks && (!Array.isArray(bankBundle.banks) || bankBundle.banks.length > 40)) return NextResponse.json({ error: "同步题库数量超出限制。" }, { status: 400 });
   if (englishBundle?.tests && (!Array.isArray(englishBundle.tests) || englishBundle.tests.length > 80)) return NextResponse.json({ error: "英文题库数量超出限制。" }, { status: 400 });
   const allowedKeys = ["progress", "firstProgress", "favorites", "notes", "recordLedger", "settings", "nickname", "bankName", "questionBanks", "englishTests", "englishPractice"];
-  const allowed = Object.fromEntries(allowedKeys.filter((key) => key in state).map((key) => [key, state[key]]));
+  const allowed = Object.fromEntries(allowedKeys.filter((key) => key in state).map((key) => [key, state[key]])) as Record<string, unknown>;
   const rows = await withTransaction(async (client) => {
     // Serialise writes for one learner so simultaneous iPad/Mac uploads cannot
     // both merge against the same stale snapshot and lose the other update.
@@ -40,6 +98,9 @@ export async function PUT(request: Request) {
       [session.userId],
     );
     const currentPayload = currentResult.rows[0]?.payload ?? {};
+    if ("questionBanks" in allowed) {
+      allowed.questionBanks = mergeQuestionBankBundles(currentPayload.questionBanks, allowed.questionBanks);
+    }
     const records = mergeLearningRecords(
       {
         progress: currentPayload.progress,

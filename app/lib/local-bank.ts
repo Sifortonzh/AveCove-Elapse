@@ -50,17 +50,27 @@ export type Western306StandardPackage = {
 };
 
 export type QuestionBankSyncBundle = {
-  version: 1;
+  version: 1 | 2;
   activeBankId: string | null;
   banks: SavedQuestionBank[];
   groupOrder?: string[];
+  bankOrder?: string[];
+  sortMode?: QuestionBankSortMode;
+  deletedBanks?: Record<string, string>;
+  preferencesUpdatedAt?: string;
 };
+
+export type QuestionBankSortMode = "custom" | "imported-desc" | "imported-asc" | "name-asc";
 
 const DB_NAME = "hongdou-local-data";
 const STORE_NAME = "question-banks";
 const LEGACY_ACTIVE_KEY = "active-bank";
 const ACTIVE_ID_KEY = "active-bank-id";
 const GROUP_ORDER_KEY = "question-bank-group-order";
+const BANK_ORDER_KEY = "question-bank-order";
+const SORT_MODE_KEY = "question-bank-sort-mode";
+const DELETED_BANKS_KEY = "question-bank-deletions";
+const PREFERENCES_UPDATED_AT_KEY = "question-bank-preferences-updated-at";
 const BANK_KEY_PREFIX = "bank:";
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -130,6 +140,45 @@ async function readValue<T>(key: IDBValidKey): Promise<T | undefined> {
   });
 }
 
+async function writeValues(entries: Array<[IDBValidKey, unknown]>, notify = true): Promise<void> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    for (const [key, value] of entries) store.put(value, key);
+    transaction.oncomplete = () => {
+      database.close();
+      if (notify) notifySyncChange();
+      resolve();
+    };
+    transaction.onerror = () => reject(transaction.error ?? new Error("保存题库设置失败"));
+  });
+}
+
+function normalizeBankOrder(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0 && entry.length <= 160))].slice(0, 200);
+}
+
+function normalizeSortMode(value: unknown): QuestionBankSortMode {
+  return value === "custom" || value === "imported-asc" || value === "name-asc" ? value : "imported-desc";
+}
+
+function normalizeDeletedBanks(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const result: Record<string, string> = {};
+  for (const [id, deletedAt] of Object.entries(value)) {
+    if (!id || id.length > 160 || typeof deletedAt !== "string" || Number.isNaN(Date.parse(deletedAt))) continue;
+    result[id] = deletedAt;
+    if (Object.keys(result).length >= 200) break;
+  }
+  return result;
+}
+
+async function touchQuestionBankPreferences(entries: Array<[IDBValidKey, unknown]>) {
+  await writeValues([...entries, [PREFERENCES_UPDATED_AT_KEY, new Date().toISOString()]]);
+}
+
 function normalizeGroupOrder(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const result: string[] = [];
@@ -149,17 +198,28 @@ export async function loadQuestionBankGroupOrder(): Promise<string[]> {
 
 export async function saveQuestionBankGroupOrder(order: string[]): Promise<string[]> {
   const normalized = normalizeGroupOrder(order);
-  const database = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put(normalized, GROUP_ORDER_KEY);
-    transaction.oncomplete = () => {
-      database.close();
-      notifySyncChange();
-      resolve(normalized);
-    };
-    transaction.onerror = () => reject(transaction.error ?? new Error("保存题库分组顺序失败"));
-  });
+  await touchQuestionBankPreferences([[GROUP_ORDER_KEY, normalized]]);
+  return normalized;
+}
+
+export async function loadQuestionBankOrder(): Promise<string[]> {
+  return normalizeBankOrder(await readValue<unknown>(BANK_ORDER_KEY));
+}
+
+export async function saveQuestionBankOrder(order: string[]): Promise<string[]> {
+  const normalized = normalizeBankOrder(order);
+  await touchQuestionBankPreferences([[BANK_ORDER_KEY, normalized]]);
+  return normalized;
+}
+
+export async function loadQuestionBankSortMode(): Promise<QuestionBankSortMode> {
+  return normalizeSortMode(await readValue<unknown>(SORT_MODE_KEY));
+}
+
+export async function saveQuestionBankSortMode(mode: QuestionBankSortMode): Promise<QuestionBankSortMode> {
+  const normalized = normalizeSortMode(mode);
+  await touchQuestionBankPreferences([[SORT_MODE_KEY, normalized]]);
+  return normalized;
 }
 
 export async function listQuestionBanks(): Promise<SavedQuestionBank[]> {
@@ -202,11 +262,14 @@ export async function loadActiveBank(): Promise<SavedQuestionBank | null> {
 
 export async function saveQuestionBank(input: QuestionBankInput, makeActive = false): Promise<SavedQuestionBank> {
   const bank = normalizeBank(input);
+  const deletions = normalizeDeletedBanks(await readValue<unknown>(DELETED_BANKS_KEY));
+  if (deletions[bank.id] && bank.updatedAt > deletions[bank.id]) delete deletions[bank.id];
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
     store.put(bank, bankKey(bank.id));
+    store.put(deletions, DELETED_BANKS_KEY);
     if (makeActive) store.put(bank.id, ACTIVE_ID_KEY);
     store.delete(LEGACY_ACTIVE_KEY);
     transaction.oncomplete = () => { database.close(); notifySyncChange(); resolve(bank); };
@@ -251,11 +314,14 @@ export async function updateQuestionBankDetails(
 }
 
 export async function deleteQuestionBank(id: string): Promise<void> {
+  const deletions = normalizeDeletedBanks(await readValue<unknown>(DELETED_BANKS_KEY));
+  deletions[id] = new Date().toISOString();
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
     store.delete(bankKey(id));
+    store.put(deletions, DELETED_BANKS_KEY);
     const activeRequest = store.get(ACTIVE_ID_KEY);
     activeRequest.onsuccess = () => {
       if (activeRequest.result === id) store.delete(ACTIVE_ID_KEY);
@@ -279,23 +345,49 @@ export async function clearActiveBank(): Promise<void> {
 
 export async function exportQuestionBankSyncBundle(): Promise<QuestionBankSyncBundle> {
   return {
-    version: 1,
+    version: 2,
     activeBankId: await readValue<string>(ACTIVE_ID_KEY) ?? null,
     banks: await listQuestionBanks(),
     groupOrder: await loadQuestionBankGroupOrder(),
+    bankOrder: await loadQuestionBankOrder(),
+    sortMode: await loadQuestionBankSortMode(),
+    deletedBanks: normalizeDeletedBanks(await readValue<unknown>(DELETED_BANKS_KEY)),
+    preferencesUpdatedAt: await readValue<string>(PREFERENCES_UPDATED_AT_KEY) ?? new Date(0).toISOString(),
   };
 }
 
 export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ merged: number; activeBankId: string | null }> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { merged: 0, activeBankId: null };
   const bundle = value as Partial<QuestionBankSyncBundle>;
-  if (bundle.version !== 1 || !Array.isArray(bundle.banks)) return { merged: 0, activeBankId: null };
+  if ((bundle.version !== 1 && bundle.version !== 2) || !Array.isArray(bundle.banks)) return { merged: 0, activeBankId: null };
   const local = new Map((await listQuestionBanks()).map((bank) => [bank.id, bank]));
+  const localDeletions = normalizeDeletedBanks(await readValue<unknown>(DELETED_BANKS_KEY));
+  const remoteDeletions = normalizeDeletedBanks(bundle.deletedBanks);
+  const mergedDeletions = { ...localDeletions };
+  for (const [id, deletedAt] of Object.entries(remoteDeletions)) {
+    if (!mergedDeletions[id] || deletedAt > mergedDeletions[id]) mergedDeletions[id] = deletedAt;
+  }
   let merged = 0;
+  for (const [id, deletedAt] of Object.entries(mergedDeletions)) {
+    const current = local.get(id);
+    if (current && deletedAt >= current.updatedAt) {
+      await deleteQuestionBank(id);
+      // Keep the newest local tombstone. deleteQuestionBank intentionally
+      // refreshes it so a device that has just learned about the deletion can
+      // never upload the removed bank again with an older timestamp.
+      mergedDeletions[id] = new Date().toISOString();
+      local.delete(id);
+      merged += 1;
+    }
+  }
   for (const candidate of bundle.banks.slice(0, 40)) {
     if (!candidate || typeof candidate.id !== "string" || candidate.id.length > 160 || !Array.isArray(candidate.questions) || !candidate.questions.length) continue;
     if (candidate.questions.length > 25_000) continue;
     const current = local.get(candidate.id);
+    const candidateUpdatedAt = typeof candidate.updatedAt === "string" && !Number.isNaN(Date.parse(candidate.updatedAt))
+      ? candidate.updatedAt
+      : new Date(0).toISOString();
+    if (mergedDeletions[candidate.id] && mergedDeletions[candidate.id] >= candidateUpdatedAt) continue;
     if (current?.updatedAt && (!candidate.updatedAt || current.updatedAt >= candidate.updatedAt)) continue;
     await saveQuestionBank({
       id: candidate.id,
@@ -309,10 +401,20 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
     });
     merged += 1;
   }
+  await writeValues([[DELETED_BANKS_KEY, mergedDeletions]], false);
   const activeBankId = typeof bundle.activeBankId === "string" && (await loadQuestionBank(bundle.activeBankId)) ? bundle.activeBankId : null;
   const localActiveBankId = await readValue<string>(ACTIVE_ID_KEY) ?? null;
   if (activeBankId && activeBankId !== localActiveBankId) await activateQuestionBank(activeBankId);
-  if (Array.isArray(bundle.groupOrder)) await saveQuestionBankGroupOrder(bundle.groupOrder);
+  const localPreferencesUpdatedAt = await readValue<string>(PREFERENCES_UPDATED_AT_KEY) ?? new Date(0).toISOString();
+  const remotePreferencesUpdatedAt = typeof bundle.preferencesUpdatedAt === "string" ? bundle.preferencesUpdatedAt : new Date(0).toISOString();
+  if (remotePreferencesUpdatedAt > localPreferencesUpdatedAt) {
+    await writeValues([
+      [GROUP_ORDER_KEY, normalizeGroupOrder(bundle.groupOrder)],
+      [BANK_ORDER_KEY, normalizeBankOrder(bundle.bankOrder)],
+      [SORT_MODE_KEY, normalizeSortMode(bundle.sortMode)],
+      [PREFERENCES_UPDATED_AT_KEY, remotePreferencesUpdatedAt],
+    ]);
+  }
   return { merged, activeBankId };
 }
 

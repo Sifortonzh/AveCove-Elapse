@@ -433,10 +433,11 @@ test("tests personal and public AI connections without exposing saved keys", asy
 });
 
 test("keeps multiple imported banks and portable share files", async () => {
-  const [localBank, page, shareRoute, styles, schema] = await Promise.all([
+  const [localBank, page, shareRoute, syncRoute, styles, schema] = await Promise.all([
     text("app/lib/local-bank.ts"),
     text("app/page.tsx"),
     text("app/api/share-bank/route.ts"),
+    text("app/api/sync/route.ts"),
     text("app/globals.css"),
     text("db/init.sql"),
   ]);
@@ -458,15 +459,28 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /export async function loadQuestionBankGroupOrder/);
   assert.match(localBank, /export async function saveQuestionBankGroupOrder/);
   assert.match(localBank, /groupOrder: await loadQuestionBankGroupOrder\(\)/);
-  assert.match(localBank, /Array\.isArray\(bundle\.groupOrder\)/);
+  assert.match(localBank, /version: 2/);
+  assert.match(localBank, /deletedBanks: normalizeDeletedBanks/);
+  assert.match(localBank, /export async function loadQuestionBankOrder/);
+  assert.match(localBank, /export async function saveQuestionBankSortMode/);
+  assert.match(localBank, /mergedDeletions\[id\] = new Date\(\)\.toISOString\(\)/);
   assert.match(localBank, /featured: candidate\.featured === true/);
+  assert.match(syncRoute, /function mergeQuestionBankBundles/);
+  assert.match(syncRoute, /allowed\.questionBanks = mergeQuestionBankBundles/);
   assert.match(page, /reconcileQuestionBankGroupOrder/);
+  assert.match(page, /reconcileQuestionBankOrder/);
   assert.match(page, /function toggleSavedBankFeatured/);
   assert.match(page, /精选试卷/);
   assert.match(page, /className="featured-bank-section"/);
   assert.match(page, /aria-pressed=\{bank\.featured\}/);
+  assert.match(page, /题库排序/);
+  assert.match(page, /最近导入/);
+  assert.match(page, /自定义排序/);
+  assert.match(page, /groupVisibleLimit/);
+  assert.match(page, /展开其余 \$\{hiddenCount\} 份题库/);
   assert.match(page, /draggable onDragStart/);
   assert.match(page, /上移分组/);
+  assert.match(page, /上移题库/);
   assert.match(page, /生成导入链接/);
   assert.match(page, /importBank/);
   assert.match(page, /function IncomingBankShareModal/);
@@ -475,6 +489,9 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(shareRoute, /parseSharedQuestionBankPackage/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS shared_question_banks/);
   assert.match(styles, /\.bank-group-order/);
+  assert.match(styles, /\.bank-sort-control/);
+  assert.match(styles, /\.bank-item-order/);
+  assert.match(styles, /\.bank-group-toggle/);
   assert.match(styles, /\.featured-bank-grid/);
   assert.match(styles, /\.bank-feature-toggle/);
   assert.match(styles, /\.share-link-result/);
@@ -826,7 +843,7 @@ test("offers five-subject filtering only for modern Western Medicine 306 banks",
   assert.match(styles, /\.western306-subject-grid/);
 });
 
-test("ships the v1.2 study modes on the restrained Spatial Bento interface", async () => {
+test("ships the v1.2 library experience on the restrained Spatial Bento interface", async () => {
   const [page, styles, packageJson, readme, readmeZh, nextConfig, dockerfile] = await Promise.all([
     text("app/page.tsx"),
     text("app/globals.css"),
@@ -837,7 +854,7 @@ test("ships the v1.2 study modes on the restrained Spatial Bento interface", asy
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.2\.3"/);
+  assert.match(packageJson, /"version": "1\.2\.4"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);
