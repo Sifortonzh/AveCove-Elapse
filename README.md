@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.2.4" src="https://img.shields.io/badge/version-1.2.4-b43d35" />
+  <img alt="Version 1.3.0" src="https://img.shields.io/badge/version-1.3.0-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -49,6 +49,8 @@ Version `1.2.2` adds subject-only practice for modern 165-question Western Medic
 Version `1.2.3` makes self-hosted production builds safer on small servers by using Next.js' memory-optimized Webpack worker and a bounded Node.js build heap.
 
 Version `1.2.4` makes Question Library synchronization conflict-aware: deletions propagate to other devices instead of being restored by stale clients, featured-paper state and ordering preferences sync with the library, and long groups use responsive folding with custom/import-time/name sorting.
+
+Version `1.3.0` improves the practice workspace for touch devices: iPad gets an always-reachable answer/next control, option taps can toggle a choice while double taps rule out distractors, full-library search can open without losing the current question, and Markdown notes gain a compact preview plus reusable saved-tag suggestions.
 
 ## Highlights
 

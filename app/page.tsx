@@ -284,6 +284,7 @@ export default function HomePage() {
   const [sessionQuestions, setSessionQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
+  const [excludedOptions, setExcludedOptions] = useState<Record<string, string[]>>({});
   const [submitted, setSubmitted] = useState(false);
   const [sessionStudyMode, setSessionStudyMode] = useState<StudyMode>("standard");
   const [revealedAnswers, setRevealedAnswers] = useState<string[]>([]);
@@ -523,6 +524,7 @@ export default function HomePage() {
     };
     return [currentBank, ...questionBanks.filter((bank) => bank.id !== currentBank.id)];
   }, [activeBankId, bankName, questionBanks, questions]);
+  const knownNoteTags = useMemo(() => [...new Set(Object.values(notes).flatMap(parseNoteTags))].sort(), [notes]);
 
   function saveSettings(next: Settings) {
     const normalized = normalizeSettings(next);
@@ -745,6 +747,7 @@ export default function HomePage() {
     setRevealedAnswers([]);
     setCurrentIndex(0);
     setSelected(memorizing ? [...(firstQuestion?.answer ?? [])] : []);
+    setExcludedOptions({});
     setSubmitted(memorizing);
     setAnswerSelections({});
     setAiTexts({});
@@ -808,6 +811,7 @@ export default function HomePage() {
     setRevealedAnswers([]);
     setCurrentIndex(index);
     setSelected([]);
+    setExcludedOptions({});
     setSubmitted(false);
     setAiTexts({});
     setAiMessages([]);
@@ -818,14 +822,33 @@ export default function HomePage() {
 
   function toggleOption(label: string) {
     if (!current || submitted) return;
+    setExcludedOptions((value) => ({ ...value, [current.id]: (value[current.id] ?? []).filter((item) => item !== label) }));
     setSelected((value) => {
       const next = current.multiple
         ? value.includes(label) ? value.filter((item) => item !== label) : [...value, label]
-        : [label];
+        : value.includes(label) ? [] : [label];
       if (sessionStudyMode === "blind") {
         setAnswerSelections((answers) => ({ ...answers, [current.id]: next }));
       }
       return next;
+    });
+  }
+
+  function toggleExcludedOption(label: string) {
+    if (!current || submitted) return;
+    setSelected((value) => value.filter((item) => item !== label));
+    if (sessionStudyMode === "blind") {
+      setAnswerSelections((answers) => ({
+        ...answers,
+        [current.id]: (answers[current.id] ?? []).filter((item) => item !== label),
+      }));
+    }
+    setExcludedOptions((value) => {
+      const currentExcluded = value[current.id] ?? [];
+      const next = currentExcluded.includes(label)
+        ? currentExcluded.filter((item) => item !== label)
+        : [...currentExcluded, label];
+      return { ...value, [current.id]: next };
     });
   }
 
@@ -1440,6 +1463,7 @@ export default function HomePage() {
           total={sessionQuestions.length}
           examScore={sessionExamScore}
           selected={selected}
+          excluded={excludedOptions[current.id] ?? []}
           submitted={submitted}
           studyMode={sessionStudyMode}
           result={progress[current.id]}
@@ -1455,6 +1479,8 @@ export default function HomePage() {
           mobilePanel={showMobilePanel}
           onHome={() => setView("home")}
           onToggleOption={toggleOption}
+          onExcludeOption={toggleExcludedOption}
+          onSearch={() => setShowSearch(true)}
           onSubmit={submitAnswer}
           onPrevious={goPreviousQuestion}
           onNext={goNextQuestion}
@@ -1471,6 +1497,7 @@ export default function HomePage() {
           onRequireLogin={() => setShowAccount(true)}
           onMobilePanel={() => setShowMobilePanel((value) => !value)}
           onEditQuestion={reviseCurrentQuestion}
+          knownNoteTags={knownNoteTags}
         />
       ) : (
         <EmptySession onHome={() => setView("home")} />
@@ -1500,7 +1527,7 @@ export default function HomePage() {
       {show306Workbench && <Western306Workbench onClose={() => setShow306Workbench(false)} onSave={save306WorkbenchResult} />}
       {showAiImport && <AiImportFallbackModal files={aiFallbackFiles} onRecognize={recognizeFileWithAi} onClose={() => { setShowAiImport(false); setAiFallbackFiles([]); }} />}
       {answerTargetBank && <AnswerImportModal bank={answerTargetBank} onMerge={mergeAnswerFile} onClose={() => setAnswerTargetBank(null)} />}
-      {showSearch && <SearchModal banks={searchableBanks} onOpen={async (bank, questionId) => { if (bank.id === "__demo__") openQuestion(questionId); else { await openSavedQuestion(bank, questionId); setShowSearch(false); } }} onClose={() => setShowSearch(false)} />}
+      {showSearch && <SearchModal banks={searchableBanks} returnToQuiz={view === "quiz" && Boolean(current)} onOpen={async (bank, questionId) => { if (bank.id === "__demo__") openQuestion(questionId); else { await openSavedQuestion(bank, questionId); setShowSearch(false); } }} onClose={() => setShowSearch(false)} />}
       {showNotes && <NotesModal questions={questions} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
       {showAccount && <AccountModal account={account} syncStatus={syncStatus} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pushRemoteState(true)} onExport={() => { void exportLearningRecord(); }} onImport={importLearningRecord} />}
       {incomingBankShare && <IncomingBankShareModal share={incomingBankShare} onImport={() => void importIncomingBankShare()} onClose={clearIncomingBankShare} />}
@@ -1927,21 +1954,22 @@ function IncomingBankShareModal({ share, onImport, onClose }: {
 }
 
 function QuizView(props: {
-  current: QuizQuestion; currentIndex: number; total: number; selected: string[]; submitted: boolean; studyMode: StudyMode;
+  current: QuizQuestion; currentIndex: number; total: number; selected: string[]; excluded: string[]; submitted: boolean; studyMode: StudyMode;
   examScore?: { earned: number; answeredMaximum: number; total: number };
   result?: "correct" | "wrong"; favorite: boolean; note: string; aiMode: AiMode;
   aiTexts: Partial<Record<AiMode, string>>; aiMessages: AiMessage[]; aiLoading: boolean; mobilePanel: boolean;
   nickname: string; account: AccountSession | null; comments: SharedComment[];
-  onHome: () => void; onToggleOption: (label: string) => void; onSubmit: () => void;
+  onHome: () => void; onToggleOption: (label: string) => void; onExcludeOption: (label: string) => void; onSubmit: () => void;
   onPrevious: () => void; onNext: () => void; onFavorite: () => void; onAnswerSheet: () => void;
   onSettings: () => void; onNote: (value: string) => void; onAi: (mode: AiMode) => void;
   onFollowUp: (text: string) => void; onComment: (text: string) => void;
   onLikeComment: (commentId: string) => void; onReportComment: (commentId: string) => void;
-  onDeleteComment: (commentId: string) => void; onRequireLogin: () => void; onMobilePanel: () => void;
+  onDeleteComment: (commentId: string) => void; onRequireLogin: () => void; onMobilePanel: () => void; onSearch: () => void;
   onEditQuestion: (question: QuizQuestion) => Promise<void>;
+  knownNoteTags: string[];
 }) {
   const [editingQuestion, setEditingQuestion] = useState(false);
-  const { current, currentIndex, total, selected, submitted, studyMode, result, favorite, note, aiMode, aiTexts, aiMessages, aiLoading, examScore } = props;
+  const { current, currentIndex, total, selected, excluded, submitted, studyMode, result, favorite, note, aiMode, aiTexts, aiMessages, aiLoading, examScore } = props;
   const progress = Math.round(((currentIndex + 1) / total) * 100);
   const answerAvailable = current.answer.length > 0;
   const memorizing = studyMode === "memorize";
@@ -1957,12 +1985,13 @@ function QuizView(props: {
     <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><span>{current.category}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""}</span><div><i style={{ width: `${progress}%` }} /></div><b>{currentIndex + 1} / {total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
-        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? ` · ${current.sharedOptionGroup}` : ""}</span>}</div><div className="question-top-actions"><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)}><Pencil size={16} />纠错编辑</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已收藏" : "收藏"}</button></div></div>
-        <article className="question-body"><h1>{current.stem}</h1><p className="choose-hint">{chooseHint}</p><div className="answer-options">{current.options.map((option) => {
+        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? ` · ${current.sharedOptionGroup}` : ""}</span>}</div><div className="question-top-actions"><button className="question-search-trigger" onClick={props.onSearch}><Search size={16} />搜题</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)}><Pencil size={16} />纠错编辑</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已收藏" : "收藏"}</button></div></div>
+        <article className="question-body"><h1>{current.stem}</h1><p className="choose-hint">{chooseHint}<span className="option-gesture-hint">单击选择或取消 · 双击排除干扰项</span></p><div className="answer-options">{current.options.map((option) => {
           const picked = selected.includes(option.label);
+          const ruledOut = excluded.includes(option.label);
           const isAnswer = submitted && current.answer.includes(option.label);
           const isWrong = submitted && picked && !current.answer.includes(option.label);
-          return <button key={option.label} className={`answer-option ${picked ? "selected" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} onClick={() => props.onToggleOption(option.label)}><span>{option.label}</span><p>{option.text}</p>{isAnswer && <Check size={18} />}{isWrong && <X size={18} />}</button>;
+          return <button key={option.label} className={`answer-option ${picked ? "selected" : ""} ${ruledOut ? "excluded" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} aria-pressed={picked} title={ruledOut ? "已排除；单击可重新选择，双击取消排除" : "单击选择或取消，双击排除"} onClick={() => props.onToggleOption(option.label)} onDoubleClick={(event) => { event.preventDefault(); props.onExcludeOption(option.label); }}><span>{option.label}</span><p>{option.text}</p>{ruledOut && !submitted ? <X className="excluded-mark" size={18} /> : isAnswer ? <Check size={18} /> : isWrong ? <X size={18} /> : null}</button>;
         })}</div></article>
         {memorizing && answerAvailable && <div className="result-strip memorize-answer"><span><Eye /></span><div><strong>标准答案已展开</strong><p>题库答案：{current.answer.join("、")} · 背题模式不会计入对错记录</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
         {!memorizing && submitted && answerAvailable && <div className={`result-strip ${result}`}><span>{result === "correct" ? <CheckCircle2 /> : <AlertCircle />}</span><div><strong>{result === "correct" ? "答对了，知识点已加深" : "这道题值得加入复盘"}</strong><p>你的答案：{selected.join("、")} · 题库答案：{current.answer.join("、")}</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
@@ -1971,10 +2000,11 @@ function QuizView(props: {
         {!memorizing && !submitted && <div className={`mobile-submit-bar ${blind ? "blind" : ""}`}><button onClick={props.onSubmit} disabled={!selected.length}>{blind ? <Eye size={18} /> : <CheckCircle2 size={18} />}{blind && answerAvailable ? "对答案" : answerAvailable ? "确认答案" : "锁定作答"}</button><small>{selected.length ? `已选择 ${selected.join("、")}` : blind ? "可先选答案并继续做题" : "选择答案后再确认"}</small></div>}
         <div className={`quiz-actions ${blind && !submitted ? "blind-actions" : ""}`}>{blind && !submitted ? <button className="blind-check-action" onClick={props.onSubmit} disabled={!selected.length}><Eye size={17} />{answerAvailable ? "对答案" : "锁定作答"}</button> : <button className="subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>}{submitted || memorizing || blind ? <button className="primary-action" onClick={props.onNext}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length}>{answerAvailable ? "提交答案" : "锁定作答"}<ArrowRight size={17} /></button>}</div>
       </section>
-      <LearningPanel current={current} submitted={submitted && answerAvailable} note={note} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} />
+      <LearningPanel current={current} submitted={submitted && answerAvailable} note={note} knownNoteTags={props.knownNoteTags} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} />
     </div>
+    <button className="tablet-quiz-action" onClick={submitted || memorizing || blind ? props.onNext : props.onSubmit} disabled={!submitted && !memorizing && !blind && !selected.length}>{submitted || memorizing || blind ? <><span>下一题</span><ChevronRight /></> : <><CheckCircle2 /><span>确认答案</span></>}</button>
     <nav className="quiz-bottom"><button onClick={props.onPrevious}><ChevronLeft /><span>上一题</span></button><button onClick={props.onAnswerSheet}><ListChecks /><span>答题卡</span></button><button className={favorite ? "active" : ""} onClick={props.onFavorite}><Star fill={favorite ? "currentColor" : "none"} /><span>收藏</span></button><button onClick={props.onMobilePanel}><MessageCircle /><span>学习区</span></button><button onClick={props.onSettings}><Settings2 /><span>设置</span></button><button className="mobile-next" onClick={props.onNext}><ChevronRight /><span>下一题</span></button></nav>
-      {props.mobilePanel && <div className="mobile-learning"><button className="drawer-close" aria-label="关闭学习区" onClick={props.onMobilePanel}><X /></button><LearningPanel current={current} submitted={submitted && answerAvailable} note={note} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} /></div>}
+      {props.mobilePanel && <div className="mobile-learning"><button className="drawer-close" aria-label="关闭学习区" onClick={props.onMobilePanel}><X /></button><LearningPanel current={current} submitted={submitted && answerAvailable} note={note} knownNoteTags={props.knownNoteTags} aiMode={aiMode} aiTexts={aiTexts} aiMessages={aiMessages} aiLoading={aiLoading} nickname={props.nickname} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onFollowUp={props.onFollowUp} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} /></div>}
       {editingQuestion && <QuestionCorrectionModal question={current} onSave={props.onEditQuestion} onClose={() => setEditingQuestion(false)} />}
   </div>;
 }
@@ -2053,8 +2083,8 @@ function QuestionCorrectionModal({ question, onSave, onClose }: {
   </div>;
 }
 
-function LearningPanel({ current, submitted, note, aiMode, aiTexts, aiMessages, aiLoading, nickname, account, comments, onNote, onAi, onFollowUp, onComment, onLikeComment, onReportComment, onDeleteComment, onRequireLogin }: {
-  current: QuizQuestion; submitted: boolean; note: string; aiMode: AiMode;
+function LearningPanel({ current, submitted, note, knownNoteTags, aiMode, aiTexts, aiMessages, aiLoading, nickname, account, comments, onNote, onAi, onFollowUp, onComment, onLikeComment, onReportComment, onDeleteComment, onRequireLogin }: {
+  current: QuizQuestion; submitted: boolean; note: string; knownNoteTags: string[]; aiMode: AiMode;
   aiTexts: Partial<Record<AiMode, string>>; aiMessages: AiMessage[]; aiLoading: boolean;
   nickname: string; account: AccountSession | null; comments: SharedComment[]; onNote: (value: string) => void; onAi: (mode: AiMode) => void;
   onFollowUp: (text: string) => void; onComment: (text: string) => void;
@@ -2088,9 +2118,15 @@ function LearningPanel({ current, submitted, note, aiMode, aiTexts, aiMessages, 
     if (next !== note) onNote(next);
     setTagDraft("");
   };
+  const addKnownTag = (tag: string) => {
+    const next = appendTagToNote(note, tag, current);
+    if (next !== note) onNote(next);
+  };
+  const currentTags = parseNoteTags(note);
+  const suggestedTags = knownNoteTags.filter((tag) => !currentTags.includes(tag)).slice(0, 16);
   return <aside className="learning-panel"><div className="learning-heading"><div><span>AI 学习讨论区</span><h2>把这道题真正弄懂</h2></div><span className="beta">BETA</span></div><div className="learning-tabs">{modes.map((mode) => <button key={mode.id} className={aiMode === mode.id ? "active" : ""} onClick={() => onAi(mode.id)}>{mode.icon}{mode.label}</button>)}</div>
     <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>AI 学习助理 · 针对当前题目</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>提交答案后开放讨论，避免提前泄露答案。</p></div> : <>{aiTexts[aiMode] && <p className="ai-copy">{aiTexts[aiMode]}</p>}{aiMode === "companion" && aiMessages.length > 0 && <div className="chat-thread">{aiMessages.map((message, index) => <p key={`${message.role}-${index}`} className={message.role}>{message.text}</p>)}</div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入我的笔记</button>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !aiTexts[aiMode] && !(aiMode === "companion" && aiMessages.length) && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心考点，并解释其他选项。` : aiMode === "pitfall" ? "识别题干里的否定词、相似概念和最容易混淆的选项。" : "没听懂也没关系，我会换一种方式继续讲，直到你能复述。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}{aiMode === "companion" && <div className="followup-form"><input value={followUp} onChange={(event) => setFollowUp(event.target.value)} onKeyDown={(event) => event.key === "Enter" && sendFollowUp()} placeholder="继续追问，例如：能换个例子吗？" /><button onClick={sendFollowUp} disabled={!followUp.trim() || aiLoading} aria-label="发送追问"><Send size={15} /></button></div>}</>}<div className="comment-actions"><button><ThumbsUp size={15} />有帮助</button><span>内容仅用于学习辅助</span></div></div>
-    <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-mode-tabs"><button className={!notePreview ? "active" : ""} onClick={() => setNotePreview(false)}>Markdown 编辑</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview(true)}>预览</button></div>{notePreview ? <MarkdownNotePreview value={note} /> : <textarea value={note} onChange={(event) => onNote(event.target.value)} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} />}{parseNoteTags(note).length > 0 && <div className="note-tag-list">{parseNoteTags(note).map((tag) => <span key={tag}>#{tag}</span>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div><div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
+    <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note} onChange={(event) => onNote(event.target.value)} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
     <div className="community-card"><div className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>云端共享 · 有审核</span></div>{account ? <div className="comment-identity"><ShieldCheck size={15} /><span>{nickname} · 已保护身份</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={16} />登录后参与讨论</button>}<div className="comment-form"><textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="写下你的判断方法或易错提醒…" /><button onClick={sendComment} disabled={!comment.trim()}><Send size={15} />发布</button></div>{comments.length ? <div className="local-comments">{comments.slice(0, 20).map((item) => <article key={item.id}><div><b>{item.nickname}</b><time>{item.status === "pending" ? "审核中" : new Date(item.createdAt).toLocaleDateString("zh-CN")}</time></div><p>{item.text}</p><div className="comment-tools"><button onClick={() => onLikeComment(item.id)}><ThumbsUp size={13} />{item.likes || "赞"}</button>{item.own ? <button onClick={() => onDeleteComment(item.id)}><Trash2 size={13} />删除</button> : <button onClick={() => onReportComment(item.id)}><Flag size={13} />举报</button>}</div></article>)}</div> : <p className="empty-comments">还没有公开讨论，成为第一个留下学习线索的人。</p>}</div>
   </aside>;
 }
@@ -2342,10 +2378,10 @@ function AccountModal({ account, syncStatus, nickname: initialNickname, onClose,
   return <div className="modal-layer account-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose} aria-label="关闭同步窗口"><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><div className="sync-coverage"><span><Database />已导入中文题库</span><span><BookOpen />英文 Test Library</span><span><CheckCircle2 />答题记录与写作草稿</span><span><NotebookPen />收藏、错题与笔记</span></div><p className="sync-privacy-copy">原始 Word、PDF 与图片不会上传；同步的是浏览器解析后的题库内容和学习记录。请只同步你有权使用的资料。</p><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。登录后可同步解析后的中英文题库与学习记录；原始文件仍只留在你的设备。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📚 同步题库与记录</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
 }
 
-function SearchModal({ banks, onOpen, onClose }: { banks: SavedQuestionBank[]; onOpen: (bank: SavedQuestionBank, id: string) => Promise<void> | void; onClose: () => void }) {
+function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: SavedQuestionBank[]; returnToQuiz?: boolean; onOpen: (bank: SavedQuestionBank, id: string) => Promise<void> | void; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const results = useMemo(() => query.trim() ? searchQuestionBanks(banks, query, 60) : [], [banks, query]);
-  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>跨题库检索 · 按相关度排序</span><h2>搜索全部题库</h2></div><button onClick={onClose}><X /></button></header><label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="题库名、疾病、症状或知识点；多个词用空格分隔" /><kbd>{results.length}</kbd></label><div className="search-results">{query.trim() ? results.length ? results.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => void onOpen(bank, question.id)}><span>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b> · {question.category} · 原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight size={17} /></button>) : <div className="search-empty"><CircleHelp /><p>没有找到同时匹配这些关键词的题目。可减少一个词，或改用疾病、症状及题库名称。</p></div> : <div className="search-empty search-guide"><Search /><p>输入关键词后，会同时检索所有题库，并优先显示题库名、分类和题干中的精准命中。</p></div>}</div></section></div>;
+  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>跨题库检索 · 按相关度排序</span><h2>搜索全部题库</h2></div><button onClick={onClose} aria-label={returnToQuiz ? "关闭搜索并返回当前题目" : "关闭搜索"}><X /></button></header>{returnToQuiz && <button className="search-return-strip" onClick={onClose}><ChevronLeft size={16} /><span><strong>当前练习已为你保留</strong><small>关闭搜索即可回到刚才的题目与已选答案</small></span></button>}<label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="题库名、疾病、症状或知识点；多个词用空格分隔" /><kbd>{results.length}</kbd></label><div className="search-results">{query.trim() ? results.length ? results.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => void onOpen(bank, question.id)}><span>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b> · {question.category} · 原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight size={17} /></button>) : <div className="search-empty"><CircleHelp /><p>没有找到同时匹配这些关键词的题目。可减少一个词，或改用疾病、症状及题库名称。</p></div> : <div className="search-empty search-guide"><Search /><p>输入关键词后，会同时检索所有题库，并优先显示题库名、分类和题干中的精准命中。</p></div>}</div></section></div>;
 }
 
 function NotesModal({ questions, notes, onOpen, onClose }: { questions: QuizQuestion[]; notes: Record<string, string>; onOpen: (id: string) => void; onClose: () => void }) {

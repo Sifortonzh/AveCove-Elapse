@@ -843,7 +843,7 @@ test("offers five-subject filtering only for modern Western Medicine 306 banks",
   assert.match(styles, /\.western306-subject-grid/);
 });
 
-test("ships the v1.2 library experience on the restrained Spatial Bento interface", async () => {
+test("ships the v1.3 practice and library experience on the restrained Spatial Bento interface", async () => {
   const [page, styles, packageJson, readme, readmeZh, nextConfig, dockerfile] = await Promise.all([
     text("app/page.tsx"),
     text("app/globals.css"),
@@ -854,7 +854,7 @@ test("ships the v1.2 library experience on the restrained Spatial Bento interfac
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.2\.4"/);
+  assert.match(packageJson, /"version": "1\.3\.0"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);
@@ -1040,6 +1040,21 @@ test("separates personal BYOK AI from administrator-wide AI", async () => {
   assert.match(testRoute, /publicAiErrorMessage/);
   assert.match(providers, /provider\.id === "custom"/);
   assert.match(adminPage, /公共 AI 配置/);
+});
+
+test("keeps touch practice controls, in-quiz search, and reusable note tags discoverable", async () => {
+  const [page, styles] = await Promise.all([text("app/page.tsx"), text("app/globals.css")]);
+
+  assert.match(page, /onDoubleClick=.*onExcludeOption/);
+  assert.match(page, /单击选择或取消 · 双击排除干扰项/);
+  assert.match(page, /className="tablet-quiz-action"/);
+  assert.match(page, /returnToQuiz=\{view === "quiz"/);
+  assert.match(page, /关闭搜索即可回到刚才的题目与已选答案/);
+  assert.match(page, /已存标签/);
+  assert.match(page, /Markdown 显示效果/);
+  assert.match(styles, /pointer:coarse/);
+  assert.match(styles, /answer-option\.excluded/);
+  assert.match(styles, /note-preview-compact/);
 });
 
 test("ships shared data, moderation, branding, and deployment material", async () => {
