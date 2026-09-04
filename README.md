@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.3.2" src="https://img.shields.io/badge/version-1.3.2-b43d35" />
+  <img alt="Version 1.3.3" src="https://img.shields.io/badge/version-1.3.3-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -50,7 +50,7 @@ Version `1.2.3` makes self-hosted production builds safer on small servers by us
 
 Version `1.2.4` makes Question Library synchronization conflict-aware: deletions propagate to other devices instead of being restored by stale clients, featured-paper state and ordering preferences sync with the library, and long groups use responsive folding with custom/import-time/name sorting.
 
-Version `1.3.2` refines the iPad question workspace with a persistent action path, live accuracy, explicit correct/wrong labels, stronger option states, and a simpler learning panel organized as Summary, Source Explanation, and Related Concepts. Version `1.3.1` fixed the iPad landscape home layout, while Version `1.3.0` improved touch practice controls, in-session search, option interactions, and Markdown notes.
+Version `1.3.3` adds an exam-like typography layer: Times New Roman for English test content and Song-style fallbacks for Chinese stems, options, and source explanations. It includes the `1.3.2` iPad refinements: a persistent action path, live accuracy, explicit correct/wrong labels, stronger option states, and a simpler learning panel organized as Summary, Source Explanation, and Related Concepts.
 
 ## Highlights
 

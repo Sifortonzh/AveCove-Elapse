@@ -387,8 +387,11 @@ input,textarea,select{padding-block:12px}
 
 /* v1.3.2: clearer iPad judging states and a calmer three-part learning workspace. */
 .quiz-header-progress>b{white-space:nowrap}
+.question-body h1,.answer-option p,.source-explanation .markdown-note-preview,.original-explanation-panel .markdown-note-preview{font-family:"Times New Roman","Songti SC","STSong","SimSun",serif}
+.question-body h1{font-weight:600;letter-spacing:.012em}
+.answer-option p{font-weight:400;line-height:1.72}
+.english-product :is(.cloze-copy,.english-passage,.reading-questions h3,.reading-questions>button span,.imported-passage,.imported-question-card h3,.imported-question-card>div:first-of-type>button span,.translation-segment-list p,.writing-prompt h2,.writing-editor textarea,.demo-translation blockquote,.demo-translation textarea,.translation-reference p){font-family:"Times New Roman",Times,serif}
 .answer-option{grid-template-columns:32px minmax(0,1fr) auto}
-.answer-option p{font-weight:500}
 .answer-option.selected{border-width:2px;box-shadow:0 0 0 3px color-mix(in srgb,var(--bean) 12%,transparent)}
 .answer-option.excluded:not(.correct):not(.wrong){opacity:.72}
 .answer-state-label{min-width:66px;padding:5px 8px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:.72rem!important;font-style:normal;font-weight:750;white-space:nowrap}

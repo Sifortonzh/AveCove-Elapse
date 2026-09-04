@@ -320,6 +320,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /answer-state-label correct-label/);
   assert.match(page, /answer-state-label wrong-label/);
   assert.match(styles, /iPad judging states/);
+  assert.match(styles, /"Times New Roman","Songti SC","STSong","SimSun",serif/);
   assert.doesNotMatch(page, /红豆伴学/);
   assert.doesNotMatch(page, /AI我在/);
   assert.match(page, /const homeQuotes/);
@@ -858,7 +859,7 @@ test("ships the v1.3 practice and library experience on the restrained Spatial B
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.3\.2"/);
+  assert.match(packageJson, /"version": "1\.3\.3"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);
