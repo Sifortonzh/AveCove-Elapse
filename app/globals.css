@@ -559,6 +559,15 @@ input,textarea,select{padding-block:12px}
 .dark .bank-overview,.dark .bento-practice{background:color-mix(in srgb,var(--surface) 92%,transparent)}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.bank-overview{background:var(--surface)}}
 
+/* iPad landscape keeps the desktop sidebar, but gives practice cards a full row. */
+@media(min-width:1121px) and (max-width:1400px){
+  .bento-practice,.bento-library-card{grid-column:1/-1}
+  .bento-practice .mode-grid{grid-template-columns:repeat(2,minmax(280px,1fr))}
+  .bento-practice .mode-card{grid-template-columns:46px minmax(0,1fr) 20px}
+  .bento-practice .mode-card p{max-width:48ch;word-break:normal;overflow-wrap:break-word}
+  .bento-library-card{min-height:230px}
+}
+
 @media(max-width:1120px){
   .home-bento{grid-template-columns:1fr}.home-bento>article,.hero-card.bento-hero,.bento-progress-card,.bento-practice,.bento-library-card,.bento-insight,.bento-ai{grid-column:1}
   .bento-progress-card{min-height:auto}.bento-progress-card .hero-progress{flex-direction:row;align-items:center}.bento-library-card{min-height:255px}

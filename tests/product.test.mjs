@@ -854,7 +854,7 @@ test("ships the v1.3 practice and library experience on the restrained Spatial B
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.3\.0"/);
+  assert.match(packageJson, /"version": "1\.3\.1"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);
@@ -866,6 +866,8 @@ test("ships the v1.3 practice and library experience on the restrained Spatial B
   assert.match(page, /className="import-workbench-grid"/);
   assert.match(page, /onClick=\{on306\}/);
   assert.match(styles, /\.home-bento\{[^}]*grid-template-columns:repeat\(12/);
+  assert.match(styles, /@media\(min-width:1121px\) and \(max-width:1400px\)\{[\s\S]*?\.bento-practice,\.bento-library-card\{grid-column:1\/-1\}/);
+  assert.match(styles, /\.bento-practice \.mode-grid\{grid-template-columns:repeat\(2,minmax\(280px,1fr\)\)\}/);
   assert.match(styles, /\.bank-card-progress/);
   assert.match(styles, /\.spatial-import-modal/);
   assert.match(styles, /font-variant-numeric:tabular-nums lining-nums/);

@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.3.0" src="https://img.shields.io/badge/version-1.3.0-b43d35" />
+  <img alt="版本 1.3.1" src="https://img.shields.io/badge/version-1.3.1-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -47,6 +47,8 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 `1.2.4` 修复题库多端同步冲突：删除操作会同步到其他设备，不再被旧设备重新带回；精选状态、分组顺序、题库顺序和排序方式一并同步；较长分组会按设备尺寸折叠，并支持自定义、导入时间与名称排序。
 
 `1.3.0` 升级触屏刷题工作区：iPad 常驻“确认/下一题”快捷按钮；单击选项可选择或取消、双击可排除干扰项；刷题中可搜索全部题库且关闭后回到原题；Markdown 笔记改为紧凑预览，并可直接复用已经保存过的标签。
+
+`1.3.1` 修复 iPad 横屏首页布局：练习模式区域在平板宽度下独占整行，四张模式卡保持两列和正常文字宽度，不再被右侧知识书架挤成逐字换行；电脑和手机布局保持原样。
 
 项目不含广告，不要求手机号或微信登录。学号只用于生成不可逆的同步标识，原始学号不会写入数据库；邮箱仅在使用者主动开启验证码登录或身份保护时使用。
 
