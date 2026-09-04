@@ -309,13 +309,17 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /本协议不排除或限制依法不得排除的责任/);
   assert.match(page, /正式上线前，站点运营者必须公布有效的版权与隐私联系邮箱/);
   assert.match(styles, /Copyright, disclaimer, and responsible-use agreement/);
-  assert.match(page, /同学讨论/);
-  assert.match(page, /云端共享 · 有审核/);
+  assert.doesNotMatch(page, /className="community-card"/);
+  assert.match(page, /AI 学习工作台/);
   assert.match(page, /学号只生成不可逆的同步标识/);
   assert.match(page, /邮箱验证码/);
   assert.match(page, /导出学习记录/);
-  assert.match(page, /askFollowUp/);
-  assert.match(page, /知微/);
+  assert.match(page, /label: "原题解析"/);
+  assert.match(page, /label: "同类考点"/);
+  assert.match(page, /正确率 \{props\.accuracy\}%/);
+  assert.match(page, /answer-state-label correct-label/);
+  assert.match(page, /answer-state-label wrong-label/);
+  assert.match(styles, /iPad judging states/);
   assert.doesNotMatch(page, /红豆伴学/);
   assert.doesNotMatch(page, /AI我在/);
   assert.match(page, /const homeQuotes/);
@@ -854,7 +858,7 @@ test("ships the v1.3 practice and library experience on the restrained Spatial B
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.3\.1"/);
+  assert.match(packageJson, /"version": "1\.3\.2"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);

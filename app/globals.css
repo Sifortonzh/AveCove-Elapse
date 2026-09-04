@@ -385,6 +385,35 @@ input,textarea,select{padding-block:12px}
   .drawer-close svg{width:25px;height:25px;stroke-width:2.8}
 }
 
+/* v1.3.2: clearer iPad judging states and a calmer three-part learning workspace. */
+.quiz-header-progress>b{white-space:nowrap}
+.answer-option{grid-template-columns:32px minmax(0,1fr) auto}
+.answer-option p{font-weight:500}
+.answer-option.selected{border-width:2px;box-shadow:0 0 0 3px color-mix(in srgb,var(--bean) 12%,transparent)}
+.answer-option.excluded:not(.correct):not(.wrong){opacity:.72}
+.answer-state-label{min-width:66px;padding:5px 8px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:.72rem!important;font-style:normal;font-weight:750;white-space:nowrap}
+.answer-state-label.correct-label{color:#22624f;background:#d8eee6}
+.answer-state-label.wrong-label{color:var(--bean);background:var(--bean-soft)}
+.answer-state-label.excluded-label{color:var(--muted);background:var(--surface-2)}
+.dark .answer-state-label.correct-label{color:#bce9d8;background:#24463a}
+.dark .answer-state-label.wrong-label{color:#ffd6d0;background:#4a2b28}
+.dark .answer-state-label.excluded-label{color:#c0cbc7;background:#263632}
+.learning-source-note{display:flex;justify-content:flex-end;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.learning-source-note span{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:right}
+.original-explanation-panel{margin-top:14px}
+.original-explanation-panel .markdown-note-preview{min-height:0;margin:0}
+.original-explanation-panel>small{display:block;margin-top:8px;color:var(--muted);font-size:.72rem}
+
+@media (min-width:621px) and (hover:none) and (pointer:coarse){
+  .quiz-actions{display:none}
+  .answer-option{grid-template-columns:38px minmax(0,1fr) auto;min-height:78px}
+}
+
+@media(max-width:620px){
+  .answer-option{grid-template-columns:36px minmax(0,1fr) auto}
+  .answer-state-label{min-width:54px;padding:5px 6px;font-size:.66rem!important}
+}
+
 /* Source explanations stay separate from AI output so imported evidence remains visible. */
 .source-explanation{margin-top:14px;padding:16px;border:1px solid color-mix(in srgb,var(--gold) 35%,var(--line));border-radius:14px;background:color-mix(in srgb,var(--gold-soft) 62%,var(--surface));box-shadow:inset 4px 0 0 color-mix(in srgb,var(--gold) 75%,transparent)}
 .source-explanation header{display:flex;align-items:center;gap:10px}.source-explanation header>span{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#82611f;background:var(--gold-soft)}
