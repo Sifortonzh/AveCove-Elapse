@@ -1,4 +1,9 @@
-# AveCove Elapse · 红豆生南国
+# AveCove Elapse
+
+### v1.3.4 · 批注与学习区优化
+
+支持左右滑动选项或点击批注入口，批注与手绘随本题笔记保存、同步。答题后可追问 AI 并把回复写入笔记；对话本身仅当前会话保留。学习区改为“解析与考点”，修复考试字体覆盖，区分精选题与精选试卷。清除本题笔记前须确认。
+ · 红豆生南国
 
 <p align="center">
   <img src="public/hongdou-logo.png" width="112" alt="AveCove Elapse 蛇形医学标识" />
@@ -17,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.3.3" src="https://img.shields.io/badge/version-1.3.3-b43d35" />
+  <img alt="版本 1.3.4" src="https://img.shields.io/badge/version-1.3.4-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -48,7 +53,7 @@ AveCove Elapse 是“红豆生南国”的可自行部署版本，目前首先�
 
 `1.3.0` 升级触屏刷题工作区：iPad 常驻“确认/下一题”快捷按钮；单击选项可选择或取消、双击可排除干扰项；刷题中可搜索全部题库且关闭后回到原题；Markdown 笔记改为紧凑预览，并可直接复用已经保存过的标签。
 
-`1.3.3` 在 `1.3.2` 的 iPad 刷题优化基础上加入考卷化字体：英文考试正文使用 Times New Roman，中文题干、选项和原题解析优先使用宋体系列；导航和操作按钮继续使用界面字体，兼顾考试观感与操作清晰度。`1.3.2` 已包含稳定底部操作、顶栏实时正确率、明确“正确 / 错误”标签、强化选项状态，以及“大神总结 / 原题解析 / 同类考点”三段式学习区。
+`1.3.4` 在 `1.3.2` 的 iPad 刷题优化基础上加入考卷化字体：英文考试正文使用 Times New Roman，中文题干、选项和原题解析优先使用宋体系列；导航和操作按钮继续使用界面字体，兼顾考试观感与操作清晰度。`1.3.2` 已包含稳定底部操作、顶栏实时正确率、明确“正确 / 错误”标签、强化选项状态，以及“大神总结 / 原题解析 / 同类考点”三段式学习区。
 
 项目不含广告，不要求手机号或微信登录。学号只用于生成不可逆的同步标识，原始学号不会写入数据库；邮箱仅在使用者主动开启验证码登录或身份保护时使用。
 
