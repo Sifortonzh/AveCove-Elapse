@@ -1,6 +1,6 @@
 # AveCove Elapse
 
-### v1.3.6 · 作答恢复与笔记图片
+### v1.3.7 · 更安全的上一题导航
 
 已解除 AI 解析及追问的站内每日额度限制，个人 AI 不再依赖额度数据库。AI 服务商自身的余额及接口限制仍然适用。
 
@@ -32,7 +32,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.3.6" src="https://img.shields.io/badge/version-1.3.6-b43d35" />
+  <img alt="版本 1.3.7" src="https://img.shields.io/badge/version-1.3.7-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />

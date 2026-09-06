@@ -1,6 +1,6 @@
 # AveCove Elapse
 
-### v1.3.6 · Keep your place
+### v1.3.7 · Safer previous navigation
 
 AI explanations and follow-up chat no longer have an application-level daily quota or depend on the usage-counter database. Provider account limits still apply.
 
@@ -32,7 +32,7 @@ Swipe an option or use its annotation button; comments and handwriting are saved
 </p>
 
 <p align="center">
-  <img alt="Version 1.3.6" src="https://img.shields.io/badge/version-1.3.6-b43d35" />
+  <img alt="Version 1.3.7" src="https://img.shields.io/badge/version-1.3.7-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
