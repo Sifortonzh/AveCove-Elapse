@@ -10,7 +10,7 @@ import {
   Star, Sun, Target, Trash2, Upload, X, Zap,
 } from "lucide-react";
 import questionBank from "./questions.json";
-import { AnnotatedOption, AiDialogue, InkNote, ChapterDirectory } from "./components/PracticeExtras";
+import { AnnotatedOption, AiDialogue, InkNote, NoteImages, ChapterDirectory } from "./components/PracticeExtras";
 import EnglishLearningView from "./components/EnglishLearningView";
 import { extractQuestionFileText, importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
 import {
@@ -159,7 +159,7 @@ function parseNoteSource(markdown: string, question: QuizQuestion) {
 
 function markdownSummary(markdown: string) {
   return markdown
-    .replace(/```elapse-ink\n[^`]+\n```/g, "手绘笔记")
+    .replace(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "笔记图片").replace(/```elapse-ink\n[^`]+\n```/g, "手绘笔记")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^>\s*(?:来源|标签|参考框架|AI整理)[：:].*$/gm, "")
     .replace(/^[-*]\s+/gm, "")
@@ -200,7 +200,7 @@ function inlineMarkdown(text: string) {
 }
 
 function MarkdownNotePreview({ value, empty = "还没有可预览的内容。" }: { value: string; empty?: string }) {
-  const lines = value.replace(/```elapse-ink\n[^`]+\n```/g, "✎ 已保存手绘笔记（进入题目查看）").replace(/\r/g, "").split("\n");
+  const lines = value.replace(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "📷 笔记图片（进入题目查看）").replace(/```elapse-ink\n[^`]+\n```/g, "✎ 已保存手绘笔记（进入题目查看）").replace(/\r/g, "").split("\n");
   const rendered = lines.map((line, index) => {
     let kind: MarkdownLineKind = "paragraph";
     let content = line;
@@ -350,6 +350,10 @@ export default function HomePage() {
           ledger: JSON.parse(localStorage.getItem("hongdou-record-ledger") ?? "{}"),
         }));
         setSettings(normalizeSettings(JSON.parse(localStorage.getItem("hongdou-settings") ?? "{}")));
+        const savedSelections = JSON.parse(localStorage.getItem("hongdou-answer-selections") ?? "{}");
+        if (savedSelections && typeof savedSelections === "object" && !Array.isArray(savedSelections)) {
+          setAnswerSelections(Object.fromEntries(Object.entries(savedSelections).filter((entry): entry is [string, string[]] => Array.isArray(entry[1]) && entry[1].every((label) => typeof label === "string" && /^[A-G]$/.test(label)))));
+        }
         setNickname(localStorage.getItem("hongdou-nickname") ?? "红豆同学");
       } catch {
         // Ignore invalid local data and keep safe defaults.
@@ -372,6 +376,10 @@ export default function HomePage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (localReady) localStorage.setItem("hongdou-answer-selections", JSON.stringify(answerSelections));
+  }, [answerSelections, localReady]);
 
   useEffect(() => {
     if (!localReady || shareImportCheckedRef.current) return;
@@ -738,7 +746,6 @@ export default function HomePage() {
     setSelected(memorizing ? [...(firstQuestion?.answer ?? [])] : []);
     setExcludedOptions({});
     setSubmitted(memorizing);
-    setAnswerSelections({});
     setAiTexts({});
     setView("quiz");
     setShowSettings(false);
@@ -768,7 +775,7 @@ export default function HomePage() {
     );
     const restoredSelection = target ? [...(answerSelections[target.id] ?? target.draftAnswer ?? [])] : [];
     setCurrentIndex(boundedIndex);
-    setSelected(memorizing ? [...(target?.answer ?? [])] : sessionStudyMode === "blind" || shouldRevealPrevious ? restoredSelection : []);
+    setSelected(memorizing ? [...(target?.answer ?? [])] : restoredSelection);
     setSubmitted(memorizing || blindRevealed || shouldRevealPrevious);
     setAiTexts({});
     setAiMode("summary");
@@ -787,7 +794,7 @@ export default function HomePage() {
       setToast("完结撒花 🎉 已经到达本轮最后一题！");
       return;
     }
-    resetQuestion(currentIndex + 1);
+    resetQuestion(currentIndex + 1, settings.showAnswerOnReturn);
   }
 
   function openQuestion(questionId: string) {
@@ -797,9 +804,9 @@ export default function HomePage() {
     setSessionStudyMode("standard");
     setRevealedAnswers([]);
     setCurrentIndex(index);
-    setSelected([]);
+    setSelected([...(answerSelections[questionId] ?? questions[index].draftAnswer ?? [])]);
     setExcludedOptions({});
-    setSubmitted(false);
+    setSubmitted(Boolean(settings.showAnswerOnReturn && progress[questionId]));
     setAiTexts({});
     setView("quiz");
     setShowSearch(false);
@@ -809,26 +816,20 @@ export default function HomePage() {
   function toggleOption(label: string) {
     if (!current || submitted) return;
     setExcludedOptions((value) => ({ ...value, [current.id]: (value[current.id] ?? []).filter((item) => item !== label) }));
-    setSelected((value) => {
-      const next = current.multiple
-        ? value.includes(label) ? value.filter((item) => item !== label) : [...value, label]
-        : value.includes(label) ? [] : [label];
-      if (sessionStudyMode === "blind") {
-        setAnswerSelections((answers) => ({ ...answers, [current.id]: next }));
-      }
-      return next;
-    });
+    const next = current.multiple
+      ? selected.includes(label) ? selected.filter((item) => item !== label) : [...selected, label]
+      : selected.includes(label) ? [] : [label];
+    setSelected(next);
+    setAnswerSelections((answers) => ({ ...answers, [current.id]: next }));
   }
 
   function toggleExcludedOption(label: string) {
     if (!current || submitted) return;
     setSelected((value) => value.filter((item) => item !== label));
-    if (sessionStudyMode === "blind") {
-      setAnswerSelections((answers) => ({
+    setAnswerSelections((answers) => ({
         ...answers,
         [current.id]: (answers[current.id] ?? []).filter((item) => item !== label),
-      }));
-    }
+    }));
     setExcludedOptions((value) => {
       const currentExcluded = value[current.id] ?? [];
       const next = currentExcluded.includes(label)
@@ -1297,6 +1298,7 @@ export default function HomePage() {
 
   async function resetSavedBankProgress(bank: SavedQuestionBank) {
     const questionIds = new Set(bank.questions.map((question) => question.id));
+    setAnswerSelections((value) => Object.fromEntries(Object.entries(value).filter(([id]) => !questionIds.has(id))));
     const nextProgress = Object.fromEntries(Object.entries(progress).filter(([id]) => !questionIds.has(id))) as Progress;
     const nextFirstProgress = Object.fromEntries(Object.entries(firstProgress).filter(([id]) => !questionIds.has(id))) as Progress;
     const nextFavorites = favorites.filter((id) => !questionIds.has(id));
@@ -1323,8 +1325,8 @@ export default function HomePage() {
     setSessionStudyMode("standard");
     setRevealedAnswers([]);
     setCurrentIndex(Math.max(0, index));
-    setSelected([]);
-    setSubmitted(false);
+    setSelected([...(answerSelections[questionId] ?? bank.questions[index]?.draftAnswer ?? [])]);
+    setSubmitted(Boolean(settings.showAnswerOnReturn && progress[questionId]));
     setAiTexts({});
   }
 
@@ -1429,7 +1431,7 @@ export default function HomePage() {
         <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} western306SubjectCounts={western306SubjectCounts} showWestern306Subjects={hasModernWestern306} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
-        <AnswerSheet questions={sessionQuestions} progress={progress} answerSelections={answerSelections} currentIndex={currentIndex} onJump={(next) => { resetQuestion(next); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
+        <AnswerSheet questions={sessionQuestions} progress={progress} favorites={favorites} answerSelections={answerSelections} currentIndex={currentIndex} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
       )}
       {showImport && (
         <ImportModal
@@ -1897,7 +1899,7 @@ function QuizView(props: {
   const memorizing = studyMode === "memorize";
   const blind = studyMode === "blind";
   const modeSuffix = blind ? " · 盲刷" : memorizing ? " · 背题" : "";
-  const questionKind = `${current.questionType ? `${current.questionType} 型题` : current.multiple ? "多选题" : "单选题"}${answerAvailable ? modeSuffix : " · 测试模式"}`;
+  const questionKind = `${current.questionType || (current.multiple ? "多" : "单")}${answerAvailable ? modeSuffix : " · 测试模式"}`;
   const chooseHint = memorizing
     ? answerAvailable ? "标准答案已直接展开；结合题干与原资料解析快速记忆" : "当前题库没有提供标准答案，暂时只能查看题干与选项"
     : blind
@@ -1907,7 +1909,7 @@ function QuizView(props: {
     <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b>正确率 {props.accuracy.toFixed(2)}% · {currentIndex + 1} / {total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
-        <button className="question-previous-top subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>
+        <button className="question-previous-top subtle-button floating-previous" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>
         <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? ` · ${current.sharedOptionGroup}` : ""}</span>}</div><div className="question-top-actions"><button className="question-search-trigger" onClick={props.onSearch}><Search size={16} />搜题</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)}><Pencil size={16} />纠错编辑</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已精选" : "精选"}</button></div></div>
         <article className="question-body"><h1>{current.stem}</h1><p className="choose-hint">{chooseHint}<span className="option-gesture-hint">单击选择或取消 · 双击排除干扰项</span></p><div className="answer-options">{current.options.map((option) => {
           const picked = selected.includes(option.label);
@@ -2043,10 +2045,11 @@ function LearningPanel({ current, submitted, note, onSearchNotes, knownNoteTags,
   const currentTags = parseNoteTags(note);
   const suggestedTags = knownNoteTags.filter((tag) => !currentTags.includes(tag)).slice(0, 16);
   return <aside className="learning-panel"><div className="learning-heading"><h2>解析与考点</h2><button className="note-search-trigger" onClick={onSearchNotes}><Search size={16} />搜索笔记</button></div><div className="learning-tabs">{modes.map((mode) => <button key={mode.id} className={aiMode === mode.id ? "active" : ""} onClick={() => onAi(mode.id)}>{mode.icon}{mode.label}</button>)}</div>
-    <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className="original-explanation-panel"><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析"}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“大神总结”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入我的笔记</button>}</> : <>{generatedText && <p className="ai-copy">{generatedText}</p>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入我的笔记</button>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}<div className="learning-source-note"><span>AI 内容仅用于学习辅助，请结合教材与原题解析核对</span></div></div>
-    {submitted && <AiDialogue key={current.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} />}
+    <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className="original-explanation-panel"><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析"}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“大神总结”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入我的笔记</button>}</> : <>{generatedText && <p className="ai-copy">{generatedText}</p>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入我的笔记</button>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
+    {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={current.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
+    <NoteImages key={`images-${current.id}`} note={note} onNote={onNote} />
     <InkNote key={`ink-${current.id}`} note={note} onNote={onNote} />
-    <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "")} onChange={(event) => onNote(event.target.value + (note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? "\n" + note.match(/```elapse-ink\n[^`]+\n```/)![0] : ""))} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
+    <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(event.target.value + "\n" + [...note.matchAll(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g)].map((match) => match[0]).join("\n") + (note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? "\n" + note.match(/```elapse-ink\n[^`]+\n```/)![0] : ""))} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
   </aside>;
 }
 
@@ -2070,8 +2073,9 @@ function SwitchRow({ label, detail, value, onChange }: { label: string; detail: 
   return <button className="switch-row" onClick={() => onChange(!value)}><div><strong>{label}</strong><span>{detail}</span></div><i className={value ? "on" : ""}><b /></i></button>;
 }
 
-function AnswerSheet({ questions, progress, answerSelections, currentIndex, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; answerSelections: Record<string, string[]>; currentIndex: number; onJump: (index: number) => void; onClose: () => void }) {
-  return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose}><X /></button></header><div className="answer-legend"><span><i className="done" />已答</span><span><i className="wrong" />错题</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => <button key={`${question.id}-${index}`} className={`${progress[question.id] ?? (answerSelections[question.id]?.length ? "done" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{index + 1}</button>)}</div></section></div>;
+function AnswerSheet({ questions, progress, favorites, answerSelections, currentIndex, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; favorites: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onJump: (index: number) => void; onClose: () => void }) {
+  const favoriteIds = new Set(favorites);
+  return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose} aria-label="关闭答题卡"><X /></button></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span>★ 精选</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => <button key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${favoriteIds.has(question.id) ? "，精选" : ""}`} className={`${progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{index + 1}{favoriteIds.has(question.id) && <span className="sheet-star">★</span>}</button>)}</div></section></div>;
 }
 
 function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; on306: () => void }) {

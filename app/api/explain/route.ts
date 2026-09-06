@@ -1,7 +1,4 @@
-import { deriveVisitorId, readSession } from "@/app/lib/server/auth";
 import { generateAiText, loadActiveAiConfig, publicAiErrorMessage, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
-import { query } from "@/app/lib/server/db";
-import { requestFingerprint } from "@/app/lib/server/rate-limit";
 
 export async function POST(request: Request) {
   const body = await request.json() as {
@@ -28,24 +25,6 @@ export async function POST(request: Request) {
   const question = body.question;
   if (!question?.stem || !question.options?.length || !question.answer?.length) {
     return Response.json({ error: "题目信息不完整。" }, { status: 400 });
-  }
-
-  const dailyLimit = Math.max(1, Number(process.env.AI_DAILY_LIMIT || 20));
-  const session = readSession(request);
-  const quotaId = session?.userId ?? deriveVisitorId(requestFingerprint(request));
-  try {
-    const usage = await query<{ request_count: number }>(
-      `INSERT INTO ai_usage (user_id, usage_day, request_count)
-       VALUES ($1, CURRENT_DATE, 1)
-       ON CONFLICT (user_id, usage_day) DO UPDATE
-       SET request_count = ai_usage.request_count + 1
-       WHERE ai_usage.request_count < $2
-       RETURNING request_count`,
-      [quotaId, dailyLimit],
-    );
-    if (!usage[0]) return Response.json({ error: `今天的 AI 伴学额度已用完（${dailyLimit} 次），明天再继续吧 🌙` }, { status: 429 });
-  } catch {
-    return Response.json({ error: "AI 额度服务暂时不可用，请稍后重试。" }, { status: 503 });
   }
 
   const modeInstruction = {

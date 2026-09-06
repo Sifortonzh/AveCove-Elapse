@@ -351,7 +351,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(styles, /\.top-actions \.profile\{[^}]*background:var\(--green\)/);
   assert.match(explainRoute, /followUp/);
   assert.match(explainRoute, /history/);
-  assert.match(explainRoute, /AI_DAILY_LIMIT/);
+  assert.doesNotMatch(explainRoute, /AI_DAILY_LIMIT|INSERT INTO ai_usage/);
   assert.match(auth, /createHmac/);
   assert.doesNotMatch(auth, /studentId.*INSERT/i);
 });
@@ -859,7 +859,7 @@ test("ships the v1.3 practice and library experience on the restrained Spatial B
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.3\.5"/);
+  assert.match(packageJson, /"version": "1\.3\.6"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import { readPersonalAiConfig } from "../lib/personal-ai";
 import type { QuizQuestion } from "../lib/question-parser";
 
@@ -8,18 +9,13 @@ export function AnnotatedOption({ label, note, submitted, onNote, children }: { 
   const marker = `> 选项 ${label} 批注：`;
   const value = note.split("\n").find((line) => line.startsWith(marker))?.slice(marker.length) ?? "";
   const [editing, setEditing] = useState(false);
-  const start = useRef<{ x: number; y: number } | null>(null);
-  const swiped = useRef(false);
   const save = (text: string) => {
     const lines = note.split("\n").filter((line) => !line.startsWith(marker));
     onNote([...lines, ...(text ? [marker + text.replace(/\n/g, " ")] : [])].join("\n"));
   };
-  return <div className="annotated-option" onPointerDown={(e) => { start.current = { x: e.clientX, y: e.clientY }; swiped.current = false; }} onPointerUp={(e) => {
-    if (start.current && Math.abs(e.clientX - start.current.x) > 60 && Math.abs(e.clientY - start.current.y) < 35) { swiped.current = true; setEditing(true); }
-    start.current = null;
-  }} onClickCapture={(e) => { if (swiped.current) { e.preventDefault(); e.stopPropagation(); swiped.current = false; } }}>
+  return <div className="annotated-option">
     {children}<button className="option-annotation-toggle" aria-label={`${editing ? "收起" : "编辑"}选项 ${label} 批注`} title={value ? "已保存批注，点击查看" : "添加批注"} onClick={() => setEditing(!editing)}>{editing ? "×" : "✎"}{value && <i aria-hidden="true" />}</button>
-    {editing ? <input aria-label={`选项 ${label} 批注`} value={value} maxLength={500} onChange={(e) => save(e.target.value)} placeholder="左右滑动也可展开批注" /> : submitted && value && <p className="option-annotation-text">✎ {value}</p>}
+    {editing ? <textarea aria-label={`选项 ${label} 批注`} value={value} maxLength={500} onChange={(e) => save(e.target.value)} placeholder="输入批注，也可使用 iPad 随手写" /> : submitted && value && <p className="option-annotation-text">✎ {value}</p>}
   </div>;
 }
 
@@ -54,6 +50,34 @@ export function AiDialogue({ question, onSave }: { question: QuizQuestion; onSav
 }
 
 type Point = [number, number];
+export function NoteImages({ note, onNote }: { note: string; onNote: (value: string) => void }) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const latest = useRef(note);
+  useEffect(() => { latest.current = note; }, [note]);
+  const images = [...note.matchAll(/!\[笔记图片\]\((data:image\/jpeg;base64,[A-Za-z0-9+/=]+)\)/g)];
+  async function add(file: File) {
+    setError(""); setBusy(true);
+    const url = URL.createObjectURL(file);
+    try {
+      if (file.size > 20_000_000) throw new Error("请选择小于 20 MB 的图片");
+      const image = new window.Image(); image.src = url;
+      await image.decode();
+      const scale = Math.min(1, 1000 / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("无法处理图片");
+      context.fillStyle = "white"; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const data = canvas.toDataURL("image/jpeg", .7);
+      if (data.length > 350_000 || latest.current.length + data.length > 600_000) throw new Error("本题图片较多，请先删除不需要的图片");
+      onNote(`${latest.current.trimEnd()}\n\n![笔记图片](${data})\n`);
+    } catch (e) { setError(e instanceof Error ? e.message : "图片读取失败，请先转换为 JPG 或 PNG"); }
+    finally { URL.revokeObjectURL(url); setBusy(false); }
+  }
+  return <section className="note-images" tabIndex={0} aria-label="笔记图片，可粘贴图片" onPaste={(e) => { const file = [...e.clipboardData.files].find((item) => item.type.startsWith("image/")); if (file && !busy) { e.preventDefault(); void add(file); } }}><label>添加笔记图片<input type="file" accept="image/*" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void add(file); e.target.value = ""; }} /></label><small>也可点击此区域后粘贴图片</small>{busy && <p>正在保存图片…</p>}{error && <p role="alert">{error}</p>}{images.map((match, index) => <figure key={index}><Image unoptimized src={match[1]} alt={`笔记图片 ${index + 1}`} width={1000} height={750} style={{ height: "auto" }} /><button onClick={() => onNote(note.replace(match[0], ""))}>删除图片</button></figure>)}</section>;
+}
 export function InkNote({ note, onNote }: { note: string; onNote: (value: string) => void }) {
   const match = note.match(/```elapse-ink\n([^`]+)\n```/);
   let saved: Point[][] = [];

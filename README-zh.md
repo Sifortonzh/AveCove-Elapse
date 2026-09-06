@@ -1,5 +1,11 @@
 # AveCove Elapse
 
+### v1.3.6 · 作答恢复与笔记图片
+
+已解除 AI 解析及追问的站内每日额度限制，个人 AI 不再依赖额度数据库。AI 服务商自身的余额及接口限制仍然适用。
+
+前后切题、答题卡及搜题跳转恢复已选答案，同设备刷新后也保留。答题卡区分正确、错误、已选未核对，并叠加精选星标。上一题改为悬浮入口；取消滑动批注，点击后可输入多行文字或使用 iPad 随手写。笔记支持上传及粘贴压缩图片，AI 追问默认折叠。
+
 ### v1.3.5 · 紧凑刷题工作区
 
 批注入口改为小图标，未提交时默认隐藏已存批注，可主动展开。题干加粗、题卡左上增加上一题，正确率保留两位小数。点击题库名打开按已有分类整理的章节目录；学习区新增搜索笔记入口，并精简重复标题和留白。
@@ -26,7 +32,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.3.4" src="https://img.shields.io/badge/version-1.3.5-b43d35" />
+  <img alt="版本 1.3.6" src="https://img.shields.io/badge/version-1.3.6-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
