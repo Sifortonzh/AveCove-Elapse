@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### v1.3.5 · 紧凑刷题工作区
+
+批注入口改为小图标，未提交时默认隐藏已存批注，可主动展开。题干加粗、题卡左上增加上一题，正确率保留两位小数。点击题库名打开按已有分类整理的章节目录；学习区新增搜索笔记入口，并精简重复标题和留白。
+
 ### v1.3.4 · 批注与学习区优化
 
 支持左右滑动选项或点击批注入口，批注与手绘随本题笔记保存、同步。答题后可追问 AI 并把回复写入笔记；对话本身仅当前会话保留。学习区改为“解析与考点”，修复考试字体覆盖，区分精选题与精选试卷。清除本题笔记前须确认。
@@ -22,7 +26,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.3.4" src="https://img.shields.io/badge/version-1.3.4-b43d35" />
+  <img alt="版本 1.3.4" src="https://img.shields.io/badge/version-1.3.5-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />

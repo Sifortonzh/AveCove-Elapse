@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### v1.3.5 · Compact practice workspace
+
+Option annotations use compact icons and stay hidden before submission unless explicitly opened. Question stems are bold, the card has a top-left Previous button, accuracy shows two decimal places, and the bank title opens a chapter directory based on existing categories. The learning panel includes note search and removes duplicate headings and empty space.
+
 ### v1.3.4 · Practice annotations
 
 Swipe an option or use its annotation button; comments and handwriting are saved with question notes and use the existing sync. AI follow-up chat opens after submitting an answer. The learning panel is renamed, exam typography is corrected, and selected questions are distinguished from featured papers. Clearing a question note requires confirmation. AI chat history is session-only; save useful replies to notes.
@@ -22,7 +26,7 @@ Swipe an option or use its annotation button; comments and handwriting are saved
 </p>
 
 <p align="center">
-  <img alt="Version 1.3.4" src="https://img.shields.io/badge/version-1.3.4-b43d35" />
+  <img alt="Version 1.3.5" src="https://img.shields.io/badge/version-1.3.5-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />

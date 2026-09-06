@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { readPersonalAiConfig } from "../lib/personal-ai";
 import type { QuizQuestion } from "../lib/question-parser";
 
-export function AnnotatedOption({ label, note, onNote, children }: { label: string; note: string; onNote: (value: string) => void; children: ReactNode }) {
+export function AnnotatedOption({ label, note, submitted, onNote, children }: { label: string; note: string; submitted: boolean; onNote: (value: string) => void; children: ReactNode }) {
   const marker = `> 选项 ${label} 批注：`;
   const value = note.split("\n").find((line) => line.startsWith(marker))?.slice(marker.length) ?? "";
   const [editing, setEditing] = useState(false);
@@ -18,9 +18,15 @@ export function AnnotatedOption({ label, note, onNote, children }: { label: stri
     if (start.current && Math.abs(e.clientX - start.current.x) > 60 && Math.abs(e.clientY - start.current.y) < 35) { swiped.current = true; setEditing(true); }
     start.current = null;
   }} onClickCapture={(e) => { if (swiped.current) { e.preventDefault(); e.stopPropagation(); swiped.current = false; } }}>
-    {children}<button className="option-annotation-toggle" onClick={() => setEditing(!editing)}>{editing ? "收起批注" : "✎ 批注"}</button>
-    {editing ? <input aria-label={`选项 ${label} 批注`} value={value} maxLength={500} onChange={(e) => save(e.target.value)} placeholder="左右滑动也可展开批注" /> : value && <p className="option-annotation-text">✎ {value}</p>}
+    {children}<button className="option-annotation-toggle" aria-label={`${editing ? "收起" : "编辑"}选项 ${label} 批注`} title={value ? "已保存批注，点击查看" : "添加批注"} onClick={() => setEditing(!editing)}>{editing ? "×" : "✎"}{value && <i aria-hidden="true" />}</button>
+    {editing ? <input aria-label={`选项 ${label} 批注`} value={value} maxLength={500} onChange={(e) => save(e.target.value)} placeholder="左右滑动也可展开批注" /> : submitted && value && <p className="option-annotation-text">✎ {value}</p>}
   </div>;
+}
+
+export function ChapterDirectory({ questions, onOpen, onClose }: { questions: QuizQuestion[]; onOpen: (id: string) => void; onClose: () => void }) {
+  const groups = new Map<string, QuizQuestion[]>();
+  for (const question of questions) { const name = question.category || "未分类"; groups.set(name, [...(groups.get(name) ?? []), question]); }
+  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal chapter-directory" role="dialog" aria-modal="true" aria-label="章节目录" onMouseDown={(e) => e.stopPropagation()}><header><h2>章节目录 · {questions.length} 题</h2><button aria-label="关闭章节目录" onClick={onClose}>×</button></header><p>按题库已有分类显示；展开章节可直接定位题目。</p>{[...groups].map(([name, items]) => <details key={name}><summary>{name}<span>{items.length} 题 · {((items.length / questions.length) * 100).toFixed(1)}%</span></summary>{items.map((q) => <button key={q.id} onClick={() => { onOpen(q.id); onClose(); }}><b>{q.sourceNumber}</b><span>{q.stem}</span></button>)}</details>)}</section></div>;
 }
 
 export function AiDialogue({ question, onSave }: { question: QuizQuestion; onSave: (text: string) => void }) {
