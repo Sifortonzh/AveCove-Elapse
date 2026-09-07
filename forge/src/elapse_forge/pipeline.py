@@ -31,7 +31,6 @@ def run_job(
     store: JobStore, settings: Settings, row: dict, provider: OCRProvider | None = None
 ):
     artifacts = LocalStorage(settings.data)
-    provider = provider or provider_from(settings)
     payload, lease, job_id = row["payload"], row["lease"], row["id"]
     attempt = uuid.uuid4().hex
     base = f"jobs/{job_id}/attempts/{attempt}"
@@ -58,70 +57,99 @@ def run_job(
         save("preprocessing")
         tree = load_curriculum(settings, payload.get("course_id"))
         source = artifacts.path(payload["source_key"])
+        imported_document_key = payload.get("imported_document_key")
+        if imported_document_key:
+            imported = Document.model_validate_json(
+                artifacts.get(imported_document_key)
+            )
+            if imported.id != payload["sha256"]:
+                raise ValueError(
+                    "Imported MinerU result does not match source identity"
+                )
+            if len(imported.pages) != payload.get("page_count"):
+                raise ValueError("Imported MinerU result page count changed")
+            pages = imported.pages
+            raw_refs = imported.raw_output_reference
+            payload["pages_done"] = len(pages)
+            payload["ocr_signature"] = hashlib.sha256(
+                json.dumps(
+                    [payload["sha256"], imported_document_key, "mineru-hybrid-v1"]
+                ).encode()
+            ).hexdigest()
+            provider_name = "mineru-cloud-hybrid"
+        else:
+            provider = provider or provider_from(settings)
+            provider_name = provider.name
         # Invalidate checkpoints if provider/mode/backend/parser input changes.
-        signature = hashlib.sha256(
-            json.dumps(
-                [
-                    payload["sha256"],
-                    provider.name,
-                    settings.mineru_mode,
-                    settings.mineru_command,
-                    settings.mineru_api_url,
-                    settings.mineru_image,
-                    settings.mineru_backend,
-                    "preprocess-identity-v1",
-                ]
-            ).encode()
-        ).hexdigest()
-        if payload.get("ocr_signature") != signature:
-            payload["checkpoints"] = {}
-        payload["ocr_signature"] = signature
-        pages, raw_refs = [], []
-        with pymupdf.open(source) as pdf:
-            payload["page_count"] = len(pdf)
-            if len(pdf) > settings.max_pages:
-                raise ValueError("PDF exceeds configured page limit")
-            for index, original in enumerate(pdf):
-                page_number = index + 1
-                checkpoint = payload["checkpoints"].get(str(page_number))
-                if checkpoint:
-                    pages.append(
-                        Page.model_validate_json(artifacts.get(checkpoint["page_key"]))
+        if not imported_document_key:
+            signature = hashlib.sha256(
+                json.dumps(
+                    [
+                        payload["sha256"],
+                        provider_name,
+                        settings.mineru_mode,
+                        settings.mineru_command,
+                        settings.mineru_api_url,
+                        settings.mineru_image,
+                        settings.mineru_backend,
+                        "preprocess-identity-v1",
+                    ]
+                ).encode()
+            ).hexdigest()
+            if payload.get("ocr_signature") != signature:
+                payload["checkpoints"] = {}
+            payload["ocr_signature"] = signature
+            pages, raw_refs = [], []
+            with pymupdf.open(source) as pdf:
+                payload["page_count"] = len(pdf)
+                if len(pdf) > settings.max_pages:
+                    raise ValueError("PDF exceeds configured page limit")
+                for index, original in enumerate(pdf):
+                    page_number = index + 1
+                    checkpoint = payload["checkpoints"].get(str(page_number))
+                    if checkpoint:
+                        pages.append(
+                            Page.model_validate_json(
+                                artifacts.get(checkpoint["page_key"])
+                            )
+                        )
+                        raw_refs.extend(checkpoint["raw_keys"])
+                        continue
+                    save("ocr")
+                    page_key = f"{base}/pages/{page_number}"
+                    input_path = artifacts.path(f"{page_key}/input/page.pdf")
+                    input_path.parent.mkdir(parents=True, exist_ok=True)
+                    # Preserve PDF rotation/geometry and all columns, never auto-crop content.
+                    with pymupdf.open() as single:
+                        single.insert_pdf(pdf, from_page=index, to_page=index)
+                        single.save(input_path)
+                    output = artifacts.path(f"{page_key}/raw")
+                    assert provider is not None
+                    page, files = provider.recognize(
+                        input_path,
+                        output,
+                        page_number,
+                        original.rect.width,
+                        original.rect.height,
                     )
-                    raw_refs.extend(checkpoint["raw_keys"])
-                    continue
-                save("ocr")
-                page_key = f"{base}/pages/{page_number}"
-                input_path = artifacts.path(f"{page_key}/input/page.pdf")
-                input_path.parent.mkdir(parents=True, exist_ok=True)
-                # Preserve PDF rotation/geometry and all columns, never auto-crop content.
-                with pymupdf.open() as single:
-                    single.insert_pdf(pdf, from_page=index, to_page=index)
-                    single.save(input_path)
-                output = artifacts.path(f"{page_key}/raw")
-                page, files = provider.recognize(
-                    input_path,
-                    output,
-                    page_number,
-                    original.rect.width,
-                    original.rect.height,
-                )
-                page.rotation = original.rotation
-                page.preprocessing = [
-                    "identity: original displayed coordinates retained"
-                ]
-                raw_keys = [str(p.resolve().relative_to(settings.data)) for p in files]
-                normalized = artifacts.json(
-                    f"{page_key}/normalized.json", page.model_dump(mode="json")
-                )
-                payload["checkpoints"][str(page_number)] = {
-                    "page_key": normalized,
-                    "raw_keys": raw_keys,
-                }
-                payload["pages_done"] = len(payload["checkpoints"])
-                pages.append(page)
-                raw_refs.extend(raw_keys)
-                save("ocr")
+                    page.rotation = original.rotation
+                    page.preprocessing = [
+                        "identity: original displayed coordinates retained"
+                    ]
+                    raw_keys = [
+                        str(p.resolve().relative_to(settings.data)) for p in files
+                    ]
+                    normalized = artifacts.json(
+                        f"{page_key}/normalized.json", page.model_dump(mode="json")
+                    )
+                    payload["checkpoints"][str(page_number)] = {
+                        "page_key": normalized,
+                        "raw_keys": raw_keys,
+                    }
+                    payload["pages_done"] = len(payload["checkpoints"])
+                    pages.append(page)
+                    raw_refs.extend(raw_keys)
+                    save("ocr")
         document = Document(
             id=payload["sha256"],
             metadata={
@@ -130,7 +158,7 @@ def run_job(
                 "coordinate_system": "normalized-displayed-original-page",
             },
             pages=pages,
-            provider=provider.name,
+            provider=provider_name,
             raw_output_reference=raw_refs,
         )
         payload["document_key"] = artifacts.json(

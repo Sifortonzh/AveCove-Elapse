@@ -16,7 +16,12 @@ References: [MinerU CLI documentation](https://github.com/opendatalab/MinerU/blo
 
 ## Normalization dialect
 
-Phase 1 supports legacy flat `*_content_list.json`, not `*_content_list_v2.json`. Each OCR input is one original PDF page: page_idx must be 0, then remapped to original 1-based page number. Bboxes 0–1000 normalize to 0–1. Preserve text, text-level headings, list text and table-body HTML for later parsing. Reject unexpected dialects/invalid boxes instead of manufacturing text.
+Forge supports two explicitly separated dialects:
+
+- Legacy flat `*_content_list.json` from the self-hosted per-page CLI path. Each OCR input is one original PDF page: page_idx must be 0, then remapped to the original 1-based page number. Bboxes 0–1000 normalize to 0–1.
+- Official MinerU 3.x `hybrid` JSON with a document-wide `pdf_info` array. `page_idx` must be contiguous; each bbox is normalized using that page's real `page_size`. Text/inline equations, headings, table HTML, cell spans and image references are retained. The original PDF/image and result JSON are imported together through `POST /jobs/import-mineru`; optional Markdown is archival evidence only.
+
+Unexpected dialects, noncontiguous pages, invalid boxes and page-count mismatches are rejected instead of manufacturing text. Imported cloud results bypass OCR execution and cannot use per-page “retry OCR”; import a replacement result instead.
 
 Only an explicit engine `confidence` field is stored as confidence. Missing means null; layout/model scores are not substituted. Raw content lists, middle/output artifacts and subprocess log are retained. Coordinate correctness on the supplied rotated double-page scans still needs real-engine visual comparison; a schema-valid box is not proof it covers the intended text.
 
@@ -36,6 +41,8 @@ Output directory must not already exist. The script keeps original PDF page numb
 
 ## Actual status this phase
 
-`forge/benchmarks/preflight.json` records no installed `mineru` executable, no real MinerU execution and no normalized real OCR result. No remote OCR endpoint or model was provisioned. Synthetic adapter/worker tests are separate and do not count as real OCR. Phase-1 code integration exists; PDF→MinerU→Document runtime acceptance remains open.
+Two user-produced MinerU 3.4.4 hybrid results were used for a private local regression on 2026-09-07. The 21-page infectious-diseases sample preserved a question crossing PDF pages 4→5 and associated 79 answers. The 10-page military obstetrics/gynecology sample exposed a structured answer table: 64 answer entries were read, 55 linked to questions, and 13 missing X-type section labels were conservatively recovered from the answer-table section and flagged for review. These are observed integration counts, not independently annotated accuracy scores. Multi-column OCR still interleaves some options and must remain in Review.
+
+No local MinerU executable, official-cloud automatic upload client or public OCR endpoint is provisioned yet. Synthetic contract tests remain separate from real OCR evidence.
 
 Do not run heavyweight OCR or download models on the existing small production Elapse server. On Apple Silicon, native acceleration is runtime-dependent; Docker cannot be assumed to access MPS. Do not upload copyrighted/sensitive samples to an external OCR service without appropriate authorization.

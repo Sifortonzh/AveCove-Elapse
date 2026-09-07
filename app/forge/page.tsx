@@ -26,6 +26,9 @@ export default function ForgeWorkbench() {
   const [anchorIndex, setAnchorIndex] = useState(0);
   const [manualPage, setManualPage] = useState(1);
   const [jobId, setJobId] = useState("");
+  const [mineruSource, setMineruSource] = useState<File | null>(null);
+  const [mineruResult, setMineruResult] = useState<File | null>(null);
+  const [mineruMarkdown, setMineruMarkdown] = useState<File | null>(null);
   const sourceBox = useRef<HTMLDivElement>(null);
   const question = job?.payload.questions?.find((q) => q.id === selected);
   const source = question?.source[anchorIndex];
@@ -69,12 +72,16 @@ export default function ForgeWorkbench() {
   }
 
   return <main className={styles.workbench}>
-    <header><div><small>ELAPSE FORGE · FOUNDATION 0.1</small><h1>扫描题库导入工作台</h1><p>上传 → OCR → 文档关联 → 人工复核 → 导出 Elapse</p></div><Link href="/">返回 Elapse</Link></header>
+    <header><div><small>ELAPSE FORGE · FOUNDATION 0.2</small><h1>扫描题库导入工作台</h1><p>上传 → OCR → 文档关联 → 人工复核 → 导出 Elapse</p></div><Link href="/">返回 Elapse</Link></header>
     <section className={styles.controls}>
       <label>工作台访问令牌<input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" /></label>
       <button disabled={busy || !token} onClick={() => perform(async () => { setCourses(await (await api("curriculums")).json()); const capability = await (await api("capabilities")).json(); if (!capability.ocr.ready) setError(capability.ocr.issues.join("；")); })}>连接与检查配置</button>
       <label>标准课程<select value={course} onChange={(e) => setCourse(e.target.value)}><option value="">暂不映射（需后续复核）</option>{courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
       <label>上传 PDF / 图片<input type="file" accept=".pdf,.png,.jpg,.jpeg" disabled={busy || !token} onChange={(e) => { const file = e.target.files?.[0]; if (file) void perform(async () => { const body = new FormData(); body.append("file", file); body.append("course_id", course); const result = await (await api("jobs", { method: "POST", body })).json(); setJob(result); setJobId(result.id); setSelected(""); }); }} /></label>
+      <label>已完成 OCR 的原文件<input type="file" accept=".pdf,.png,.jpg,.jpeg" disabled={busy || !token} onChange={(e) => setMineruSource(e.target.files?.[0] || null)} /></label>
+      <label>MinerU JSON<input type="file" accept=".json,application/json" disabled={busy || !token} onChange={(e) => setMineruResult(e.target.files?.[0] || null)} /></label>
+      <label>MinerU Markdown（可选）<input type="file" accept=".md,text/markdown" disabled={busy || !token} onChange={(e) => setMineruMarkdown(e.target.files?.[0] || null)} /></label>
+      <button disabled={busy || !token || !mineruSource || !mineruResult} onClick={() => perform(async () => { const body = new FormData(); body.append("source_file", mineruSource!); body.append("mineru_json", mineruResult!); if (mineruMarkdown) body.append("markdown", mineruMarkdown); body.append("course_id", course); const result = await (await api("jobs/import-mineru", { method: "POST", body })).json(); setJob(result); setJobId(result.id); setSelected(""); })}>导入现成 MinerU 结果（不重复 OCR）</button>
       <label>恢复任务 ID<input value={jobId} onChange={(e) => setJobId(e.target.value)} /></label><button disabled={busy || !jobId} onClick={() => perform(async () => setJob(await (await api(`jobs/${jobId}`)).json()))}>打开 / 刷新任务</button>
     </section>
     {error && <p role="alert" className={styles.error}>{error}</p>}

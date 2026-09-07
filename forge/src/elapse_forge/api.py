@@ -1,6 +1,7 @@
 import copy
 import hashlib
 import io
+import json
 import secrets
 import uuid
 import zipfile
@@ -13,8 +14,8 @@ from fastapi.responses import Response
 from .config import Settings
 from .export import export_bank
 from .jobs import Conflict, JobStore
-from .models import Question, ReviewAction
-from .ocr import MinerUProvider
+from .models import Document, Question, ReviewAction
+from .ocr import MinerUProvider, normalize_mineru_hybrid
 from .pipeline import load_curriculum
 from .storage import LocalStorage
 from .validation import question_issues
@@ -30,7 +31,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         store.initialize()
         yield
 
-    app = FastAPI(title="Elapse Forge", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Elapse Forge", version="0.2.0", lifespan=lifespan)
     app.state.store = store
 
     def authorize(authorization: str = Header(default="")):
@@ -47,7 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "service": "elapse-forge", "version": "0.1.0"}
+        return {"status": "ok", "service": "elapse-forge", "version": "0.2.0"}
 
     @app.get("/capabilities", dependencies=[Depends(authorize)])
     def capabilities():
@@ -58,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 settings.ai_key and settings.ai_url and settings.ai_model
             ),
             "paddleocr": "not_implemented",
+            "mineru_hybrid_import": True,
             "worker_required": True,
         }
 
@@ -109,6 +111,98 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             }
         )
 
+    @app.post("/jobs/import-mineru", status_code=202, dependencies=[Depends(authorize)])
+    async def import_mineru(
+        source_file: UploadFile = File(...),
+        mineru_json: UploadFile = File(...),
+        markdown: UploadFile | None = File(default=None),
+        course_id: str = Form(default=""),
+    ):
+        """Queue an already completed official MinerU result without rerunning OCR."""
+
+        try:
+            load_curriculum(settings, course_id or None)
+        except ValueError as error:
+            raise HTTPException(422, str(error))
+
+        async def limited(upload: UploadFile, limit: int) -> bytes:
+            body = bytearray()
+            while chunk := await upload.read(1024 * 1024):
+                body.extend(chunk)
+                if len(body) > limit:
+                    raise HTTPException(413, "Imported artifact exceeds size limit")
+            return bytes(body)
+
+        source_body = await limited(source_file, settings.max_upload_bytes)
+        result_body = await limited(mineru_json, settings.max_upload_bytes)
+        markdown_body = (
+            await limited(markdown, 20 * 1024 * 1024) if markdown is not None else None
+        )
+        source_name = (
+            (source_file.filename or "upload.pdf").replace("\\", "/").split("/")[-1]
+        )
+        extension = source_name.rsplit(".", 1)[-1].lower()
+        if extension not in ("pdf", "png", "jpg", "jpeg"):
+            raise HTTPException(415, "Source must be PDF, PNG or JPEG")
+        try:
+            with pymupdf.open(stream=source_body, filetype=extension) as doc:
+                if doc.needs_pass or not 0 < len(doc) <= settings.max_pages:
+                    raise ValueError("Encrypted, empty or oversized document")
+                page_count = len(doc)
+                pdf_bytes = source_body if extension == "pdf" else doc.convert_to_pdf()
+            result = json.loads(result_body.decode("utf-8-sig"))
+            pages, mineru_metadata = normalize_mineru_hybrid(result)
+            if len(pages) != page_count:
+                raise ValueError(
+                    f"Source has {page_count} pages but MinerU result has {len(pages)}"
+                )
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+            raise HTTPException(422, f"Invalid source or MinerU result: {error}")
+        except Exception:
+            raise HTTPException(422, "Cannot read source document")
+
+        upload_id = uuid.uuid4().hex
+        source_hash = hashlib.sha256(source_body).hexdigest()
+        original_key = artifacts.put(
+            f"uploads/{upload_id}/original.{extension}", source_body
+        )
+        source_key = artifacts.put(f"uploads/{upload_id}/source.pdf", pdf_bytes)
+        raw_key = artifacts.put(f"uploads/{upload_id}/mineru-hybrid.json", result_body)
+        raw_refs = [raw_key]
+        if markdown_body is not None:
+            raw_refs.append(
+                artifacts.put(f"uploads/{upload_id}/mineru.md", markdown_body)
+            )
+        document = Document(
+            id=source_hash,
+            metadata={
+                "source_file": source_name,
+                "sha256": source_hash,
+                "coordinate_system": "normalized-displayed-original-page",
+                "mineru": mineru_metadata,
+            },
+            pages=pages,
+            provider="mineru-cloud-hybrid",
+            raw_output_reference=raw_refs,
+        )
+        document_key = artifacts.json(
+            f"uploads/{upload_id}/normalized-document.json",
+            document.model_dump(mode="json"),
+        )
+        return store.create(
+            {
+                "source_key": source_key,
+                "original_key": original_key,
+                "source_name": source_name,
+                "sha256": source_hash,
+                "course_id": course_id or None,
+                "page_count": page_count,
+                "imported_document_key": document_key,
+                "imported_mineru_key": raw_key,
+                "imported_mineru": mineru_metadata,
+            }
+        )
+
     @app.get("/jobs", dependencies=[Depends(authorize)])
     def list_jobs():
         return [
@@ -153,6 +247,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         payload = copy.deepcopy(row["payload"])
         if action.action in ("retry_parser", "retry_ocr"):
             if action.action == "retry_ocr":
+                if payload.get("imported_document_key"):
+                    raise HTTPException(
+                        422,
+                        "This job uses an imported MinerU result; import a replacement result to retry OCR",
+                    )
                 if not action.page_number or action.page_number > payload["page_count"]:
                     raise HTTPException(422, "A valid PDF page number is required")
                 payload["checkpoints"].pop(str(action.page_number), None)

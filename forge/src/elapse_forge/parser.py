@@ -25,11 +25,85 @@ TYPE_HEADINGS = {
 }
 
 
+def _question_type_heading(line: str) -> tuple[QuestionType, str] | None:
+    match = re.match(
+        r"^[【\[]?\s*(A[1-4]?型题|B1?型题|X型题|单选题|多选题|判断题|填空题|名词解释|简答题|问答题)\s*[】\]]?\s*(.*)$",
+        line,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    heading, remainder = match.groups()
+    key = next((key for key in TYPE_HEADINGS if key in heading), None)
+    return (QuestionType(TYPE_HEADINGS[key]), remainder) if key else None
+
+
+def _table_answers(block, source, document, scope, default_kind, result):
+    rows = block.metadata.get("table_rows")
+    if not isinstance(rows, list):
+        return False
+    column_kinds: dict[int, QuestionType] = {}
+    occupied: dict[int, int] = {}
+    found = False
+    for row in rows:
+        if not isinstance(row, list):
+            continue
+        column = 0
+        for cell in row:
+            while occupied.get(column, 0) > 0:
+                column += 1
+            if not isinstance(cell, dict):
+                continue
+            text = str(cell.get("text", "")).strip()
+            colspan = max(1, int(cell.get("colspan", 1)))
+            rowspan = max(1, int(cell.get("rowspan", 1)))
+            heading = next(
+                (
+                    QuestionType(value)
+                    for key, value in TYPE_HEADINGS.items()
+                    if key in text and re.search(r"题|型", text)
+                ),
+                None,
+            )
+            if heading:
+                for offset in range(colspan):
+                    column_kinds[column + offset] = heading
+            else:
+                kind = column_kinds.get(column, default_kind)
+                for pair in re.finditer(
+                    r"(?:^|\s)(\d+)\s*[.．、]\s*([A-G]+|[√×])(?=\s|$|[。；;])",
+                    text,
+                ):
+                    value = pair[2]
+                    result.answers.append(
+                        RegistryEntry(
+                            document_id=document.id,
+                            scope=scope,
+                            question_type=kind,
+                            source_question_number=pair[1],
+                            value=(
+                                ["A" if value == "√" else "B"]
+                                if value in ("√", "×")
+                                else list(value)
+                            ),
+                            source=[source],
+                        )
+                    )
+                    found = True
+            if rowspan > 1:
+                for offset in range(colspan):
+                    occupied[column + offset] = rowspan
+            column += colspan
+        occupied = {key: value - 1 for key, value in occupied.items() if value > 1}
+    return found
+
+
 def parse_document(document: Document) -> ParseResult:
     result = ParseResult()
+    chapter = ""
     scope = ""
     kind = QuestionType.UNKNOWN
-    mode = "questions"
+    mode = "ignore"
     current: Question | None = None
     entry: RegistryEntry | None = None
     option = None
@@ -46,17 +120,33 @@ def parse_document(document: Document) -> ParseResult:
                 ocr_provider=document.provider,
             )
             if block.type == "table":
-                result.unparsed_blocks.append(block.id)
-                result.issues.append(f"table_requires_parser:{block.id}")
+                if _table_answers(block, source, document, scope, kind, result):
+                    mode, current, entry, option = "answers", None, None, None
+                else:
+                    result.unparsed_blocks.append(block.id)
+                    result.issues.append(f"table_requires_review:{block.id}")
                 continue
             for raw in block.text.splitlines():
                 line = raw.strip()
                 if not line:
                     continue
-                if re.match(r"^第[一二三四五六七八九十百\d]+章", line):
-                    scope = line
+                if line == "总论":
+                    chapter = scope = line
                     kind = QuestionType.UNKNOWN
-                    mode, current, entry, option = "questions", None, None, None
+                    mode, current, entry, option = "ignore", None, None, None
+                    continue
+                if re.match(r"^第[一二三四五六七八九十百\d]+章", line):
+                    chapter = scope = line
+                    kind = QuestionType.UNKNOWN
+                    mode, current, entry, option = "ignore", None, None, None
+                    continue
+                if re.match(r"^第[一二三四五六七八九十百\d]+节", line):
+                    scope = f"{chapter} / {line}" if chapter else line
+                    kind = QuestionType.UNKNOWN
+                    mode, current, entry, option = "ignore", None, None, None
+                    continue
+                if re.fullmatch(r"[【\[]?\s*练习题\s*[】\]]?", line):
+                    mode, current, entry, option = "ignore", None, None, None
                     continue
                 if re.fullmatch(
                     r"[【\[（(]?\s*(参考答案|答案与解析|参考答案与解析|答案|解析)\s*[】\]）)]?",
@@ -69,18 +159,14 @@ def parse_document(document: Document) -> ParseResult:
                     )
                     current, entry, option = None, None, None
                     continue
-                heading = next(
-                    (
-                        v
-                        for k, v in TYPE_HEADINGS.items()
-                        if k in line and len(line) < 20 and re.search(r"题|型", line)
-                    ),
-                    None,
-                )
+                heading = _question_type_heading(line)
                 if heading:
-                    kind = QuestionType(heading)
+                    kind, line = heading
+                    if mode not in ("answers", "explanations"):
+                        mode = "questions"
                     current, entry, option = None, None, None
-                    continue
+                    if not line:
+                        continue
                 if mode == "answers":
                     pairs = list(
                         re.finditer(
@@ -126,6 +212,8 @@ def parse_document(document: Document) -> ParseResult:
                     else:
                         result.unparsed_blocks.append(block.id)
                     continue
+                if mode == "ignore":
+                    continue
                 number = re.match(r"^(\d+)\s*[.．、]\s*(.+)$", line)
                 if mode == "explanations":
                     if number:
@@ -144,6 +232,11 @@ def parse_document(document: Document) -> ParseResult:
                             entry.source.append(source)
                     continue
                 if number:
+                    body = number[2]
+                    choices = list(
+                        re.finditer(r"(?:^|(?<=[\s:：]))([A-G])[.．、]\s*", body)
+                    )
+                    stem = body[: choices[0].start()].strip() if choices else body
                     identity = f"{document.id}:{scope}:{kind}:{number[1]}:{block.id}:{len(result.questions)}"
                     current = Question(
                         id=uuid.uuid5(uuid.NAMESPACE_URL, identity).hex,
@@ -151,13 +244,27 @@ def parse_document(document: Document) -> ParseResult:
                         source_question_number=number[1],
                         scope=scope,
                         type=kind,
-                        stem=number[2],
+                        stem=stem,
                         source=[source],
                     )
                     result.questions.append(current)
                     option = None
+                    if choices:
+                        from .models import Option
+
+                        for i, choice in enumerate(choices):
+                            text = body[
+                                choice.end() : choices[i + 1].start()
+                                if i + 1 < len(choices)
+                                else len(body)
+                            ].strip()
+                            if text:
+                                option = Option(label=choice[1], text=text)
+                                current.options.append(option)
                 elif current:
-                    choices = list(re.finditer(r"(?:^|\s)([A-G])[.．、]\s*", line))
+                    choices = list(
+                        re.finditer(r"(?:^|(?<=[\s:：]))([A-G])[.．、]\s*", line)
+                    )
                     if choices:
                         from .models import Option
 
@@ -209,8 +316,26 @@ def reconcile(result: ParseResult) -> ParseResult:
                 result.issues.append(f"{field}_schema_invalid:{key(item)}")
                 continue
             registry[key(item)].append(item)
+        loose_questions: dict[tuple, list[Question]] = defaultdict(list)
+        for question in result.questions:
+            loose_questions[
+                (
+                    question.document_id,
+                    question.scope,
+                    question.source_question_number,
+                )
+            ].append(question)
         for identity, candidates in registry.items():
             targets = questions.get(identity, [])
+            if field == "answer" and not targets:
+                loose_identity = (identity[0], identity[1], identity[3])
+                loose_targets = loose_questions.get(loose_identity, [])
+                incoming_types = {item.question_type for item in candidates}
+                if len(loose_targets) == 1 and len(incoming_types) == 1:
+                    target = loose_targets[0]
+                    target.type = next(iter(incoming_types))
+                    target.flags.append("question_type_from_answer_section")
+                    targets = [target]
             unique = {
                 str(sorted(e.value)) if isinstance(e.value, list) else e.value.strip()
                 for e in candidates

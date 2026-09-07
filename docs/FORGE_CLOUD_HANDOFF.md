@@ -10,7 +10,7 @@
 
 - 基础代码提交：`1076695`（本地 main）；18 项 Forge 测试和 29 项 Elapse 测试通过，构建/类型检查通过。
 - 基础数据模型、Provider 接口、课程树、队列、复核和导出已存在。
-- **官方云 API Provider 尚未实现，未获得 Token，未上传真实文件，未完成真实 OCR 验收。**
+- **官方云 API Provider 尚未实现。Token 已由用户取得但不得写入文档、代码或 Git；用户已自行上传两份样本并提供结果，现成 hybrid JSON 导入已完成真实本地回归。**
 - 现有 `FORGE_MINERU_MODE=remote` 是自托管 MinerU CLI/API 模式，不是官方云 API。不能只改一个地址就声称接入成功。
 
 ## 用户准备
@@ -21,7 +21,7 @@
 
 ## Sol 下一步：按顺序做
 
-1. **新建独立云 Provider。** 阅读官方文档，再实现申请上传链接、上传、异步状态查询、下载结果。官方本地文件流程使用 `POST /api/v4/file-urls/batch`，批次结果使用 `GET /api/v4/extract-results/batch/{batch_id}`。精准解析提供 ZIP 中的 Markdown/JSON；免 Token 轻量接口仅返回 Markdown，不满足本项目的完整来源结构要求。不要把轻量接口当作等价降级。
+1. **新建独立云 Provider。** 现成结果入口 `POST /jobs/import-mineru` 已实现并验证，不要重做。下一步按官方文档实现申请上传链接、上传、异步状态查询、下载结果。官方本地文件流程使用 `POST /api/v4/file-urls/batch`，批次结果使用 `GET /api/v4/extract-results/batch/{batch_id}`。精准解析提供 ZIP 中的 Markdown/JSON；免 Token 轻量接口仅返回 Markdown，不满足本项目的完整来源结构要求。不要把轻量接口当作等价降级。
 2. **保护任务与密钥。** 单独服务器环境变量（例如待实现的 `FORGE_MINERU_CLOUD_TOKEN`），显式云上传同意开关。持久化服务端 batch/task ID，重启优先恢复轮询而非重复上传。限制并发、上传/下载大小、轮询时长；对 401/429/超时给出明确状态。Bearer Token 只发往官方 API，不能转发给签名上传/下载地址。
 3. **安全保留和归一化结果。** ZIP 防目录穿越/压缩炸弹；下载链接限定 HTTPS、阻断私网和不可信重定向，保留原始产物。用真实结果确认输出版本、bbox 坐标、旋转和页码；不要假定云输出与现有单页 CLI legacy content_list 完全相同。继续通过统一 Document 接入，不改 Elapse 原题库结构。
 4. **真实小样本验收。** 获得 Token 和上传授权后，先跑人卫样本相邻两页，再跑军医答案表页面。保留原始输出、normalized Document、耗时和失败日志。验收题目→原页定位、跨页选项、答案关联；没有人工 gold truth 就只报可观测统计。

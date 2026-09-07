@@ -23,7 +23,12 @@ from elapse_forge.models import (
     validate_json,
 )
 from elapse_forge.normalizer import MedicalNormalizer
-from elapse_forge.ocr import MinerUProvider, PaddleOCRProvider, normalize_mineru
+from elapse_forge.ocr import (
+    MinerUProvider,
+    PaddleOCRProvider,
+    normalize_mineru,
+    normalize_mineru_hybrid,
+)
 from elapse_forge.parser import parse_document, reconcile
 from elapse_forge.pipeline import run_job
 from elapse_forge.storage import LocalStorage
@@ -81,6 +86,77 @@ def test_cross_page_document_reconciliation(tree):
     assert q.explanation == "原文件示例解析"
 
 
+def test_type_heading_can_share_line_with_first_question():
+    doc = Document(
+        id="heading-inline",
+        metadata={"source_file": "inline.pdf"},
+        provider="synthetic-not-ocr",
+        raw_output_reference=[],
+        pages=[page(1, "第一章 示例\n[A型题] 1. 题干\nA. 甲\nB. 乙")],
+    )
+    parsed = parse_document(doc)
+    assert len(parsed.questions) == 1
+    assert parsed.questions[0].type == "single"
+    assert [option.label for option in parsed.questions[0].options] == ["A", "B"]
+
+
+def test_answer_table_can_recover_missing_question_type_heading():
+    pages, _ = normalize_mineru_hybrid(
+        {
+            "pdf_info": [
+                {
+                    "page_idx": 0,
+                    "page_size": [100, 100],
+                    "para_blocks": [
+                        {
+                            "type": "text",
+                            "bbox": [0, 0, 100, 20],
+                            "lines": [
+                                {
+                                    "spans": [
+                                        {
+                                            "type": "text",
+                                            "content": "第一章 示例\n[A型题] 1. 题干：A. 甲 B. 乙\n2. 第二题：A. 甲 B. 乙",
+                                        }
+                                    ]
+                                }
+                            ],
+                        },
+                        {
+                            "type": "table",
+                            "bbox": [0, 20, 100, 80],
+                            "blocks": [
+                                {
+                                    "lines": [
+                                        {
+                                            "spans": [
+                                                {
+                                                    "html": '<table><tr><td colspan="2">[X型题]</td></tr><tr><td>1. AB</td><td>2. A</td></tr></table>'
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ]
+        }
+    )
+    doc = Document(
+        id="table-answer",
+        metadata={"source_file": "table.pdf"},
+        provider="mineru-cloud-hybrid",
+        raw_output_reference=[],
+        pages=pages,
+    )
+    parsed = reconcile(parse_document(doc))
+    assert [q.answer for q in parsed.questions] == [["A", "B"], ["A"]]
+    assert all(q.type == "multiple" for q in parsed.questions)
+    assert all("question_type_from_answer_section" in q.flags for q in parsed.questions)
+
+
 def test_duplicate_and_scope_do_not_guess():
     result = parse_document(document())
     result.questions.append(result.questions[0].model_copy(deep=True))
@@ -118,6 +194,71 @@ def test_provider_adapter_preserves_only_real_confidence():
         Box(x0=0.9, x1=0.1, y0=0, y1=1)
     with pytest.raises(NotImplementedError):
         PaddleOCRProvider().recognize(None, None, 1, 1, 1)
+
+
+def test_hybrid_adapter_preserves_layout_equations_and_table_grid():
+    pages, metadata = normalize_mineru_hybrid(
+        {
+            "_version_name": "3.4.4",
+            "_backend": "hybrid",
+            "_ocr_enable": True,
+            "pdf_info": [
+                {
+                    "page_idx": 0,
+                    "page_size": [500, 1000],
+                    "para_blocks": [
+                        {
+                            "type": "title",
+                            "bbox": [50, 100, 450, 200],
+                            "index": 1,
+                            "level": 2,
+                            "lines": [
+                                {
+                                    "spans": [
+                                        {"type": "text", "content": "A"},
+                                        {
+                                            "type": "inline_equation",
+                                            "content": "_{1}",
+                                        },
+                                        {"type": "text", "content": "型题"},
+                                    ]
+                                }
+                            ],
+                        },
+                        {
+                            "type": "table",
+                            "bbox": [100, 300, 400, 600],
+                            "blocks": [
+                                {
+                                    "type": "table_body",
+                                    "lines": [
+                                        {
+                                            "spans": [
+                                                {
+                                                    "type": "table",
+                                                    "html": '<table><tr><td colspan="2">[A型题]</td><td>[X型题]</td></tr><tr><td>1. B</td><td>2. E</td><td>3. AC</td></tr></table>',
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+    assert metadata == {
+        "version": "3.4.4",
+        "backend": "hybrid",
+        "ocr_enabled": True,
+        "effort": None,
+    }
+    assert pages[0].blocks[0].text == "A$_{1}$型题"
+    assert pages[0].blocks[0].bbox.x0 == 0.1
+    assert pages[0].blocks[1].metadata["table_rows"][0][0]["colspan"] == 2
+    assert pages[0].blocks[1].confidence is None
 
 
 def test_schema_and_normalization(tree):

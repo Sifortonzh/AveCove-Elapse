@@ -1,8 +1,12 @@
 # AveCove Elapse
 
-### Elapse Forge · optional foundation 0.1.0
+### Elapse Forge · optional foundation 0.2.0
 
-A separate scanned-question import workbench is now scaffolded at `/forge`: background jobs, MinerU provider integration, canonical curricula, source-linked review and a compatible Elapse export adapter. Existing practice and import flows are unchanged. **Real MinerU runtime acceptance is still pending; no OCR accuracy is claimed.** See [Forge setup](forge/README.md), [architecture](docs/FORGE_ARCHITECTURE.md) and [next-stage handoff](docs/FORGE_HANDOFF.md). Forge is not automatically deployed with the main app.
+`/forge` can now ingest an original file plus an already completed official MinerU Hybrid JSON result and optional Markdown without spending OCR again. The normalizer preserves pages, coordinates, tables and image references, while the parser improves chapter-scoped numbering, split options and answer-table association. A conservative MinerU Markdown-to-Elapse portable-bank builder is also included. Existing practice and import flows are unchanged. **Automated medical extraction still requires human review and does not claim zero errors.** See [Forge setup](forge/README.md), [architecture](docs/FORGE_ARCHITECTURE.md) and [next-stage handoff](docs/FORGE_HANDOFF.md). The Forge backend is not automatically deployed with the main app.
+
+### v1.3.8 · MinerU result ingestion
+
+Forge 0.2 accepts completed official MinerU artifacts without repeating OCR and adds a strict objective-question conversion and validation path for chapter-based medical workbooks. Copyrighted source books and generated personal banks are never bundled with the repository.
 
 ### v1.3.7 · Safer previous navigation
 
@@ -36,7 +40,7 @@ Swipe an option or use its annotation button; comments and handwriting are saved
 </p>
 
 <p align="center">
-  <img alt="Version 1.3.7" src="https://img.shields.io/badge/version-1.3.7-b43d35" />
+  <img alt="Version 1.3.8" src="https://img.shields.io/badge/version-1.3.8-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />

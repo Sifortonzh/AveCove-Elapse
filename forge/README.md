@@ -2,7 +2,7 @@
 
 [简体中文](README-zh.md) · [Architecture](../docs/FORGE_ARCHITECTURE.md) · [Handoff](../docs/FORGE_HANDOFF.md)
 
-Foundation **0.1.0** for an optional scanned medical question-bank import workbench. Not a complete OCR product. Existing Elapse remains untouched apart from optional routes. Real MinerU execution is pending on a provisioned engine host.
+Foundation **0.2.0** for an optional scanned medical question-bank import workbench. Not a complete OCR product. Existing Elapse remains untouched apart from optional routes. Official MinerU 3.4.4 hybrid JSON/Markdown results can now be imported alongside their original PDF without rerunning OCR.
 
 ## Local start (from repository root)
 
@@ -36,11 +36,13 @@ FORGE_API_URL=http://127.0.0.1:8091 npm run dev
 
 Open `http://localhost:3000/forge`, enter the same access token, connect, choose a canonical course, upload a PDF/image, keep its job ID and manually refresh. The API can queue uploads before OCR is installed, but the worker will report a clear failed status until MinerU is available. Stop/restart a worker to recover an expired nonterminal lease; explicit failed-job retry creates a child task reusing successful page checkpoints.
 
+If OCR was already completed on MinerU, select the original PDF/image plus the corresponding MinerU JSON under **Import completed MinerU result**. Markdown is optional archival evidence. Forge validates the page count, retains the raw artifacts privately, normalizes page coordinates and queues parsing directly; it does not spend OCR quota again. The original file is still required for visual review and source identity.
+
 Review the source scan alongside structured JSON. Save edits, then Confirm; export a ZIP. Import only `elapse-bank.json` into existing Elapse. Retain `forge-provenance.json` privately for source/audit history. Default exports exclude unanswered, rejected, uncertain and unsupported subjective questions. Choose a course at upload for export; unassigned API jobs are diagnostic-only in this foundation UI.
 
 ## OCR configuration
 
-See [OCR modes and the real-run command](../docs/FORGE_OCR.md). Install a tested MinerU environment separately, then point `FORGE_MINERU_COMMAND` to its CLI. Native, operator-managed remote API and Docker invocation are implemented configuration paths; they still need real-engine acceptance. PaddleOCR is only an interface reservation. No model download, API key, hidden fallback or fake OCR is bundled.
+See [OCR modes and result import](../docs/FORGE_OCR.md). Install a tested MinerU environment separately only when local/self-hosted OCR is required. Imported official-cloud output works independently of a local MinerU executable. PaddleOCR is only an interface reservation. No hidden fallback or fake OCR is bundled.
 
 ## Self-hosted layout
 

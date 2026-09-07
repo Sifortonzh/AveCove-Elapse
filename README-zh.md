@@ -1,8 +1,12 @@
 # AveCove Elapse
 
-### Elapse Forge · 可选基础模块 0.1.0
+### Elapse Forge · 可选基础模块 0.2.0
 
-新增 `/forge` 扫描题库导入工作台骨架：后台任务、MinerU Provider、标准课程树、来源定位复核，以及兼容现有 Elapse 的导出适配层。原刷题与导入流程不变。**真实 MinerU 运行验收尚未完成，目前不承诺识别准确率。** 参见 [运行说明](forge/README-zh.md)、[架构](docs/FORGE_ARCHITECTURE.md)和[下一阶段交接](docs/FORGE_HANDOFF.md)。Forge 不随主程序自动部署。
+`/forge` 现可导入官方 MinerU 已完成的原文件、Hybrid JSON 及可选 Markdown，不重复消耗 OCR；标准化层保留页码、坐标、表格与图片引用，并增强分章题号、跨段选项和答案表关联。另提供保守的 MinerU Markdown → Elapse 便携题库转换工具。原刷题与导入流程不变。**自动识别仍需人工抽查，不承诺医学内容零错误。** 参见 [运行说明](forge/README-zh.md)、[架构](docs/FORGE_ARCHITECTURE.md)和[下一阶段交接](docs/FORGE_HANDOFF.md)。Forge 后台不随主程序自动部署。
+
+### v1.3.8 · MinerU 结果接入
+
+Forge 0.2 支持接管已完成的官方 MinerU 结果，避免重复 OCR，并增加适用于章节化医学练习册的严格客观题转换与校验流程。受版权保护的原书及生成题库不会随仓库发布。
 
 ### v1.3.7 · 更安全的上一题导航
 
@@ -36,7 +40,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.3.7" src="https://img.shields.io/badge/version-1.3.7-b43d35" />
+  <img alt="版本 1.3.8" src="https://img.shields.io/badge/version-1.3.8-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
