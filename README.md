@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### v1.4.0 · Medical grouped questions and Slash Skip
+
+Medical imports now preserve A1, A2, A3, A4, B1, C, and X type identities. A3/A4 case groups show their shared stem and linked subquestions together; B1 groups reuse their source option pool. The new **Slash Skip** action can exclude one question or a chapter-scoped original-number range such as `1-31`; skipped questions show `/` on the answer sheet, synchronize across devices, and are excluded from accuracy and Western Medicine 306 scoring. Forge and the general AI importer now explicitly support book-wide answer registries placed after all questions, while generated private banks can include concise table-of-contents question ranges in their description. Source books and converted personal banks remain outside the public repository.
+
 ### Elapse Forge · optional foundation 0.2.0
 
 `/forge` can now ingest an original file plus an already completed official MinerU Hybrid JSON result and optional Markdown without spending OCR again. The normalizer preserves pages, coordinates, tables and image references, while the parser improves chapter-scoped numbering, split options and answer-table association. A conservative MinerU Markdown-to-Elapse portable-bank builder is also included. Existing practice and import flows are unchanged. **Automated medical extraction still requires human review and does not claim zero errors.** See [Forge setup](forge/README.md), [architecture](docs/FORGE_ARCHITECTURE.md) and [next-stage handoff](docs/FORGE_HANDOFF.md). The Forge backend is not automatically deployed with the main app.
@@ -40,7 +44,7 @@ Swipe an option or use its annotation button; comments and handwriting are saved
 </p>
 
 <p align="center">
-  <img alt="Version 1.3.8" src="https://img.shields.io/badge/version-1.3.8-b43d35" />
+  <img alt="Version 1.4.0" src="https://img.shields.io/badge/version-1.4.0-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />

@@ -85,7 +85,7 @@ def build_document(paths: list[Path]) -> Document:
 
 def suitable(question) -> bool:
     kind = str(question.type)
-    if kind not in {"A1", "A2", "single", "multiple"}:
+    if kind not in {"A1", "A2", "A3", "A4", "B1", "C", "single", "multiple"}:
         return False
     labels = [option.label for option in question.options]
     if labels != list("ABCDE") or not question.answer:
@@ -110,8 +110,12 @@ def elapse_question(question, index: int) -> dict:
         r"^\s*(?:试题分析|解析)\s*[:：]\s*", "", question.explanation
     ).strip()
     stable = hashlib.sha256(
-        f"{category}\0{question.source_question_number}\0{question.stem}".encode()
+        f"{category}\0{kind}\0{question.source_question_number}\0{question.stem}".encode()
     ).hexdigest()[:20]
+    question_type = (
+        "X" if kind == "multiple" else "B" if kind == "B1" else "C" if kind == "C" else "A"
+    )
+    medical_type = "X" if kind == "multiple" else kind if kind in {"A1", "A2", "A3", "A4", "B1", "C"} else None
     return {
         "id": f"renwei-infectious-{stable}",
         "sourceNumber": question.source_question_number,
@@ -120,7 +124,11 @@ def elapse_question(question, index: int) -> dict:
         "options": [option.model_dump(mode="json") for option in question.options],
         "answer": question.answer,
         "multiple": kind == "multiple",
-        "questionType": "X" if kind == "multiple" else "A",
+        "questionType": question_type,
+        "medicalQuestionType": medical_type,
+        "sharedStem": question.shared_stem.strip(),
+        "sharedStemGroup": question.shared_stem_group,
+        "sharedOptionGroup": question.shared_option_group,
         "explanation": explanation,
         "answerSource": "《传染病学学习指导与习题集》第3版（《传染病学》第9版配套）参考答案；MinerU Markdown 转换，使用时请结合原书复核。",
     }
@@ -148,14 +156,25 @@ def main():
         question.scope.split("/")[0].strip() or "未分章" for question in selected
     )
     types = Counter(str(question.type) for question in selected)
+    scope_distribution = []
+    for scope in dict.fromkeys(question.scope for question in selected):
+        scoped = [question for question in selected if question.scope == scope]
+        type_ranges = []
+        for kind in dict.fromkeys(str(question.type) for question in scoped):
+            numbers = [int(question.source_question_number) for question in scoped if str(question.type) == kind and question.source_question_number.isdigit()]
+            if numbers:
+                compact = str(min(numbers)) if len(numbers) == 1 else f"{min(numbers)}-{max(numbers)}"
+                type_ranges.append(f"{kind} {compact}")
+        scope_distribution.append(f"{scope.replace(' / ', ' · ')}：{'、'.join(type_ranges)}（{len(scoped)}题）")
     description = "\n".join(
         [
             "用途：2026-09-21 传染病学考试复习的最低可用题库。",
             "来源：《传染病学学习指导与习题集》第3版，对应人民卫生出版社《传染病学》第9版教材。",
-            f"本版收录 {len(selected)} 道结构完整且答案可关联的客观题：A1 {types['A1']} 道、A2 {types['A2']} 道、X 型 {types['multiple']} 道。",
-            "筛选规则：仅保留 A–E 五项完整、单选答案唯一或 X 型答案不少于两项的题；暂不收入依赖共用题干/备选项的 A3、A4、B1，以及填空、名词解释和问答题。",
+            f"本版收录 {len(selected)} 道结构完整且答案可关联的客观题：A1 {types['A1']}、A2 {types['A2']}、A3 {types['A3']}、A4 {types['A4']}、B1 {types['B1']}、C {types['C']}、X {types['multiple']}。",
+            "筛选规则：仅保留选项完整、且答案能从原书答案区可靠关联的客观题；不收入填空、名词解释和问答题。A3/A4 共用病例题干，B1 共用备选答案。",
             "章节分布："
             + "；".join(f"{name} {count} 道" for name, count in chapters.items()),
+            "目录备注（原题号按题型分区）：\n" + "\n".join(scope_distribution),
             "说明：由 MinerU Markdown 自动整理，已过滤明显结构异常；原文 OCR、答案和解析仍可能存在错误，请结合教材原文复核。",
         ]
     )

@@ -21,6 +21,9 @@ class ElapseQuestion(Model):
     multiple: bool
     explanation: str
     answerSource: str
+    medicalQuestionType: str | None = None
+    sharedStem: str = ""
+    sharedStemGroup: str | None = None
     sharedOptionGroup: str | None = None
 
 
@@ -62,12 +65,19 @@ def export_bank(
                 id=q.id,
                 sourceNumber=q.source_question_number,
                 category=category,
-                stem="\n\n".join(filter(None, [q.shared_stem, q.stem])),
+                stem=q.stem,
                 options=q.options,
                 answer=q.answer,
                 answerPending=not q.answer,
                 multiple=q.type == "multiple",
                 explanation=q.explanation,
+                medicalQuestionType=(
+                    str(q.type)
+                    if str(q.type) in {"A1", "A2", "A3", "A4", "B1", "C"}
+                    else "X" if str(q.type) == "multiple" else None
+                ),
+                sharedStem=q.shared_stem,
+                sharedStemGroup=q.shared_stem_group,
                 sharedOptionGroup=q.shared_option_group,
                 answerSource="；".join(
                     f"{s.source_file} PDF第{s.source_page}页" for s in q.answer_source

@@ -10,6 +10,7 @@ export type RecordLedgerEntry = {
   firstProgress?: TimedValue<ProgressValue | null>;
   favorite?: TimedValue<boolean>;
   note?: TimedValue<string | null>;
+  killed?: TimedValue<boolean>;
 };
 
 export type RecordLedger = Record<string, RecordLedgerEntry>;
@@ -19,6 +20,7 @@ export type LearningRecords = {
   firstProgress: Record<string, ProgressValue>;
   favorites: string[];
   notes: Record<string, string>;
+  killed: string[];
   ledger: RecordLedger;
 };
 
@@ -27,6 +29,7 @@ export type LearningRecordsInput = {
   firstProgress?: unknown;
   favorites?: unknown;
   notes?: unknown;
+  killed?: unknown;
   ledger?: unknown;
 };
 
@@ -59,7 +62,8 @@ function normalizeLedger(value: unknown): RecordLedger {
     const favorite = normalizeTimedValue(entry.favorite, (candidate): candidate is boolean => typeof candidate === "boolean");
     const note = normalizeTimedValue(entry.note, (candidate): candidate is string | null =>
       candidate === null || typeof candidate === "string");
-    if (progress || firstProgress || favorite || note) result[questionId] = { progress, firstProgress, favorite, note };
+    const killed = normalizeTimedValue(entry.killed, (candidate): candidate is boolean => typeof candidate === "boolean");
+    if (progress || firstProgress || favorite || note || killed) result[questionId] = { progress, firstProgress, favorite, note, killed };
   }
   return result;
 }
@@ -86,7 +90,10 @@ function normalizeLegacyRecords(input: LearningRecordsInput) {
       if (typeof value === "string" && value) notes[questionId] = value;
     }
   }
-  return { progress, firstProgress, favorites, notes };
+  const killed = Array.isArray(input.killed)
+    ? [...new Set(input.killed.filter((item): item is string => typeof item === "string" && Boolean(item)))]
+    : [];
+  return { progress, firstProgress, favorites, notes, killed };
 }
 
 function chooseTimedValue<T>(
@@ -125,13 +132,15 @@ function materializeLedger(ledger: RecordLedger): LearningRecords {
   const firstProgress: Record<string, ProgressValue> = {};
   const favorites: string[] = [];
   const notes: Record<string, string> = {};
+  const killed: string[] = [];
   for (const [questionId, entry] of Object.entries(ledger)) {
     if (entry.progress?.value === "correct" || entry.progress?.value === "wrong") progress[questionId] = entry.progress.value;
     if (entry.firstProgress?.value === "correct" || entry.firstProgress?.value === "wrong") firstProgress[questionId] = entry.firstProgress.value;
     if (entry.favorite?.value) favorites.push(questionId);
     if (typeof entry.note?.value === "string" && entry.note.value) notes[questionId] = entry.note.value;
+    if (entry.killed?.value) killed.push(questionId);
   }
-  return { progress, firstProgress, favorites, notes, ledger };
+  return { progress, firstProgress, favorites, notes, killed, ledger };
 }
 
 export function normalizeLearningRecords(input: LearningRecordsInput): LearningRecords {
@@ -167,6 +176,12 @@ export function normalizeLearningRecords(input: LearningRecordsInput): LearningR
       note: ledger[questionId]?.note ?? { value, updatedAt: LEGACY_TIMESTAMP },
     };
   }
+  for (const questionId of legacy.killed) {
+    ledger[questionId] = {
+      ...ledger[questionId],
+      killed: ledger[questionId]?.killed ?? { value: true, updatedAt: LEGACY_TIMESTAMP },
+    };
+  }
   return materializeLedger(ledger);
 }
 
@@ -188,7 +203,8 @@ export function mergeLearningRecords(leftInput: LearningRecordsInput, rightInput
       if (rightValue === null) return leftValue;
       return rightValue.length >= leftValue.length ? rightValue : leftValue;
     });
-    ledger[questionId] = { progress, firstProgress, favorite, note };
+    const killed = chooseTimedValue(leftEntry?.killed, rightEntry?.killed, (leftValue, rightValue) => leftValue || rightValue);
+    ledger[questionId] = { progress, firstProgress, favorite, note, killed };
   }
   return materializeLedger(ledger);
 }
@@ -203,7 +219,7 @@ export function learningRecordsEqual(leftInput: LearningRecordsInput, rightInput
     const leftEntry = left[questionId];
     const rightEntry = right[questionId];
     if (!rightEntry) return false;
-    return (["progress", "firstProgress", "favorite", "note"] as const).every((field) => {
+    return (["progress", "firstProgress", "favorite", "note", "killed"] as const).every((field) => {
       const leftValue = leftEntry[field];
       const rightValue = rightEntry[field];
       return leftValue?.value === rightValue?.value && leftValue?.updatedAt === rightValue?.updatedAt;
@@ -214,7 +230,7 @@ export function learningRecordsEqual(leftInput: LearningRecordsInput, rightInput
 export function stampLearningRecord(
   ledger: RecordLedger,
   questionId: string,
-  patch: { progress?: ProgressValue | null; firstProgress?: ProgressValue | null; favorite?: boolean; note?: string | null },
+  patch: { progress?: ProgressValue | null; firstProgress?: ProgressValue | null; favorite?: boolean; note?: string | null; killed?: boolean },
   updatedAt = Date.now(),
 ): RecordLedger {
   const next = { ...ledger };
@@ -228,6 +244,7 @@ export function stampLearningRecord(
   }
   if (Object.prototype.hasOwnProperty.call(patch, "favorite")) entry.favorite = { value: Boolean(patch.favorite), updatedAt };
   if (Object.prototype.hasOwnProperty.call(patch, "note")) entry.note = { value: patch.note ?? null, updatedAt };
+  if (Object.prototype.hasOwnProperty.call(patch, "killed")) entry.killed = { value: Boolean(patch.killed), updatedAt };
   next[questionId] = entry;
   return next;
 }

@@ -752,7 +752,7 @@ test("keeps imported explanations separate and upgrades AI-assisted notes to sea
 
 test("merges per-question practice records across devices without stale overwrites", async () => {
   const { learningRecordsEqual, mergeLearningRecords, stampLearningRecord } = await loadRecordSync();
-  const ipadLedger = stampLearningRecord({}, "q-ipad", { progress: "wrong", favorite: true, note: "复盘重点" }, 200);
+  const ipadLedger = stampLearningRecord({}, "q-ipad", { progress: "wrong", favorite: true, note: "复盘重点", killed: true }, 200);
   const macLedger = stampLearningRecord({}, "q-mac", { progress: "correct" }, 300);
   const merged = mergeLearningRecords(
     { progress: { "q-ipad": "wrong" }, favorites: ["q-ipad"], notes: { "q-ipad": "复盘重点" }, ledger: ipadLedger },
@@ -762,13 +762,15 @@ test("merges per-question practice records across devices without stale overwrit
   assert.deepEqual(merged.progress, { "q-ipad": "wrong", "q-mac": "correct" });
   assert.deepEqual(merged.favorites, ["q-ipad"]);
   assert.deepEqual(merged.notes, { "q-ipad": "复盘重点" });
+  assert.deepEqual(merged.killed, ["q-ipad"]);
   assert.equal(learningRecordsEqual(merged, { ...merged, favorites: [...merged.favorites].reverse() }), true);
 
-  const resetLedger = stampLearningRecord(merged.ledger, "q-ipad", { progress: null, favorite: false, note: null }, 500);
+  const resetLedger = stampLearningRecord(merged.ledger, "q-ipad", { progress: null, favorite: false, note: null, killed: false }, 500);
   const afterReset = mergeLearningRecords(merged, { ledger: resetLedger });
   assert.deepEqual(afterReset.progress, { "q-mac": "correct" });
   assert.deepEqual(afterReset.favorites, []);
   assert.deepEqual(afterReset.notes, {});
+  assert.deepEqual(afterReset.killed, []);
   assert.equal(learningRecordsEqual(merged, afterReset), false);
 });
 
@@ -833,6 +835,31 @@ test("ships blind review and answer-first memorization only in practice settings
   assert.match(styles, /\.number-grid button\.done/);
 });
 
+test("supports grouped medical questions and synchronized slash-skipping", async () => {
+  const [page, styles, parser, medicalImport, recordSync, forgeParser] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/globals.css"),
+    text("app/lib/question-parser.ts"),
+    text("app/lib/medical-ai-import.ts"),
+    text("app/lib/record-sync.ts"),
+    text("forge/src/elapse_forge/parser.py"),
+  ]);
+
+  assert.match(parser, /medicalQuestionType\?: MedicalQuestionType/);
+  assert.match(parser, /sharedStemGroup\?: string/);
+  assert.match(page, /className=\{`question-kill-trigger/);
+  assert.match(page, /function parseKillNumberSpec/);
+  assert.match(page, /不计入做题数、正确率或 306 得分/);
+  assert.match(page, /className="shared-medical-stem"/);
+  assert.match(page, /className="linked-question-group"/);
+  assert.match(page, /className="sheet-slash">／/);
+  assert.match(styles, /\.number-grid button\.killed/);
+  assert.match(recordSync, /killed\?: TimedValue<boolean>/);
+  assert.match(medicalImport, /A1、A2、A3、A4、B1、C、X/);
+  assert.match(medicalImport, /全书所有题目之后统一出现的总答案表/);
+  assert.match(forgeParser, /题共用\(题干\|备选答案\)/);
+});
+
 test("offers five-subject filtering only for modern Western Medicine 306 banks", async () => {
   const [page, styles] = await Promise.all([
     text("app/page.tsx"),
@@ -859,7 +886,7 @@ test("ships the v1.3 practice and library experience on the restrained Spatial B
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.3\.7"/);
+  assert.match(packageJson, /"version": "1\.4\.0"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);

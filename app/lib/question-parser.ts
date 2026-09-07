@@ -1,5 +1,6 @@
 export type QuizOption = { label: string; text: string };
 export type Western306Format = "modern-165" | "legacy-c-type" | "unknown-306";
+export type MedicalQuestionType = "A1" | "A2" | "A3" | "A4" | "B1" | "C" | "X";
 export type QuizQuestion = {
   id: string;
   sourceNumber: string;
@@ -14,7 +15,10 @@ export type QuizQuestion = {
   examYear?: number;
   examFormat?: Western306Format;
   questionType?: "A" | "B" | "C" | "X";
+  medicalQuestionType?: MedicalQuestionType;
   points?: number;
+  sharedStem?: string;
+  sharedStemGroup?: string;
   sharedOptionGroup?: string;
   explanation?: string;
   answerSource?: string;

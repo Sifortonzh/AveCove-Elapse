@@ -297,6 +297,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "explanation",
                 "type",
                 "shared_stem",
+                "shared_stem_group",
                 "shared_option_group",
                 "course",
                 "curriculum_node",

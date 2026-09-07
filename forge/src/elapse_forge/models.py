@@ -106,6 +106,7 @@ class Question(Model):
     answer: list[str] = Field(default_factory=list)
     explanation: str = ""
     shared_stem: str = ""
+    shared_stem_group: str | None = None
     shared_option_group: str | None = None
     course: str | None = None
     curriculum_node: str | None = None

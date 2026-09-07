@@ -1,4 +1,4 @@
-import type { QuizOption, QuizQuestion, Western306Format } from "./question-parser";
+import type { MedicalQuestionType as DetailedMedicalQuestionType, QuizOption, QuizQuestion, Western306Format } from "./question-parser";
 
 export type MedicalExamProfile = "general" | "western-medicine-306";
 export type MedicalQuestionType = "A" | "B" | "C" | "X";
@@ -30,6 +30,9 @@ type AiQuestion = {
   options?: unknown;
   answer?: unknown;
   questionType?: unknown;
+  medicalQuestionType?: unknown;
+  sharedStem?: unknown;
+  sharedStemGroup?: unknown;
   sharedOptionGroup?: unknown;
   explanation?: unknown;
   answerSource?: unknown;
@@ -421,6 +424,10 @@ function normalizeQuestion(
   const sourceNumber = String(raw.sourceNumber ?? index + 1).trim() || String(index + 1);
   const inferred = profile === "western-medicine-306" ? western306Metadata(sourceNumber, blueprint) : {};
   const suppliedType = String(raw.questionType ?? "").toUpperCase().match(/[ABCX]/)?.[0] as MedicalQuestionType | undefined;
+  const detailedTypeValue = String(raw.medicalQuestionType ?? "").toUpperCase();
+  const medicalQuestionType = /^(?:A[1-4]|B1|C|X)$/.test(detailedTypeValue)
+    ? detailedTypeValue as DetailedMedicalQuestionType
+    : undefined;
   const questionType = blueprint?.format === "modern-165"
     ? inferred.questionType ?? suppliedType
     : suppliedType ?? inferred.questionType;
@@ -439,7 +446,10 @@ function normalizeQuestion(
     examYear: profile === "western-medicine-306" ? blueprint?.year : undefined,
     examFormat: profile === "western-medicine-306" ? blueprint?.format : undefined,
     questionType,
+    medicalQuestionType,
     points: inferred.points,
+    sharedStem: typeof raw.sharedStem === "string" ? raw.sharedStem.trim().slice(0, 8_000) || undefined : undefined,
+    sharedStemGroup: typeof raw.sharedStemGroup === "string" ? raw.sharedStemGroup.trim().slice(0, 160) || undefined : undefined,
     sharedOptionGroup: typeof raw.sharedOptionGroup === "string" ? raw.sharedOptionGroup.trim().slice(0, 120) || undefined : undefined,
     explanation: typeof raw.explanation === "string" ? raw.explanation.trim().slice(0, 6_000) || undefined : undefined,
     answerSource: typeof raw.answerSource === "string" ? raw.answerSource.trim().slice(0, 160) || undefined : undefined,
@@ -681,8 +691,10 @@ export function buildMedicalImportPrompt(input: {
     "C 型题必须保留两条来源陈述和 A/B/C/D 判定选项，并为同组题填写相同 sharedOptionGroup。",
     "X 型题仅记录文件明确给出的全部正确选项，不得按医学知识猜测。",
   ] : [
-    "只整理单选题、多选题和判断题；跳过填空题、名词解释、简答题、问答题及病例论述题。",
-    "兼容章节末尾、全书末尾、题干后缀、答案表和解析标题内的答案。若题干末尾形如“……：A”，冒号后的字母就是该题原文答案。",
+    "医学客观题型包括 A1、A2、A3、A4、B1、C、X。只整理这些客观题；跳过填空题、名词解释、简答题、问答题及病例论述题。",
+    "A3/A4 的病例材料是共用题干：每道子题只把自己的追问放入 stem，把病例原文完整放入 sharedStem，并给同组题相同 sharedStemGroup。",
+    "B1 的 A-E 是共用备选答案：把同一组选项复制到每道子题，并给同组题相同 sharedOptionGroup。C 型按原文件结构保留，不得误判为多选。",
+    "兼容章节末尾、全书所有题目之后统一出现的总答案表、题干后缀、答案表和解析标题内的答案。必须先识别章节与 A1/A2/A3/A4/B1/C/X 分区，再用“章节＋题型＋原题号”关联，不能因答案离题目很远而丢失。若题干末尾形如“……：A”，冒号后的字母就是该题原文答案。",
     "章节型资料可能在每章重新从第 1 题编号。必须用“章节标题＋单选/多选/判断分区＋原题号”关联答案，禁止把不同章节的同号题串在一起。",
     "判断题统一输出 A=正确、B=错误两个选项；原文 √ 对应 A，× 对应 B。",
     "若多道题共用一组选项，把选项复制到每道题，并用 sharedOptionGroup 标记同组。",
@@ -699,7 +711,7 @@ export function buildMedicalImportPrompt(input: {
     "若 OCR 丢失少数题号，只有在相邻题号与题目顺序能唯一确定时才补回；无法唯一确定时保留可见题号，不得随意编号。",
     "若片段带有 CROSS_PAGE_SEAM 标记，表示题干在上一页、选项或答案在下一页；必须把接缝两侧合并为同一道完整题，标记本身不是题目内容。",
     "输出 NDJSON：每行一个独立 JSON 对象，不要数组、不要 Markdown、不要行内换行。坏一行不能影响其他题。",
-    `每行结构：{"type":"question","sourceNumber":"1","questionType":"A","sharedOptionGroup":"","stem":"题干","options":[{"label":"A","text":"选项"}],"answer":["A"],"answerPending":false,"explanation":"原文有则整理，无则空","answerSource":"总论 · 单选题答案表"}。questionType 只能是 A、B、C、X。`,
+    `每行结构：{"type":"question","sourceNumber":"1","questionType":"A","medicalQuestionType":"A3","sharedStem":"共用病例","sharedStemGroup":"本章-A3-1-3","sharedOptionGroup":"","stem":"子题追问","options":[{"label":"A","text":"选项"}],"answer":["A"],"answerPending":false,"explanation":"原文有则整理，无则空","answerSource":"总论 · A3答案表"}。questionType 只能是 A、B、C、X；medicalQuestionType 只能是 A1、A2、A3、A4、B1、C、X。`,
     "单选 answer 一个字母，多选为多个字母。保留原意，删除页眉页脚、公众号、水印和排版噪声。",
     "可供关联的答案参考区：",
     input.answerReference || "（没有单独提取到答案参考区，请只用片段内明确答案）",

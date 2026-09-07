@@ -100,6 +100,43 @@ def test_type_heading_can_share_line_with_first_question():
     assert [option.label for option in parsed.questions[0].options] == ["A", "B"]
 
 
+def test_medical_shared_stems_and_option_groups_are_preserved():
+    doc = Document(
+        id="medical-groups",
+        metadata={"source_file": "groups.md"},
+        provider="mineru-markdown",
+        raw_output_reference=[],
+        pages=[page(1, """第一章 示例
+A3型题
+(1 ~ 2 题共用题干)
+患者发热三天，伴明显乏力。
+1. 首先考虑
+A. 甲
+B. 乙
+2. 首选检查
+A. 丙
+B. 丁
+B1型题
+(3 ~ 4 题共用备选答案)
+A. 戊
+B. 己
+3. 第一种表现
+4. 第二种表现
+参考答案
+A3型题
+1.A 2.B
+B1型题
+3.A 4.B""")],
+    )
+    questions = reconcile(parse_document(doc)).questions
+    assert [q.type for q in questions] == ["A3", "A3", "B1", "B1"]
+    assert questions[0].shared_stem == "患者发热三天，伴明显乏力。"
+    assert questions[0].shared_stem_group == questions[1].shared_stem_group
+    assert questions[2].shared_option_group == questions[3].shared_option_group
+    assert [option.text for option in questions[2].options] == ["戊", "己"]
+    assert [q.answer for q in questions] == [["A"], ["B"], ["A"], ["B"]]
+
+
 def test_answer_table_can_recover_missing_question_type_heading():
     pages, _ = normalize_mineru_hybrid(
         {

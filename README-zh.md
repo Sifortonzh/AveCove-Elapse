@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### v1.4.0 · 医学组题与“斩”题
+
+医学导入现可保留 A1、A2、A3、A4、B1、C、X 七类题型。A3/A4 会把共用病例题干与同组子题放在一个连续工作区，B1 会复用原文件的共用备选答案。新增“斩”题：可斩当前题，也可按当前章节原题号批量输入 `1-31` 等范围；答题卡以 `/` 标记，多端同步，并从做题数、正确率及西综 306 得分中剔除。Forge 与通用 AI 导入同时补强“全书题目结束后统一答案表”的关联规则，生成的个人题库简介可写入目录式章节题号范围。原书与转换后的私人题库仍不会进入公开仓库。
+
 ### Elapse Forge · 可选基础模块 0.2.0
 
 `/forge` 现可导入官方 MinerU 已完成的原文件、Hybrid JSON 及可选 Markdown，不重复消耗 OCR；标准化层保留页码、坐标、表格与图片引用，并增强分章题号、跨段选项和答案表关联。另提供保守的 MinerU Markdown → Elapse 便携题库转换工具。原刷题与导入流程不变。**自动识别仍需人工抽查，不承诺医学内容零错误。** 参见 [运行说明](forge/README-zh.md)、[架构](docs/FORGE_ARCHITECTURE.md)和[下一阶段交接](docs/FORGE_HANDOFF.md)。Forge 后台不随主程序自动部署。
@@ -40,7 +44,7 @@ Forge 0.2 支持接管已完成的官方 MinerU 结果，避免重复 OCR，并�
 </p>
 
 <p align="center">
-  <img alt="版本 1.3.8" src="https://img.shields.io/badge/version-1.3.8-b43d35" />
+  <img alt="版本 1.4.0" src="https://img.shields.io/badge/version-1.4.0-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
