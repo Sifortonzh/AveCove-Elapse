@@ -1,0 +1,298 @@
+{
+  "$defs": {
+    "Box": {
+      "additionalProperties": false,
+      "description": "Coordinates in [0,1], relative to the displayed (rotated) original page.",
+      "properties": {
+        "x0": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X0",
+          "type": "number"
+        },
+        "y0": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y0",
+          "type": "number"
+        },
+        "x1": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X1",
+          "type": "number"
+        },
+        "y1": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y1",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x0",
+        "y0",
+        "x1",
+        "y1"
+      ],
+      "title": "Box",
+      "type": "object"
+    },
+    "Option": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "pattern": "^[A-Z]$",
+          "title": "Label",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "text"
+      ],
+      "title": "Option",
+      "type": "object"
+    },
+    "QuestionType": {
+      "enum": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "B1",
+        "C",
+        "single",
+        "multiple",
+        "judgement",
+        "fill",
+        "term",
+        "short",
+        "essay",
+        "unknown"
+      ],
+      "title": "QuestionType",
+      "type": "string"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "source_file": {
+          "title": "Source File",
+          "type": "string"
+        },
+        "source_page": {
+          "minimum": 1,
+          "title": "Source Page",
+          "type": "integer"
+        },
+        "block_id": {
+          "title": "Block Id",
+          "type": "string"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Box"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ocr_text": {
+          "title": "Ocr Text",
+          "type": "string"
+        },
+        "ocr_provider": {
+          "title": "Ocr Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_file",
+        "source_page",
+        "block_id",
+        "ocr_text",
+        "ocr_provider"
+      ],
+      "title": "Source",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "document_id": {
+      "title": "Document Id",
+      "type": "string"
+    },
+    "source_question_number": {
+      "minLength": 1,
+      "title": "Source Question Number",
+      "type": "string"
+    },
+    "scope": {
+      "default": "",
+      "title": "Scope",
+      "type": "string"
+    },
+    "type": {
+      "$ref": "#/$defs/QuestionType",
+      "default": "unknown"
+    },
+    "stem": {
+      "title": "Stem",
+      "type": "string"
+    },
+    "options": {
+      "items": {
+        "$ref": "#/$defs/Option"
+      },
+      "title": "Options",
+      "type": "array"
+    },
+    "answer": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Answer",
+      "type": "array"
+    },
+    "explanation": {
+      "default": "",
+      "title": "Explanation",
+      "type": "string"
+    },
+    "shared_stem": {
+      "default": "",
+      "title": "Shared Stem",
+      "type": "string"
+    },
+    "shared_option_group": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Shared Option Group"
+    },
+    "course": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Course"
+    },
+    "curriculum_node": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Curriculum Node"
+    },
+    "source": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "minItems": 1,
+      "title": "Source",
+      "type": "array"
+    },
+    "answer_source": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "title": "Answer Source",
+      "type": "array"
+    },
+    "explanation_source": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "title": "Explanation Source",
+      "type": "array"
+    },
+    "confidence": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Confidence"
+    },
+    "review_status": {
+      "default": "needs_review",
+      "enum": [
+        "needs_review",
+        "confirmed",
+        "rejected",
+        "uncertain"
+      ],
+      "title": "Review Status",
+      "type": "string"
+    },
+    "flags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Flags",
+      "type": "array"
+    },
+    "parser_version": {
+      "default": "rules-0.1",
+      "title": "Parser Version",
+      "type": "string"
+    },
+    "model_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Version"
+    }
+  },
+  "required": [
+    "id",
+    "document_id",
+    "source_question_number",
+    "stem",
+    "source"
+  ],
+  "title": "Question",
+  "type": "object"
+}

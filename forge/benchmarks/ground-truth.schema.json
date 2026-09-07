@@ -1,0 +1,274 @@
+{
+  "$defs": {
+    "Box": {
+      "additionalProperties": false,
+      "description": "Coordinates in [0,1], relative to the displayed (rotated) original page.",
+      "properties": {
+        "x0": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X0",
+          "type": "number"
+        },
+        "y0": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y0",
+          "type": "number"
+        },
+        "x1": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X1",
+          "type": "number"
+        },
+        "y1": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y1",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x0",
+        "y0",
+        "x1",
+        "y1"
+      ],
+      "title": "Box",
+      "type": "object"
+    },
+    "GoldQuestion": {
+      "additionalProperties": false,
+      "properties": {
+        "annotation_id": {
+          "title": "Annotation Id",
+          "type": "string"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "source_question_number": {
+          "title": "Source Question Number",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/QuestionType"
+        },
+        "stem": {
+          "title": "Stem",
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/Option"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "answer": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Answer",
+          "type": "array"
+        },
+        "explanation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Explanation"
+        },
+        "curriculum_node": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Curriculum Node"
+        },
+        "question_source": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "minItems": 1,
+          "title": "Question Source",
+          "type": "array"
+        },
+        "answer_source": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Answer Source",
+          "type": "array"
+        },
+        "explanation_source": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Explanation Source",
+          "type": "array"
+        }
+      },
+      "required": [
+        "annotation_id",
+        "scope",
+        "source_question_number",
+        "type",
+        "stem",
+        "options",
+        "answer",
+        "question_source"
+      ],
+      "title": "GoldQuestion",
+      "type": "object"
+    },
+    "Option": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "pattern": "^[A-Z]$",
+          "title": "Label",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "text"
+      ],
+      "title": "Option",
+      "type": "object"
+    },
+    "QuestionType": {
+      "enum": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "B1",
+        "C",
+        "single",
+        "multiple",
+        "judgement",
+        "fill",
+        "term",
+        "short",
+        "essay",
+        "unknown"
+      ],
+      "title": "QuestionType",
+      "type": "string"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "source_file": {
+          "title": "Source File",
+          "type": "string"
+        },
+        "source_page": {
+          "minimum": 1,
+          "title": "Source Page",
+          "type": "integer"
+        },
+        "block_id": {
+          "title": "Block Id",
+          "type": "string"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Box"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ocr_text": {
+          "title": "Ocr Text",
+          "type": "string"
+        },
+        "ocr_provider": {
+          "title": "Ocr Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_file",
+        "source_page",
+        "block_id",
+        "ocr_text",
+        "ocr_provider"
+      ],
+      "title": "Source",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "source_sha256": {
+      "title": "Source Sha256",
+      "type": "string"
+    },
+    "canonical_version": {
+      "title": "Canonical Version",
+      "type": "string"
+    },
+    "reviewed_by": {
+      "title": "Reviewed By",
+      "type": "string"
+    },
+    "coverage_pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Coverage Pages",
+      "type": "array"
+    },
+    "complete_question_inventory": {
+      "default": false,
+      "title": "Complete Question Inventory",
+      "type": "boolean"
+    },
+    "questions": {
+      "items": {
+        "$ref": "#/$defs/GoldQuestion"
+      },
+      "title": "Questions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "source_sha256",
+    "canonical_version",
+    "reviewed_by",
+    "coverage_pages",
+    "questions"
+  ],
+  "title": "GroundTruth",
+  "type": "object"
+}

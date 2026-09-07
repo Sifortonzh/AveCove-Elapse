@@ -1,0 +1,6 @@
+.data
+.env
+tests
+benchmarks
+__pycache__
+*.egg-info

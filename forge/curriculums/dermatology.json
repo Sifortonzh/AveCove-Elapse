@@ -1,0 +1,3649 @@
+{
+  "id": "dermatology",
+  "title": "皮肤性病学",
+  "version": "user-provided-2026-09-06",
+  "source_file": "31皮肤性病学_目录.pdf",
+  "source_sha256": "5efd4dd3b313c3b4715c561bca3e574e8144e4360efd53f27c48cf58ffeb01b8",
+  "nodes": [
+    {
+      "id": "f9d642f53ed006b99a3dd38e",
+      "course_id": "dermatology",
+      "parent_id": null,
+      "node_type": "part",
+      "title": "皮肤性病学总论",
+      "normalized_title": "皮肤性病学总论",
+      "order": 0,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 1,
+        "source_label": "第一篇",
+        "raw_text": "第一篇　皮肤性病学总论                              1",
+        "bbox": [
+          0.2661562760745241,
+          0.20000011669352877,
+          0.420095630240725,
+          0.21694825191588188
+        ]
+      }
+    },
+    {
+      "id": "972b2fb8baeef567fd34b654",
+      "course_id": "dermatology",
+      "parent_id": "f9d642f53ed006b99a3dd38e",
+      "node_type": "chapter",
+      "title": "皮肤性病学导论",
+      "normalized_title": "皮肤性病学导论",
+      "order": 1,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 2,
+        "source_label": "第一章",
+        "raw_text": "第一章  皮肤性病学导论 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2",
+        "bbox": [
+          0.3417331054597858,
+          0.2396453126543366,
+          0.47170385820795496,
+          0.2553167830289364
+        ]
+      }
+    },
+    {
+      "id": "3b20ae04e264e3d556ddf81a",
+      "course_id": "dermatology",
+      "parent_id": "972b2fb8baeef567fd34b654",
+      "node_type": "section",
+      "title": "皮肤性病学的定义和范畴",
+      "normalized_title": "皮肤性病学的定义和范畴",
+      "order": 2,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 2,
+        "source_label": "第一节",
+        "raw_text": "第一节　皮肤性病学的定义和范畴 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2",
+        "bbox": [
+          0.37326551454465867,
+          0.25987695909613256,
+          0.5589380184706146,
+          0.2741484082701532
+        ]
+      }
+    },
+    {
+      "id": "9280ceeeb971967ac0e19247",
+      "course_id": "dermatology",
+      "parent_id": "972b2fb8baeef567fd34b654",
+      "node_type": "section",
+      "title": "国外皮肤性病学的发展简史",
+      "normalized_title": "国外皮肤性病学的发展简史",
+      "order": 3,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 2,
+        "source_label": "第二节",
+        "raw_text": "第二节　国外皮肤性病学的发展简史  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2",
+        "bbox": [
+          0.37325894681665056,
+          0.27999048157236023,
+          0.575810795037126,
+          0.29426193074638085
+        ]
+      }
+    },
+    {
+      "id": "a8d1f95ac45d861a4017ef75",
+      "course_id": "dermatology",
+      "parent_id": "972b2fb8baeef567fd34b654",
+      "node_type": "section",
+      "title": "中国皮肤性病学的发展简史和现状",
+      "normalized_title": "中国皮肤性病学的发展简史和现状",
+      "order": 4,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 3,
+        "source_label": "第三节",
+        "raw_text": "第三节　中国皮肤性病学的发展简史和现状 . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3",
+        "bbox": [
+          0.37325894681665056,
+          0.3000978305844855,
+          0.6264487506532957,
+          0.31436927975850615
+        ]
+      }
+    },
+    {
+      "id": "de8e08a0735e7a5e44abaa60",
+      "course_id": "dermatology",
+      "parent_id": "972b2fb8baeef567fd34b654",
+      "node_type": "section",
+      "title": "皮肤性病学的学科特点和学习路径",
+      "normalized_title": "皮肤性病学的学科特点和学习路径",
+      "order": 5,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 4,
+        "source_label": "第四节",
+        "raw_text": "第四节　皮肤性病学的学科特点和学习路径 . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4",
+        "bbox": [
+          0.37325894681665056,
+          0.3202051607750739,
+          0.6264487506532957,
+          0.3344766287706314
+        ]
+      }
+    },
+    {
+      "id": "c465731c2216aba1935f9ae6",
+      "course_id": "dermatology",
+      "parent_id": "f9d642f53ed006b99a3dd38e",
+      "node_type": "chapter",
+      "title": "皮肤的结构",
+      "normalized_title": "皮肤的结构",
+      "order": 6,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 7,
+        "source_label": "第二章",
+        "raw_text": "第二章  皮肤的结构 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7",
+        "bbox": [
+          0.3417331054597858,
+          0.35766468694212966,
+          0.43456935742276376,
+          0.3733361761382663
+        ]
+      }
+    },
+    {
+      "id": "3984708b0adbf91f0830b02c",
+      "course_id": "dermatology",
+      "parent_id": "c465731c2216aba1935f9ae6",
+      "node_type": "section",
+      "title": "表皮",
+      "normalized_title": "表皮",
+      "order": 7,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 7,
+        "source_label": "第一节",
+        "raw_text": "第一节　表皮..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7",
+        "bbox": [
+          0.37326551454465867,
+          0.37789633338392564,
+          0.4070241516221052,
+          0.39216780137948315
+        ]
+      }
+    },
+    {
+      "id": "517460626b7d2d7d6a196a9f",
+      "course_id": "dermatology",
+      "parent_id": "c465731c2216aba1935f9ae6",
+      "node_type": "section",
+      "title": "真皮",
+      "normalized_title": "真皮",
+      "order": 8,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 11,
+        "source_label": "第二节",
+        "raw_text": "第二节　真皮..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11",
+        "bbox": [
+          0.37325894681665056,
+          0.39800985586015325,
+          0.4070175838940971,
+          0.4122813238557108
+        ]
+      }
+    },
+    {
+      "id": "04293efc4d7292284e9f0309",
+      "course_id": "dermatology",
+      "parent_id": "c465731c2216aba1935f9ae6",
+      "node_type": "section",
+      "title": "皮下组织",
+      "normalized_title": "皮下组织",
+      "order": 9,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 12,
+        "source_label": "第三节",
+        "raw_text": "第三节　皮下组织 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12",
+        "bbox": [
+          0.3732587922818739,
+          0.41811731780149997,
+          0.44077604068097087,
+          0.4323887857970575
+        ]
+      }
+    },
+    {
+      "id": "1df369a645a1c749fd608102",
+      "course_id": "dermatology",
+      "parent_id": "c465731c2216aba1935f9ae6",
+      "node_type": "section",
+      "title": "皮肤附属器",
+      "normalized_title": "皮肤附属器",
+      "order": 10,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 12,
+        "source_label": "第四节",
+        "raw_text": "第四节　皮肤附属器 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12",
+        "bbox": [
+          0.3732587922818739,
+          0.4382246668136252,
+          0.45765535921969414,
+          0.4524961348091827
+        ]
+      }
+    },
+    {
+      "id": "41663796dd3ca6942d1d808c",
+      "course_id": "dermatology",
+      "parent_id": "c465731c2216aba1935f9ae6",
+      "node_type": "section",
+      "title": "皮肤的神经、脉管和肌肉",
+      "normalized_title": "皮肤的神经脉管和肌肉",
+      "order": 11,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 14,
+        "source_label": "第五节",
+        "raw_text": "第五节　皮肤的神经、脉管和肌肉 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14",
+        "bbox": null
+      }
+    },
+    {
+      "id": "dc0ab7c79cbcf7ea804db90b",
+      "course_id": "dermatology",
+      "parent_id": "f9d642f53ed006b99a3dd38e",
+      "node_type": "chapter",
+      "title": "皮肤的功能",
+      "normalized_title": "皮肤的功能",
+      "order": 12,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 16,
+        "source_label": "第三章",
+        "raw_text": "第三章  皮肤的功能 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16",
+        "bbox": [
+          0.3417331054597858,
+          0.4957915419928063,
+          0.43456935742276376,
+          0.511463031188943
+        ]
+      }
+    },
+    {
+      "id": "ea0a1cb2c3f346a45d9c1548",
+      "course_id": "dermatology",
+      "parent_id": "dc0ab7c79cbcf7ea804db90b",
+      "node_type": "section",
+      "title": "皮肤的屏障功能",
+      "normalized_title": "皮肤的屏障功能",
+      "order": 13,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 16,
+        "source_label": "第一节",
+        "raw_text": "第一节　皮肤的屏障功能  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16",
+        "bbox": [
+          0.3732655660562509,
+          0.516023226077676,
+          0.4914207958273138,
+          0.5302946940732336
+        ]
+      }
+    },
+    {
+      "id": "69d36ed5989b35a747b12616",
+      "course_id": "dermatology",
+      "parent_id": "dc0ab7c79cbcf7ea804db90b",
+      "node_type": "section",
+      "title": "皮肤的吸收功能",
+      "normalized_title": "皮肤的吸收功能",
+      "order": 14,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 16,
+        "source_label": "第二节",
+        "raw_text": "第二节　皮肤的吸收功能  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16",
+        "bbox": [
+          0.3732587922818739,
+          0.5361367485539037,
+          0.4914139962971407,
+          0.5504082165494611
+        ]
+      }
+    },
+    {
+      "id": "a56816810a63b3107ce62a98",
+      "course_id": "dermatology",
+      "parent_id": "dc0ab7c79cbcf7ea804db90b",
+      "node_type": "section",
+      "title": "皮肤的感觉功能",
+      "normalized_title": "皮肤的感觉功能",
+      "order": 15,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 17,
+        "source_label": "第三节",
+        "raw_text": "第三节　皮肤的感觉功能  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17",
+        "bbox": [
+          0.3732587922818739,
+          0.5562442104952503,
+          0.4914139962971407,
+          0.5705156784908079
+        ]
+      }
+    },
+    {
+      "id": "0f7a03511455dd6a531f76ef",
+      "course_id": "dermatology",
+      "parent_id": "dc0ab7c79cbcf7ea804db90b",
+      "node_type": "section",
+      "title": "皮肤的分泌和排泄功能",
+      "normalized_title": "皮肤的分泌和排泄功能",
+      "order": 16,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 17,
+        "source_label": "第四节",
+        "raw_text": "第四节　皮肤的分泌和排泄功能 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17",
+        "bbox": [
+          0.3732587922818739,
+          0.5763515218643018,
+          0.5420519519133106,
+          0.5906229898598594
+        ]
+      }
+    },
+    {
+      "id": "0c995605b3d6901b57c0293e",
+      "course_id": "dermatology",
+      "parent_id": "dc0ab7c79cbcf7ea804db90b",
+      "node_type": "section",
+      "title": "皮肤的体温调节功能",
+      "normalized_title": "皮肤的体温调节功能",
+      "order": 17,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 18,
+        "source_label": "第五节",
+        "raw_text": "第五节　皮肤的体温调节功能 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18",
+        "bbox": [
+          0.3732587922818739,
+          0.5964589838056485,
+          0.5251726333745873,
+          0.610730451801206
+        ]
+      }
+    },
+    {
+      "id": "e792b748403c87a276fba367",
+      "course_id": "dermatology",
+      "parent_id": "dc0ab7c79cbcf7ea804db90b",
+      "node_type": "section",
+      "title": "皮肤的代谢功能",
+      "normalized_title": "皮肤的代谢功能",
+      "order": 18,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 18,
+        "source_label": "第六节",
+        "raw_text": "第六节　皮肤的代谢功能  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18",
+        "bbox": [
+          0.3732587922818739,
+          0.6165663328177738,
+          0.4914139962971407,
+          0.6308378008133313
+        ]
+      }
+    },
+    {
+      "id": "021b813df86107b4c0b746bd",
+      "course_id": "dermatology",
+      "parent_id": "dc0ab7c79cbcf7ea804db90b",
+      "node_type": "section",
+      "title": "皮肤的免疫功能",
+      "normalized_title": "皮肤的免疫功能",
+      "order": 19,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 19,
+        "source_label": "第七节",
+        "raw_text": "第七节　皮肤的免疫功能  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19",
+        "bbox": [
+          0.3732587922818739,
+          0.6366736441868253,
+          0.4914139962971407,
+          0.6509451121823828
+        ]
+      }
+    },
+    {
+      "id": "7462cb95c7fc297d4e36b01d",
+      "course_id": "dermatology",
+      "parent_id": "f9d642f53ed006b99a3dd38e",
+      "node_type": "chapter",
+      "title": "皮肤病和性病的临床表现",
+      "normalized_title": "皮肤病和性病的临床表现",
+      "order": 20,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 21,
+        "source_label": "第四章",
+        "raw_text": "第四章  皮肤病和性病的临床表现 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21",
+        "bbox": [
+          0.3417331054597858,
+          0.6741332456400286,
+          0.5459728597783374,
+          0.6898047348361653
+        ]
+      }
+    },
+    {
+      "id": "9fc0d4a6f23c02fa82d53c29",
+      "course_id": "dermatology",
+      "parent_id": "7462cb95c7fc297d4e36b01d",
+      "node_type": "section",
+      "title": "皮肤病和性病的症状",
+      "normalized_title": "皮肤病和性病的症状",
+      "order": 21,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 21,
+        "source_label": "第一节",
+        "raw_text": "第一节　皮肤病和性病的症状 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21",
+        "bbox": [
+          0.3732655660562509,
+          0.6943648920818246,
+          0.5251794329047603,
+          0.7086363600773821
+        ]
+      }
+    },
+    {
+      "id": "198530b143917f0cbbd18473",
+      "course_id": "dermatology",
+      "parent_id": "7462cb95c7fc297d4e36b01d",
+      "node_type": "section",
+      "title": "皮肤病和性病的体征",
+      "normalized_title": "皮肤病和性病的体征",
+      "order": 22,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 21,
+        "source_label": "第二节",
+        "raw_text": "第二节　皮肤病和性病的体征 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21",
+        "bbox": [
+          0.3732587922818739,
+          0.7144784145580523,
+          0.5251726333745873,
+          0.7287498825536097
+        ]
+      }
+    },
+    {
+      "id": "f14640eab04ce289a2cff41a",
+      "course_id": "dermatology",
+      "parent_id": "f9d642f53ed006b99a3dd38e",
+      "node_type": "chapter",
+      "title": "皮肤病和性病的辅助检查方法",
+      "normalized_title": "皮肤病和性病的辅助检查方法",
+      "order": 23,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 27,
+        "source_label": "第五章",
+        "raw_text": "第五章  皮肤病和性病的辅助检查方法 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27",
+        "bbox": [
+          0.3417331054597858,
+          0.7519380160112555,
+          0.5831073605635286,
+          0.7676095052073922
+        ]
+      }
+    },
+    {
+      "id": "9efa13a63d4e4c776466617a",
+      "course_id": "dermatology",
+      "parent_id": "f14640eab04ce289a2cff41a",
+      "node_type": "section",
+      "title": "皮肤组织病理学",
+      "normalized_title": "皮肤组织病理学",
+      "order": 24,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 27,
+        "source_label": "第一节",
+        "raw_text": "第一节　皮肤组织病理学  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27",
+        "bbox": [
+          0.3732655660562509,
+          0.7721696624530515,
+          0.4914207958273138,
+          0.7864411304486091
+        ]
+      }
+    },
+    {
+      "id": "24d3d9c5f5504d9dba8aed08",
+      "course_id": "dermatology",
+      "parent_id": "f14640eab04ce289a2cff41a",
+      "node_type": "section",
+      "title": "皮肤影像学",
+      "normalized_title": "皮肤影像学",
+      "order": 25,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 36,
+        "source_label": "第二节",
+        "raw_text": "第二节　皮肤影像学 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36",
+        "bbox": [
+          0.3732587922818739,
+          0.7922831849292792,
+          0.45765535921969414,
+          0.8065546529248367
+        ]
+      }
+    },
+    {
+      "id": "f14428144569b6fdf3702617",
+      "course_id": "dermatology",
+      "parent_id": "f14640eab04ce289a2cff41a",
+      "node_type": "section",
+      "title": "实验室诊断方法",
+      "normalized_title": "实验室诊断方法",
+      "order": 26,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 39,
+        "source_label": "第三节",
+        "raw_text": "第三节　实验室诊断方法  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39",
+        "bbox": [
+          0.3732587922818739,
+          0.8123904586552569,
+          0.4914139962971407,
+          0.8266619266508144
+        ]
+      }
+    },
+    {
+      "id": "d5ea3e724fd19b1b3db0e4ac",
+      "course_id": "dermatology",
+      "parent_id": "f14640eab04ce289a2cff41a",
+      "node_type": "section",
+      "title": "变应原检测",
+      "normalized_title": "变应原检测",
+      "order": 27,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 45,
+        "source_label": "第四节",
+        "raw_text": "第四节　变应原检测 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45",
+        "bbox": [
+          0.3732587922818739,
+          0.8324978076673822,
+          0.45765535921969414,
+          0.8467692756629397
+        ]
+      }
+    },
+    {
+      "id": "3f416efe8bb3ae46d16acaf2",
+      "course_id": "dermatology",
+      "parent_id": "f9d642f53ed006b99a3dd38e",
+      "node_type": "chapter",
+      "title": "皮肤病和性病的诊断",
+      "normalized_title": "皮肤病和性病的诊断",
+      "order": 28,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 47,
+        "source_label": "第六章",
+        "raw_text": "第六章  皮肤病和性病的诊断 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47",
+        "bbox": [
+          0.3417331054597858,
+          0.8699574091205855,
+          0.5088383589931462,
+          0.8856288983167222
+        ]
+      }
+    },
+    {
+      "id": "9d3d26c91eaf9401c8faa393",
+      "course_id": "dermatology",
+      "parent_id": "3f416efe8bb3ae46d16acaf2",
+      "node_type": "section",
+      "title": "皮肤病和性病的病史采集",
+      "normalized_title": "皮肤病和性病的病史采集",
+      "order": 29,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 47,
+        "source_label": "第一节",
+        "raw_text": "第一节　皮肤病和性病的病史采集 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47",
+        "bbox": [
+          0.3732655660562509,
+          0.8901890555623815,
+          0.5589380699822069,
+          0.904460523557939
+        ]
+      }
+    },
+    {
+      "id": "e2ee42cdd4c2c36dc1d7baa2",
+      "course_id": "dermatology",
+      "parent_id": "3f416efe8bb3ae46d16acaf2",
+      "node_type": "section",
+      "title": "皮肤病和性病的体格检查",
+      "normalized_title": "皮肤病和性病的体格检查",
+      "order": 30,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 47,
+        "source_label": "第二节",
+        "raw_text": "第二节　皮肤病和性病的体格检查 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47",
+        "bbox": [
+          0.3732587922818739,
+          0.9103025780386091,
+          0.5589312704520338,
+          0.9245740460341667
+        ]
+      }
+    },
+    {
+      "id": "1a285c96baa7f7e5d870ffd7",
+      "course_id": "dermatology",
+      "parent_id": "3f416efe8bb3ae46d16acaf2",
+      "node_type": "section",
+      "title": "皮肤病和性病的病历书写",
+      "normalized_title": "皮肤病和性病的病历书写",
+      "order": 31,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 49,
+        "source_label": "第三节",
+        "raw_text": "第三节　皮肤病和性病的病历书写 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49",
+        "bbox": [
+          0.37325894681665056,
+          0.0799805588581079,
+          0.5589314764984027,
+          0.09425201744289696
+        ]
+      }
+    },
+    {
+      "id": "6bf3f4c21cd8d824b527e661",
+      "course_id": "dermatology",
+      "parent_id": "3f416efe8bb3ae46d16acaf2",
+      "node_type": "section",
+      "title": "皮肤病和性病的诊断思维",
+      "normalized_title": "皮肤病和性病的诊断思维",
+      "order": 32,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 49,
+        "source_label": "第四节",
+        "raw_text": "第四节　皮肤病和性病的诊断思维 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49",
+        "bbox": [
+          0.3732587922818739,
+          0.10008768201179041,
+          0.5589312704520338,
+          0.11435914059657948
+        ]
+      }
+    },
+    {
+      "id": "8bc0299f6e07898e80f1e7b8",
+      "course_id": "dermatology",
+      "parent_id": "f9d642f53ed006b99a3dd38e",
+      "node_type": "chapter",
+      "title": "皮肤病和性病的治疗",
+      "normalized_title": "皮肤病和性病的治疗",
+      "order": 33,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 51,
+        "source_label": "第七章",
+        "raw_text": "第七章  皮肤病和性病的治疗 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 51",
+        "bbox": [
+          0.3417331054597858,
+          0.1375469070342558,
+          0.5088383589931462,
+          0.15321836799808713
+        ]
+      }
+    },
+    {
+      "id": "c4f6f41b8093a1bf9e19c529",
+      "course_id": "dermatology",
+      "parent_id": "8bc0299f6e07898e80f1e7b8",
+      "node_type": "section",
+      "title": "局部治疗",
+      "normalized_title": "局部治疗",
+      "order": 34,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 51,
+        "source_label": "第一节",
+        "raw_text": "第一节　局部治疗 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 51",
+        "bbox": [
+          0.3732655660562509,
+          0.15777855347605177,
+          0.44078284021114394,
+          0.1720500026500724
+        ]
+      }
+    },
+    {
+      "id": "48a72dca564637ddb0be1d95",
+      "course_id": "dermatology",
+      "parent_id": "8bc0299f6e07898e80f1e7b8",
+      "node_type": "section",
+      "title": "系统治疗",
+      "normalized_title": "系统治疗",
+      "order": 35,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 54,
+        "source_label": "第二节",
+        "raw_text": "第二节　系统治疗 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 54",
+        "bbox": [
+          0.3732587922818739,
+          0.1778914736630987,
+          0.44077604068097087,
+          0.19216292283711933
+        ]
+      }
+    },
+    {
+      "id": "502249158c3f58f20fcab074",
+      "course_id": "dermatology",
+      "parent_id": "8bc0299f6e07898e80f1e7b8",
+      "node_type": "section",
+      "title": "物理治疗",
+      "normalized_title": "物理治疗",
+      "order": 36,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 59,
+        "source_label": "第三节",
+        "raw_text": "第三节　物理治疗 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 59",
+        "bbox": [
+          0.3732587922818739,
+          0.19799852153063363,
+          0.44077604068097087,
+          0.21226997070465425
+        ]
+      }
+    },
+    {
+      "id": "3e1a5713329f2abbecc3955c",
+      "course_id": "dermatology",
+      "parent_id": "8bc0299f6e07898e80f1e7b8",
+      "node_type": "section",
+      "title": "皮肤外科",
+      "normalized_title": "皮肤外科",
+      "order": 37,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 60,
+        "source_label": "第四节",
+        "raw_text": "第四节　皮肤外科 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 60",
+        "bbox": [
+          0.3732587922818739,
+          0.21810564468431615,
+          0.44077604068097087,
+          0.23237709385833677
+        ]
+      }
+    },
+    {
+      "id": "66a5bd30abd716456170a7f0",
+      "course_id": "dermatology",
+      "parent_id": "f9d642f53ed006b99a3dd38e",
+      "node_type": "chapter",
+      "title": "皮肤美容",
+      "normalized_title": "皮肤美容",
+      "order": 38,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 62,
+        "source_label": "第八章",
+        "raw_text": "第八章  皮肤美容 ... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 62",
+        "bbox": null
+      }
+    },
+    {
+      "id": "9c47010b87b460c22858e00c",
+      "course_id": "dermatology",
+      "parent_id": "66a5bd30abd716456170a7f0",
+      "node_type": "section",
+      "title": "皮肤美容技术",
+      "normalized_title": "皮肤美容技术",
+      "order": 39,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 62,
+        "source_label": "第一节",
+        "raw_text": "第一节　皮肤美容技术 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 62",
+        "bbox": [
+          0.3732655660562509,
+          0.27579651614857753,
+          0.4745414772885905,
+          0.29006796532259815
+        ]
+      }
+    },
+    {
+      "id": "736db2c4f25f2494b5b53dd1",
+      "course_id": "dermatology",
+      "parent_id": "66a5bd30abd716456170a7f0",
+      "node_type": "section",
+      "title": "皮肤美容应用",
+      "normalized_title": "皮肤美容应用",
+      "order": 40,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 64,
+        "source_label": "第二节",
+        "raw_text": "第二节　皮肤美容应用 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 64",
+        "bbox": [
+          0.3732587922818739,
+          0.29590951162177204,
+          0.47453467775841746,
+          0.31018096079579266
+        ]
+      }
+    },
+    {
+      "id": "0b8a4ab7d21111c375ecd4d2",
+      "course_id": "dermatology",
+      "parent_id": "f9d642f53ed006b99a3dd38e",
+      "node_type": "chapter",
+      "title": "皮肤病和性病的预防和康复",
+      "normalized_title": "皮肤病和性病的预防和康复",
+      "order": 41,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 66,
+        "source_label": "第九章",
+        "raw_text": "第九章  皮肤病和性病的预防和康复 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 66",
+        "bbox": [
+          0.3417331054597858,
+          0.3333686425365529,
+          0.564540110170933,
+          0.3490401317326896
+        ]
+      }
+    },
+    {
+      "id": "8755fe4452d97d455e8aa064",
+      "course_id": "dermatology",
+      "parent_id": "0b8a4ab7d21111c375ecd4d2",
+      "node_type": "section",
+      "title": "皮肤病和性病的预防",
+      "normalized_title": "皮肤病和性病的预防",
+      "order": 42,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 66,
+        "source_label": "第一节",
+        "raw_text": "第一节　皮肤病和性病的预防 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 66",
+        "bbox": null
+      }
+    },
+    {
+      "id": "3a44f9202df94d34d6974441",
+      "course_id": "dermatology",
+      "parent_id": "0b8a4ab7d21111c375ecd4d2",
+      "node_type": "section",
+      "title": "皮肤病和性病的康复",
+      "normalized_title": "皮肤病和性病的康复",
+      "order": 43,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 66,
+        "source_label": "第二节",
+        "raw_text": "第二节　皮肤病和性病的康复 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 66",
+        "bbox": [
+          0.3732587922818739,
+          0.3737132468084696,
+          0.5251726333745873,
+          0.38798471480402713
+        ]
+      }
+    },
+    {
+      "id": "b2e462c6abea82bcae827a35",
+      "course_id": "dermatology",
+      "parent_id": null,
+      "node_type": "part",
+      "title": "皮肤性病学各论",
+      "normalized_title": "皮肤性病学各论",
+      "order": 44,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 69,
+        "source_label": "第二篇",
+        "raw_text": "第二篇　皮肤性病学各论                         69",
+        "bbox": [
+          0.2661562760745241,
+          0.4133129322930595,
+          0.420095630240725,
+          0.43026104869387566
+        ]
+      }
+    },
+    {
+      "id": "1efeed76400d56e1c52d84f2",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "病毒性皮肤病",
+      "normalized_title": "病毒性皮肤病",
+      "order": 45,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 70,
+        "source_label": "第十章",
+        "raw_text": "第十章  病毒性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 70",
+        "bbox": [
+          0.3417331054597858,
+          0.4529579400384983,
+          0.45313660781535936,
+          0.468629429234635
+        ]
+      }
+    },
+    {
+      "id": "aefa37ac41af527345c1e9ae",
+      "course_id": "dermatology",
+      "parent_id": "1efeed76400d56e1c52d84f2",
+      "node_type": "section",
+      "title": "单纯疱疹",
+      "normalized_title": "单纯疱疹",
+      "order": 46,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 70,
+        "source_label": "第一节",
+        "raw_text": "第一节　单纯疱疹 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 70",
+        "bbox": [
+          0.3732655660562509,
+          0.4731895864802943,
+          0.44078284021114394,
+          0.4874610544758518
+        ]
+      }
+    },
+    {
+      "id": "40006d5b4f7042e6269bc867",
+      "course_id": "dermatology",
+      "parent_id": "1efeed76400d56e1c52d84f2",
+      "node_type": "section",
+      "title": "水痘和带状疱疹",
+      "normalized_title": "水痘和带状疱疹",
+      "order": 47,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 71,
+        "source_label": "第二节",
+        "raw_text": "第二节　水痘和带状疱疹  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 71",
+        "bbox": [
+          0.3732587922818739,
+          0.4933025066673412,
+          0.4914139962971407,
+          0.5075739746628988
+        ]
+      }
+    },
+    {
+      "id": "1d7d98455ded866a8257b612",
+      "course_id": "dermatology",
+      "parent_id": "1efeed76400d56e1c52d84f2",
+      "node_type": "section",
+      "title": "疣",
+      "normalized_title": "疣",
+      "order": 48,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 73,
+        "source_label": "第三节",
+        "raw_text": "第三节　疣 ....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 73",
+        "bbox": null
+      }
+    },
+    {
+      "id": "c7010d1460da553361fe0e7b",
+      "course_id": "dermatology",
+      "parent_id": "1efeed76400d56e1c52d84f2",
+      "node_type": "section",
+      "title": "传染性软疣",
+      "normalized_title": "传染性软疣",
+      "order": 49,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 75,
+        "source_label": "第四节",
+        "raw_text": "第四节　传染性软疣 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 75",
+        "bbox": [
+          0.3732587922818739,
+          0.5335168282608539,
+          0.45765535921969414,
+          0.5477882962564113
+        ]
+      }
+    },
+    {
+      "id": "92013276337764a3abea12a3",
+      "course_id": "dermatology",
+      "parent_id": "1efeed76400d56e1c52d84f2",
+      "node_type": "section",
+      "title": "手足口病",
+      "normalized_title": "手足口病",
+      "order": 50,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 76,
+        "source_label": "第五节",
+        "raw_text": "第五节　手足口病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 76",
+        "bbox": [
+          0.3732587922818739,
+          0.5536237631991674,
+          0.44077604068097087,
+          0.567895231194725
+        ]
+      }
+    },
+    {
+      "id": "ae20b02355be14445e5d8db9",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "细菌性皮肤病",
+      "normalized_title": "细菌性皮肤病",
+      "order": 51,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 78,
+        "source_label": "第十一章",
+        "raw_text": "第十一章  细菌性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 78",
+        "bbox": [
+          0.36030035585238135,
+          0.5910831011508542,
+          0.47170385820795496,
+          0.6067545903469909
+        ]
+      }
+    },
+    {
+      "id": "6d1fb24fef8f3aa2bb0a6c03",
+      "course_id": "dermatology",
+      "parent_id": "ae20b02355be14445e5d8db9",
+      "node_type": "section",
+      "title": "脓疱疮",
+      "normalized_title": "脓疱疮",
+      "order": 52,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 78,
+        "source_label": "第一节",
+        "raw_text": "第一节　脓疱疮 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 78",
+        "bbox": [
+          0.3732655660562509,
+          0.6113147475926501,
+          0.4239035216724207,
+          0.6255862155882077
+        ]
+      }
+    },
+    {
+      "id": "b0fb2d43a53b7affe367a932",
+      "course_id": "dermatology",
+      "parent_id": "ae20b02355be14445e5d8db9",
+      "node_type": "section",
+      "title": "毛囊炎、疖和痈",
+      "normalized_title": "毛囊炎疖和痈",
+      "order": 53,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 80,
+        "source_label": "第二节",
+        "raw_text": "第二节　毛囊炎、疖和痈 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 80",
+        "bbox": [
+          0.3732587922818739,
+          0.6314277054227708,
+          0.4829743370277791,
+          0.6456991734183284
+        ]
+      }
+    },
+    {
+      "id": "89f78bb6ee5ed75fcea3b7e0",
+      "course_id": "dermatology",
+      "parent_id": "ae20b02355be14445e5d8db9",
+      "node_type": "section",
+      "title": "丹毒和蜂窝织炎",
+      "normalized_title": "丹毒和蜂窝织炎",
+      "order": 54,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 81,
+        "source_label": "第三节",
+        "raw_text": "第三节　丹毒和蜂窝织炎  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 81",
+        "bbox": [
+          0.3732587922818739,
+          0.6515347532903057,
+          0.4914139962971407,
+          0.6658062212858633
+        ]
+      }
+    },
+    {
+      "id": "40480f891766a1173fcb7b5d",
+      "course_id": "dermatology",
+      "parent_id": "ae20b02355be14445e5d8db9",
+      "node_type": "section",
+      "title": "皮肤结核病",
+      "normalized_title": "皮肤结核病",
+      "order": 55,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 82,
+        "source_label": "第四节",
+        "raw_text": "第四节　皮肤结核病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 82",
+        "bbox": [
+          0.3732587922818739,
+          0.6716419517301359,
+          0.45765535921969414,
+          0.6859134197256934
+        ]
+      }
+    },
+    {
+      "id": "67cfafc80a27e2c3f3f8229c",
+      "course_id": "dermatology",
+      "parent_id": "ae20b02355be14445e5d8db9",
+      "node_type": "section",
+      "title": "麻风",
+      "normalized_title": "麻风",
+      "order": 56,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 83,
+        "source_label": "第五节",
+        "raw_text": "第五节　麻风..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 83",
+        "bbox": [
+          0.3732587922818739,
+          0.6917490748838184,
+          0.40701742935932045,
+          0.7060205428793759
+        ]
+      }
+    },
+    {
+      "id": "214646148eba36713b7bdf84",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "真菌性皮肤病",
+      "normalized_title": "真菌性皮肤病",
+      "order": 57,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 87,
+        "source_label": "第十二章",
+        "raw_text": "第十二章  真菌性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 87",
+        "bbox": [
+          0.36030035585238135,
+          0.7292082246201362,
+          0.47170385820795496,
+          0.7448797138162729
+        ]
+      }
+    },
+    {
+      "id": "a017804ada8d1ac69e3107cc",
+      "course_id": "dermatology",
+      "parent_id": "214646148eba36713b7bdf84",
+      "node_type": "section",
+      "title": "头癣",
+      "normalized_title": "头癣",
+      "order": 58,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 87,
+        "source_label": "第一节",
+        "raw_text": "第一节　头癣..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 87",
+        "bbox": [
+          0.3732655660562509,
+          0.7494399463480798,
+          0.4070242031336974,
+          0.7637114143436373
+        ]
+      }
+    },
+    {
+      "id": "40e6e32ce12fb325787ab430",
+      "course_id": "dermatology",
+      "parent_id": "214646148eba36713b7bdf84",
+      "node_type": "section",
+      "title": "体癣和股癣",
+      "normalized_title": "体癣和股癣",
+      "order": 59,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 89,
+        "source_label": "第二节",
+        "raw_text": "第二节　体癣和股癣 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 89",
+        "bbox": [
+          0.3732587922818739,
+          0.7695529418212743,
+          0.45765535921969414,
+          0.7838244098168318
+        ]
+      }
+    },
+    {
+      "id": "1dffd338275f3b13a3304a46",
+      "course_id": "dermatology",
+      "parent_id": "214646148eba36713b7bdf84",
+      "node_type": "section",
+      "title": "手癣和足癣",
+      "normalized_title": "手癣和足癣",
+      "order": 60,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 90,
+        "source_label": "第三节",
+        "raw_text": "第三节　手癣和足癣 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 90",
+        "bbox": [
+          0.3732587922818739,
+          0.7896599144026616,
+          0.45765535921969414,
+          0.8039313823982192
+        ]
+      }
+    },
+    {
+      "id": "5cca0941c1e8efee4bfc7017",
+      "course_id": "dermatology",
+      "parent_id": "214646148eba36713b7bdf84",
+      "node_type": "section",
+      "title": "甲真菌病",
+      "normalized_title": "甲真菌病",
+      "order": 61,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 92,
+        "source_label": "第四节",
+        "raw_text": "第四节　甲真菌病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 92",
+        "bbox": [
+          0.3732587922818739,
+          0.8097669622701965,
+          0.44077604068097087,
+          0.8240384302657541
+        ]
+      }
+    },
+    {
+      "id": "83d25f497d8175bb3887dd75",
+      "course_id": "dermatology",
+      "parent_id": "214646148eba36713b7bdf84",
+      "node_type": "section",
+      "title": "花斑糠疹",
+      "normalized_title": "花斑糠疹",
+      "order": 62,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 93,
+        "source_label": "第五节",
+        "raw_text": "第五节　花斑糠疹 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 93",
+        "bbox": [
+          0.3732587922818739,
+          0.8298741607100266,
+          0.44077604068097087,
+          0.8441456287055842
+        ]
+      }
+    },
+    {
+      "id": "6f53ec606ac69cb20b745109",
+      "course_id": "dermatology",
+      "parent_id": "214646148eba36713b7bdf84",
+      "node_type": "section",
+      "title": "马拉色菌毛囊炎",
+      "normalized_title": "马拉色菌毛囊炎",
+      "order": 63,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 94,
+        "source_label": "第六节",
+        "raw_text": "第六节　马拉色菌毛囊炎  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 94",
+        "bbox": [
+          0.3732587922818739,
+          0.8499812838637092,
+          0.4914139962971407,
+          0.8642527518592668
+        ]
+      }
+    },
+    {
+      "id": "fdfb2c9fb42456b2199206c7",
+      "course_id": "dermatology",
+      "parent_id": "214646148eba36713b7bdf84",
+      "node_type": "section",
+      "title": "念珠菌病",
+      "normalized_title": "念珠菌病",
+      "order": 64,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 95,
+        "source_label": "第七节",
+        "raw_text": "第七节　念珠菌病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 95",
+        "bbox": [
+          0.3732587922818739,
+          0.8700884070173917,
+          0.44077604068097087,
+          0.8843598750129492
+        ]
+      }
+    },
+    {
+      "id": "e1bada5a6eb742037cdede95",
+      "course_id": "dermatology",
+      "parent_id": "214646148eba36713b7bdf84",
+      "node_type": "section",
+      "title": "着色芽生菌病",
+      "normalized_title": "着色芽生菌病",
+      "order": 65,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 97,
+        "source_label": "第八节",
+        "raw_text": "第八节　着色芽生菌病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 97",
+        "bbox": [
+          0.3732587922818739,
+          0.8901954548849267,
+          0.47453467775841746,
+          0.9044669228804841
+        ]
+      }
+    },
+    {
+      "id": "b1b04977ba1d5327426eaec2",
+      "course_id": "dermatology",
+      "parent_id": "214646148eba36713b7bdf84",
+      "node_type": "section",
+      "title": "孢子丝菌病",
+      "normalized_title": "孢子丝菌病",
+      "order": 66,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 98,
+        "source_label": "第九节",
+        "raw_text": "第九节　孢子丝菌病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 98",
+        "bbox": [
+          0.3732587922818739,
+          0.9103025780386091,
+          0.45765535921969414,
+          0.9245740460341667
+        ]
+      }
+    },
+    {
+      "id": "ad5e050277137528aeaa23b4",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "动物性皮肤病",
+      "normalized_title": "动物性皮肤病",
+      "order": 67,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 100,
+        "source_label": "第十三章",
+        "raw_text": "第十三章  动物性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 100",
+        "bbox": [
+          0.36030035585238135,
+          0.07985023853663002,
+          0.47170385820795496,
+          0.09552169950046135
+        ]
+      }
+    },
+    {
+      "id": "e3cc3b6313ad98ca551afc91",
+      "course_id": "dermatology",
+      "parent_id": "ad5e050277137528aeaa23b4",
+      "node_type": "section",
+      "title": "疥疮",
+      "normalized_title": "疥疮",
+      "order": 68,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 100,
+        "source_label": "第一节",
+        "raw_text": "第一节　疥疮..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 100",
+        "bbox": [
+          0.3732655660562509,
+          0.1007971786666763,
+          0.4070242031336974,
+          0.11506863725146536
+        ]
+      }
+    },
+    {
+      "id": "0770aa943a93c95491c8ba3d",
+      "course_id": "dermatology",
+      "parent_id": "ad5e050277137528aeaa23b4",
+      "node_type": "section",
+      "title": "毛虫皮炎",
+      "normalized_title": "毛虫皮炎",
+      "order": 69,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 101,
+        "source_label": "第二节",
+        "raw_text": "第二节　毛虫皮炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 101",
+        "bbox": [
+          0.37325894681665056,
+          0.12162426324975968,
+          0.4407762467273398,
+          0.13589572183454876
+        ]
+      }
+    },
+    {
+      "id": "6139aeaf9f1ca824748048ce",
+      "course_id": "dermatology",
+      "parent_id": "ad5e050277137528aeaa23b4",
+      "node_type": "section",
+      "title": "隐翅虫皮炎",
+      "normalized_title": "隐翅虫皮炎",
+      "order": 70,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 102,
+        "source_label": "第三节",
+        "raw_text": "第三节　隐翅虫皮炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 102",
+        "bbox": [
+          0.37325894681665056,
+          0.14244615308865938,
+          0.45765556526606305,
+          0.15671761167344844
+        ]
+      }
+    },
+    {
+      "id": "98e5e1bcd81bb577058a5e7b",
+      "course_id": "dermatology",
+      "parent_id": "ad5e050277137528aeaa23b4",
+      "node_type": "section",
+      "title": "虱病",
+      "normalized_title": "虱病",
+      "order": 71,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 103,
+        "source_label": "第四节",
+        "raw_text": "第四节　虱病..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 103",
+        "bbox": [
+          0.37325894681665056,
+          0.16326804292755906,
+          0.4070175838940971,
+          0.17753949210157968
+        ]
+      }
+    },
+    {
+      "id": "6364da61bf8d05c3d38cbde7",
+      "course_id": "dermatology",
+      "parent_id": "ad5e050277137528aeaa23b4",
+      "node_type": "section",
+      "title": "虫咬皮炎",
+      "normalized_title": "虫咬皮炎",
+      "order": 72,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 104,
+        "source_label": "第五节",
+        "raw_text": "第五节　虫咬皮炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 104",
+        "bbox": [
+          0.37325894681665056,
+          0.18408993276645877,
+          0.4407762467273398,
+          0.19836138194047936
+        ]
+      }
+    },
+    {
+      "id": "cd4b9fd4cc0da6cc5fdeb835",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "皮炎和湿疹",
+      "normalized_title": "皮炎和湿疹",
+      "order": 73,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 106,
+        "source_label": "第十四章",
+        "raw_text": "第十四章  皮炎和湿疹 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 106",
+        "bbox": [
+          0.36030035585238135,
+          0.2222639244741413,
+          0.45313660781535936,
+          0.2379353948487411
+        ]
+      }
+    },
+    {
+      "id": "dc540dabdeaf2d12d3efe4a1",
+      "course_id": "dermatology",
+      "parent_id": "cd4b9fd4cc0da6cc5fdeb835",
+      "node_type": "section",
+      "title": "接触性皮炎",
+      "normalized_title": "接触性皮炎",
+      "order": 74,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 106,
+        "source_label": "第一节",
+        "raw_text": "第一节　接触性皮炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 106",
+        "bbox": [
+          0.3732655660562509,
+          0.24321101517648278,
+          0.4576621587498672,
+          0.25748246435050337
+        ]
+      }
+    },
+    {
+      "id": "62edbf56a9f41d83f01a04ca",
+      "course_id": "dermatology",
+      "parent_id": "cd4b9fd4cc0da6cc5fdeb835",
+      "node_type": "section",
+      "title": "特应性皮炎",
+      "normalized_title": "特应性皮炎",
+      "order": 75,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 108,
+        "source_label": "第二节",
+        "raw_text": "第二节　特应性皮炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 108",
+        "bbox": [
+          0.37325894681665056,
+          0.26403809975956616,
+          0.45765556526606305,
+          0.2783095489335868
+        ]
+      }
+    },
+    {
+      "id": "8e46a58f4eaa2c62766f6ac9",
+      "course_id": "dermatology",
+      "parent_id": "cd4b9fd4cc0da6cc5fdeb835",
+      "node_type": "section",
+      "title": "淤积性皮炎",
+      "normalized_title": "淤积性皮炎",
+      "order": 76,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 111,
+        "source_label": "第三节",
+        "raw_text": "第三节　淤积性皮炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 111",
+        "bbox": [
+          0.37325894681665056,
+          0.28486006488461346,
+          0.45765556526606305,
+          0.29913151405863403
+        ]
+      }
+    },
+    {
+      "id": "6f5a3175a8a8acfa350d3b54",
+      "course_id": "dermatology",
+      "parent_id": "cd4b9fd4cc0da6cc5fdeb835",
+      "node_type": "section",
+      "title": "湿疹",
+      "normalized_title": "湿疹",
+      "order": 77,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 111,
+        "source_label": "第四节",
+        "raw_text": "第四节　湿疹..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 111",
+        "bbox": null
+      }
+    },
+    {
+      "id": "9a3128dfb5b6157d074a81e7",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "荨麻疹类皮肤病",
+      "normalized_title": "荨麻疹类皮肤病",
+      "order": 78,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 115,
+        "source_label": "第十五章",
+        "raw_text": "第十五章  荨麻疹类皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 115",
+        "bbox": [
+          0.36030035585238135,
+          0.3438559276096588,
+          0.49027110860055056,
+          0.3595274168057955
+        ]
+      }
+    },
+    {
+      "id": "4506a524dcc4f17625c11345",
+      "course_id": "dermatology",
+      "parent_id": "9a3128dfb5b6157d074a81e7",
+      "node_type": "section",
+      "title": "荨麻疹",
+      "normalized_title": "荨麻疹",
+      "order": 79,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 115,
+        "source_label": "第一节",
+        "raw_text": "第一节　荨麻疹 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 115",
+        "bbox": null
+      }
+    },
+    {
+      "id": "acc6f0f68beae0d97a8640e1",
+      "course_id": "dermatology",
+      "parent_id": "9a3128dfb5b6157d074a81e7",
+      "node_type": "section",
+      "title": "血管性水肿",
+      "normalized_title": "血管性水肿",
+      "order": 80,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 118,
+        "source_label": "第二节",
+        "raw_text": "第二节　血管性水肿 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 118",
+        "bbox": [
+          0.37325894681665056,
+          0.3856300652520098,
+          0.45765556526606305,
+          0.39990153324756733
+        ]
+      }
+    },
+    {
+      "id": "78408b95a8839f3057d255b1",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "药疹",
+      "normalized_title": "药疹",
+      "order": 81,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 120,
+        "source_label": "第十六章",
+        "raw_text": "第十六章  药疹 ...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 120",
+        "bbox": [
+          0.36030035585238135,
+          0.4238040946027662,
+          0.39743485663757255,
+          0.4394755837989029
+        ]
+      }
+    },
+    {
+      "id": "56bdd01e68be990adecd1366",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "物理性皮肤病",
+      "normalized_title": "物理性皮肤病",
+      "order": 82,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 125,
+        "source_label": "第十七章",
+        "raw_text": "第十七章  物理性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 125",
+        "bbox": [
+          0.36030035585238135,
+          0.4621084442750004,
+          0.47170385820795496,
+          0.4777799334711371
+        ]
+      }
+    },
+    {
+      "id": "7b9ef962e1f8ffa62b1fb981",
+      "course_id": "dermatology",
+      "parent_id": "56bdd01e68be990adecd1366",
+      "node_type": "section",
+      "title": "日光性皮肤病",
+      "normalized_title": "日光性皮肤病",
+      "order": 83,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 125,
+        "source_label": "第一节",
+        "raw_text": "第一节　日光性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 125",
+        "bbox": [
+          0.3732655660562509,
+          0.4830555349773419,
+          0.4745414772885905,
+          0.4973270029728994
+        ]
+      }
+    },
+    {
+      "id": "5fbddd25ced59266eda4efe0",
+      "course_id": "dermatology",
+      "parent_id": "56bdd01e68be990adecd1366",
+      "node_type": "section",
+      "title": "夏季皮炎",
+      "normalized_title": "夏季皮炎",
+      "order": 84,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 126,
+        "source_label": "第二节",
+        "raw_text": "第二节　夏季皮炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 126",
+        "bbox": [
+          0.37325894681665056,
+          0.5038826195604252,
+          0.4407762467273398,
+          0.5181540875559828
+        ]
+      }
+    },
+    {
+      "id": "f69af924ba9648398a971fc1",
+      "course_id": "dermatology",
+      "parent_id": "56bdd01e68be990adecd1366",
+      "node_type": "section",
+      "title": "痱子",
+      "normalized_title": "痱子",
+      "order": 85,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 127,
+        "source_label": "第三节",
+        "raw_text": "第三节　痱子..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 127",
+        "bbox": [
+          0.37325894681665056,
+          0.524704509399325,
+          0.4070175838940971,
+          0.5389759773948825
+        ]
+      }
+    },
+    {
+      "id": "29bdae874ee4a4c837e9419e",
+      "course_id": "dermatology",
+      "parent_id": "56bdd01e68be990adecd1366",
+      "node_type": "section",
+      "title": "冻疮",
+      "normalized_title": "冻疮",
+      "order": 86,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 127,
+        "source_label": "第四节",
+        "raw_text": "第四节　冻疮..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 127",
+        "bbox": [
+          0.37325894681665056,
+          0.5455264368812984,
+          0.4070175838940971,
+          0.559797904876856
+        ]
+      }
+    },
+    {
+      "id": "ae03c75cfa41c260d9468178",
+      "course_id": "dermatology",
+      "parent_id": "56bdd01e68be990adecd1366",
+      "node_type": "section",
+      "title": "鸡眼与胼胝",
+      "normalized_title": "鸡眼与胼胝",
+      "order": 87,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 128,
+        "source_label": "第五节",
+        "raw_text": "第五节　鸡眼与胼胝 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 128",
+        "bbox": [
+          0.37325894681665056,
+          0.5663483267201981,
+          0.45765556526606305,
+          0.5806197947157556
+        ]
+      }
+    },
+    {
+      "id": "263b370ff7b7bbb833c85c42",
+      "course_id": "dermatology",
+      "parent_id": "56bdd01e68be990adecd1366",
+      "node_type": "section",
+      "title": "放射性皮炎",
+      "normalized_title": "放射性皮炎",
+      "order": 88,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 129,
+        "source_label": "第六节",
+        "raw_text": "第六节　放射性皮炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 129",
+        "bbox": [
+          0.37325894681665056,
+          0.5871702165590978,
+          0.45765556526606305,
+          0.6014416845546553
+        ]
+      }
+    },
+    {
+      "id": "5320fee721b0232001656988",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "瘙痒性皮肤病",
+      "normalized_title": "瘙痒性皮肤病",
+      "order": 89,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 131,
+        "source_label": "第十八章",
+        "raw_text": "第十八章  瘙痒性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 131",
+        "bbox": [
+          0.36030035585238135,
+          0.6253443588390756,
+          0.47170385820795496,
+          0.6410158480352123
+        ]
+      }
+    },
+    {
+      "id": "d7a54307f505f004abd339a6",
+      "course_id": "dermatology",
+      "parent_id": "5320fee721b0232001656988",
+      "node_type": "section",
+      "title": "瘙痒症",
+      "normalized_title": "瘙痒症",
+      "order": 90,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 131,
+        "source_label": "第一节",
+        "raw_text": "第一节　瘙痒症 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 131",
+        "bbox": [
+          0.3732655660562509,
+          0.6462912989691219,
+          0.4239035216724207,
+          0.6605627669646793
+        ]
+      }
+    },
+    {
+      "id": "73d19f89371f91fcbf675f75",
+      "course_id": "dermatology",
+      "parent_id": "5320fee721b0232001656988",
+      "node_type": "section",
+      "title": "慢性单纯性苔藓",
+      "normalized_title": "慢性单纯性苔藓",
+      "order": 91,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 132,
+        "source_label": "第二节",
+        "raw_text": "第二节　慢性单纯性苔藓  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 132",
+        "bbox": [
+          0.37325894681665056,
+          0.6671183835522052,
+          0.4914142023435096,
+          0.6813898515477628
+        ]
+      }
+    },
+    {
+      "id": "b99d61003bfc026e2bca0d09",
+      "course_id": "dermatology",
+      "parent_id": "5320fee721b0232001656988",
+      "node_type": "section",
+      "title": "痒疹",
+      "normalized_title": "痒疹",
+      "order": 92,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 133,
+        "source_label": "第三节",
+        "raw_text": "第三节　痒疹..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 133",
+        "bbox": [
+          0.37325894681665056,
+          0.6879402733911049,
+          0.4070175838940971,
+          0.7022117413866624
+        ]
+      }
+    },
+    {
+      "id": "57d420e492297d317ba528e7",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "红斑丘疹鳞屑性皮肤病",
+      "normalized_title": "红斑丘疹鳞屑性皮肤病",
+      "order": 93,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 135,
+        "source_label": "第十九章",
+        "raw_text": "第十九章  红斑丘疹鳞屑性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 135",
+        "bbox": [
+          0.36030035585238135,
+          0.7261144156710827,
+          0.5459728597783374,
+          0.7417859048672193
+        ]
+      }
+    },
+    {
+      "id": "77fad1f49571291614f6fda3",
+      "course_id": "dermatology",
+      "parent_id": "57d420e492297d317ba528e7",
+      "node_type": "section",
+      "title": "银屑病",
+      "normalized_title": "银屑病",
+      "order": 94,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 135,
+        "source_label": "第一节",
+        "raw_text": "第一节　银屑病 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 135",
+        "bbox": [
+          0.3732655660562509,
+          0.747061355801129,
+          0.4239035216724207,
+          0.7613328237966864
+        ]
+      }
+    },
+    {
+      "id": "61c5a40deda851b322b92532",
+      "course_id": "dermatology",
+      "parent_id": "57d420e492297d317ba528e7",
+      "node_type": "section",
+      "title": "玫瑰糠疹",
+      "normalized_title": "玫瑰糠疹",
+      "order": 95,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 139,
+        "source_label": "第二节",
+        "raw_text": "第二节　玫瑰糠疹 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 139",
+        "bbox": [
+          0.37325894681665056,
+          0.7678884403842123,
+          0.4407762467273398,
+          0.7821599083797698
+        ]
+      }
+    },
+    {
+      "id": "463f97c00f441c98a1445cda",
+      "course_id": "dermatology",
+      "parent_id": "57d420e492297d317ba528e7",
+      "node_type": "section",
+      "title": "多形红斑",
+      "normalized_title": "多形红斑",
+      "order": 96,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 139,
+        "source_label": "第三节",
+        "raw_text": "第三节　多形红斑 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 139",
+        "bbox": [
+          0.37325894681665056,
+          0.788710330223112,
+          0.4407762467273398,
+          0.8029817982186696
+        ]
+      }
+    },
+    {
+      "id": "7c76edab002f2126442d3d11",
+      "course_id": "dermatology",
+      "parent_id": "57d420e492297d317ba528e7",
+      "node_type": "section",
+      "title": "扁平苔藓",
+      "normalized_title": "扁平苔藓",
+      "order": 97,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 141,
+        "source_label": "第四节",
+        "raw_text": "第四节　扁平苔藓 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 141",
+        "bbox": [
+          0.37325894681665056,
+          0.8095323706343068,
+          0.4407762467273398,
+          0.8238038386298644
+        ]
+      }
+    },
+    {
+      "id": "0120b618ad38ae952f4202f4",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "结缔组织病",
+      "normalized_title": "结缔组织病",
+      "order": 98,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 143,
+        "source_label": "第二十章",
+        "raw_text": "第二十章  结缔组织病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 143",
+        "bbox": [
+          0.36030035585238135,
+          0.8477063623419895,
+          0.45313660781535936,
+          0.8633778515381261
+        ]
+      }
+    },
+    {
+      "id": "98990213ca1449a41fb43b99",
+      "course_id": "dermatology",
+      "parent_id": "0120b618ad38ae952f4202f4",
+      "node_type": "section",
+      "title": "红斑狼疮",
+      "normalized_title": "红斑狼疮",
+      "order": 99,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 143,
+        "source_label": "第一节",
+        "raw_text": "第一节　红斑狼疮 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 143",
+        "bbox": [
+          0.3732655660562509,
+          0.868653453044331,
+          0.44078284021114394,
+          0.8829249210398884
+        ]
+      }
+    },
+    {
+      "id": "d86959baba6d7786a581259a",
+      "course_id": "dermatology",
+      "parent_id": "0120b618ad38ae952f4202f4",
+      "node_type": "section",
+      "title": "皮肌炎",
+      "normalized_title": "皮肌炎",
+      "order": 100,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 148,
+        "source_label": "第二节",
+        "raw_text": "第二节　皮肌炎 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 148",
+        "bbox": [
+          0.37325894681665056,
+          0.8894805376274143,
+          0.4238969024328204,
+          0.9037520056229718
+        ]
+      }
+    },
+    {
+      "id": "6d2d76a045d10bf08dfb87af",
+      "course_id": "dermatology",
+      "parent_id": "0120b618ad38ae952f4202f4",
+      "node_type": "section",
+      "title": "硬皮病",
+      "normalized_title": "硬皮病",
+      "order": 101,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 150,
+        "source_label": "第三节",
+        "raw_text": "第三节　硬皮病 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 150",
+        "bbox": [
+          0.37325894681665056,
+          0.910302427466314,
+          0.4238969024328204,
+          0.9245738954618715
+        ]
+      }
+    },
+    {
+      "id": "88ff24b6353d2559da0bf595",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "大疱性皮肤病",
+      "normalized_title": "大疱性皮肤病",
+      "order": 102,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 154,
+        "source_label": "第二十一章",
+        "raw_text": "第二十一章  大疱性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 154",
+        "bbox": [
+          0.37887334978750953,
+          0.07984903395826859,
+          0.49027682638728703,
+          0.09552049492209992
+        ]
+      }
+    },
+    {
+      "id": "8f2bcca2ce1a5d758880c635",
+      "course_id": "dermatology",
+      "parent_id": "88ff24b6353d2559da0bf595",
+      "node_type": "section",
+      "title": "天疱疮",
+      "normalized_title": "天疱疮",
+      "order": 103,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 154,
+        "source_label": "第一节",
+        "raw_text": "第一节　天疱疮 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 154",
+        "bbox": null
+      }
+    },
+    {
+      "id": "8056d5081001c603a62050ad",
+      "course_id": "dermatology",
+      "parent_id": "88ff24b6353d2559da0bf595",
+      "node_type": "section",
+      "title": "大疱性类天疱疮",
+      "normalized_title": "大疱性类天疱疮",
+      "order": 104,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 157,
+        "source_label": "第二节",
+        "raw_text": "第二节　大疱性类天疱疮  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 157",
+        "bbox": [
+          0.37325894681665056,
+          0.12043444097325114,
+          0.4914142023435096,
+          0.1347058995580402
+        ]
+      }
+    },
+    {
+      "id": "da48443717935030be6c9b18",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "血管炎与脂膜炎",
+      "normalized_title": "血管炎与脂膜炎",
+      "order": 105,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 160,
+        "source_label": "第二十二章",
+        "raw_text": "第二十二章  血管炎与脂膜炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 160",
+        "bbox": [
+          0.37886760624497695,
+          0.1580136721149746,
+          0.5088383589931462,
+          0.17368514248957437
+        ]
+      }
+    },
+    {
+      "id": "faa8b11eceae0a54bfbf3d87",
+      "course_id": "dermatology",
+      "parent_id": "da48443717935030be6c9b18",
+      "node_type": "section",
+      "title": "IgA 血管炎",
+      "normalized_title": "iga血管炎",
+      "order": 106,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 160,
+        "source_label": "第一节",
+        "raw_text": "第一节　IgA 血管炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 160",
+        "bbox": [
+          0.3732655660562509,
+          0.178368561980375,
+          0.4550964693645623,
+          0.19264001115439564
+        ]
+      }
+    },
+    {
+      "id": "f70e98f20ce692274405f4b9",
+      "course_id": "dermatology",
+      "parent_id": "da48443717935030be6c9b18",
+      "node_type": "section",
+      "title": "皮肤小血管炎",
+      "normalized_title": "皮肤小血管炎",
+      "order": 107,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 161,
+        "source_label": "第二节",
+        "raw_text": "第二节　皮肤小血管炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 161",
+        "bbox": [
+          0.37325894681665056,
+          0.19859802512389088,
+          0.4745348838047863,
+          0.2128694742979115
+        ]
+      }
+    },
+    {
+      "id": "4d7fbf521f387c3b679c9834",
+      "course_id": "dermatology",
+      "parent_id": "da48443717935030be6c9b18",
+      "node_type": "section",
+      "title": "青斑性血管病",
+      "normalized_title": "青斑性血管病",
+      "order": 108,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 162,
+        "source_label": "第三节",
+        "raw_text": "第三节　青斑性血管病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 162",
+        "bbox": [
+          0.37325894681665056,
+          0.21882485325224113,
+          0.4745348838047863,
+          0.23309630242626173
+        ]
+      }
+    },
+    {
+      "id": "8eef01c8a29e57be8ae6b2f8",
+      "course_id": "dermatology",
+      "parent_id": "da48443717935030be6c9b18",
+      "node_type": "section",
+      "title": "结节性红斑",
+      "normalized_title": "结节性红斑",
+      "order": 109,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 163,
+        "source_label": "第四节",
+        "raw_text": "第四节　结节性红斑 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 163",
+        "bbox": [
+          0.37325894681665056,
+          0.23905183195288654,
+          0.45765556526606305,
+          0.25332328112690716
+        ]
+      }
+    },
+    {
+      "id": "9bf8e05ba9fc859795f2db03",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "嗜中性皮肤病",
+      "normalized_title": "嗜中性皮肤病",
+      "order": 110,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 165,
+        "source_label": "第二十三章",
+        "raw_text": "第二十三章  嗜中性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 165",
+        "bbox": [
+          0.37886760624497695,
+          0.2766309125223148,
+          0.49027110860055056,
+          0.29230238289691457
+        ]
+      }
+    },
+    {
+      "id": "13c46a06f09a79b9861da400",
+      "course_id": "dermatology",
+      "parent_id": "9bf8e05ba9fc859795f2db03",
+      "node_type": "section",
+      "title": "白塞病",
+      "normalized_title": "白塞病",
+      "order": 111,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 165,
+        "source_label": "第一节",
+        "raw_text": "第一节　白塞病 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 165",
+        "bbox": [
+          0.3732655660562509,
+          0.2969859529600104,
+          0.4239035216724207,
+          0.311257402134031
+        ]
+      }
+    },
+    {
+      "id": "af09eeb429d13d1d60e7cad7",
+      "course_id": "dermatology",
+      "parent_id": "9bf8e05ba9fc859795f2db03",
+      "node_type": "section",
+      "title": "急性发热性嗜中性皮病",
+      "normalized_title": "急性发热性嗜中性皮病",
+      "order": 112,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 166,
+        "source_label": "第二节",
+        "raw_text": "第二节　急性发热性嗜中性皮病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 166",
+        "bbox": [
+          0.37325894681665056,
+          0.3172152467096942,
+          0.5420521579596794,
+          0.3314867147052517
+        ]
+      }
+    },
+    {
+      "id": "8a6723db0f1fc4d36625ea5f",
+      "course_id": "dermatology",
+      "parent_id": "9bf8e05ba9fc859795f2db03",
+      "node_type": "section",
+      "title": "坏疽性脓皮病",
+      "normalized_title": "坏疽性脓皮病",
+      "order": 113,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 167,
+        "source_label": "第三节",
+        "raw_text": "第三节　坏疽性脓皮病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 167",
+        "bbox": [
+          0.37325894681665056,
+          0.33744222541033964,
+          0.4745348838047863,
+          0.35171369340589714
+        ]
+      }
+    },
+    {
+      "id": "2e494f59bfec94ad07040b07",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "皮肤附属器疾病",
+      "normalized_title": "皮肤附属器疾病",
+      "order": 114,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 169,
+        "source_label": "第二十四章",
+        "raw_text": "第二十四章  皮肤附属器疾病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 169",
+        "bbox": [
+          0.37886760624497695,
+          0.3750213436228417,
+          0.5088383589931462,
+          0.3906928328189784
+        ]
+      }
+    },
+    {
+      "id": "7b6f79e10367f6f4e61cf560",
+      "course_id": "dermatology",
+      "parent_id": "2e494f59bfec94ad07040b07",
+      "node_type": "section",
+      "title": "痤疮",
+      "normalized_title": "痤疮",
+      "order": 115,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 169,
+        "source_label": "第一节",
+        "raw_text": "第一节　痤疮..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 169",
+        "bbox": null
+      }
+    },
+    {
+      "id": "77b8a08cff276a8c3ca6dc78",
+      "course_id": "dermatology",
+      "parent_id": "2e494f59bfec94ad07040b07",
+      "node_type": "section",
+      "title": "脂溢性皮炎",
+      "normalized_title": "脂溢性皮炎",
+      "order": 116,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 171,
+        "source_label": "第二节",
+        "raw_text": "第二节　脂溢性皮炎 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 171",
+        "bbox": [
+          0.37325894681665056,
+          0.415605696631758,
+          0.45765556526606305,
+          0.4298771646273155
+        ]
+      }
+    },
+    {
+      "id": "27a9dcd670f37ef177f77ef9",
+      "course_id": "dermatology",
+      "parent_id": "2e494f59bfec94ad07040b07",
+      "node_type": "section",
+      "title": "玫瑰痤疮",
+      "normalized_title": "玫瑰痤疮",
+      "order": 117,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 172,
+        "source_label": "第三节",
+        "raw_text": "第三节　玫瑰痤疮 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 172",
+        "bbox": [
+          0.37325894681665056,
+          0.4358326753324034,
+          0.4407762467273398,
+          0.4501041433279609
+        ]
+      }
+    },
+    {
+      "id": "049bfedee3a4949bb2bde7f8",
+      "course_id": "dermatology",
+      "parent_id": "2e494f59bfec94ad07040b07",
+      "node_type": "section",
+      "title": "斑秃",
+      "normalized_title": "斑秃",
+      "order": 118,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 173,
+        "source_label": "第四节",
+        "raw_text": "第四节　斑秃..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 173",
+        "bbox": [
+          0.37325894681665056,
+          0.4560596540330488,
+          0.4070175838940971,
+          0.47033112202860633
+        ]
+      }
+    },
+    {
+      "id": "caf1146b150c86fb5d26c9f7",
+      "course_id": "dermatology",
+      "parent_id": "2e494f59bfec94ad07040b07",
+      "node_type": "section",
+      "title": "雄激素性秃发",
+      "normalized_title": "雄激素性秃发",
+      "order": 119,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 175,
+        "source_label": "第五节",
+        "raw_text": "第五节　雄激素性秃发 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 175",
+        "bbox": [
+          0.37325894681665056,
+          0.47628667037676803,
+          0.4745348838047863,
+          0.49055813837232554
+        ]
+      }
+    },
+    {
+      "id": "5c574e5aae74394a1c093658",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "色素性皮肤病",
+      "normalized_title": "色素性皮肤病",
+      "order": 120,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 177,
+        "source_label": "第二十五章",
+        "raw_text": "第二十五章  色素性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 177",
+        "bbox": [
+          0.37886760624497695,
+          0.5138657509461964,
+          0.49027110860055056,
+          0.5295372401423329
+        ]
+      }
+    },
+    {
+      "id": "112b384e9b21b1080e20cde4",
+      "course_id": "dermatology",
+      "parent_id": "5c574e5aae74394a1c093658",
+      "node_type": "section",
+      "title": "白癜风",
+      "normalized_title": "白癜风",
+      "order": 121,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 177,
+        "source_label": "第一节",
+        "raw_text": "第一节　白癜风 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 177",
+        "bbox": [
+          0.3732655660562509,
+          0.5342207537408181,
+          0.4239035216724207,
+          0.5484922217363756
+        ]
+      }
+    },
+    {
+      "id": "223649773b378dc2124df464",
+      "course_id": "dermatology",
+      "parent_id": "5c574e5aae74394a1c093658",
+      "node_type": "section",
+      "title": "黄褐斑",
+      "normalized_title": "黄褐斑",
+      "order": 122,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 179,
+        "source_label": "第二节",
+        "raw_text": "第二节　黄褐斑 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 179",
+        "bbox": [
+          0.37325894681665056,
+          0.5544501039551126,
+          0.4238969024328204,
+          0.5687215719506701
+        ]
+      }
+    },
+    {
+      "id": "40d0b1f70d124e089335003b",
+      "course_id": "dermatology",
+      "parent_id": "5c574e5aae74394a1c093658",
+      "node_type": "section",
+      "title": "雀斑",
+      "normalized_title": "雀斑",
+      "order": 123,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 180,
+        "source_label": "第三节",
+        "raw_text": "第三节　雀斑..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 180",
+        "bbox": [
+          0.37325894681665056,
+          0.574677082655758,
+          0.4070175838940971,
+          0.5889485506513156
+        ]
+      }
+    },
+    {
+      "id": "7d24b618c634a89d10162a81",
+      "course_id": "dermatology",
+      "parent_id": "5c574e5aae74394a1c093658",
+      "node_type": "section",
+      "title": "太田痣",
+      "normalized_title": "太田痣",
+      "order": 124,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 180,
+        "source_label": "第四节",
+        "raw_text": "第四节　太田痣 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 180",
+        "bbox": [
+          0.37325894681665056,
+          0.5949040613564034,
+          0.4238969024328204,
+          0.609175529351961
+        ]
+      }
+    },
+    {
+      "id": "448266e454a2fbf750991c11",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "遗传性皮肤病",
+      "normalized_title": "遗传性皮肤病",
+      "order": 125,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 182,
+        "source_label": "第二十六章",
+        "raw_text": "第二十六章  遗传性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 182",
+        "bbox": [
+          0.37886760624497695,
+          0.6324832924981268,
+          0.49027110860055056,
+          0.6481547816942635
+        ]
+      }
+    },
+    {
+      "id": "0b67122f10489744c97217ef",
+      "course_id": "dermatology",
+      "parent_id": "448266e454a2fbf750991c11",
+      "node_type": "section",
+      "title": "鱼鳞病",
+      "normalized_title": "鱼鳞病",
+      "order": 126,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 182,
+        "source_label": "第一节",
+        "raw_text": "第一节　鱼鳞病 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 182",
+        "bbox": [
+          0.3732655660562509,
+          0.6528381823635273,
+          0.4239035216724207,
+          0.6671096503590848
+        ]
+      }
+    },
+    {
+      "id": "bf58efbd36120b6ff0171316",
+      "course_id": "dermatology",
+      "parent_id": "448266e454a2fbf750991c11",
+      "node_type": "section",
+      "title": "毛周角化病",
+      "normalized_title": "毛周角化病",
+      "order": 127,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 184,
+        "source_label": "第二节",
+        "raw_text": "第二节　毛周角化病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 184",
+        "bbox": [
+          0.37325894681665056,
+          0.673067494934748,
+          0.45765556526606305,
+          0.6873389629303055
+        ]
+      }
+    },
+    {
+      "id": "510a4c687545907a706d1d4b",
+      "course_id": "dermatology",
+      "parent_id": "448266e454a2fbf750991c11",
+      "node_type": "section",
+      "title": "遗传性掌跖角化病",
+      "normalized_title": "遗传性掌跖角化病",
+      "order": 128,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 185,
+        "source_label": "第三节",
+        "raw_text": "第三节　遗传性掌跖角化病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 185",
+        "bbox": [
+          0.37325894681665056,
+          0.6932944736353934,
+          0.5082935208822329,
+          0.7075659416309509
+        ]
+      }
+    },
+    {
+      "id": "080c00459f8542521248fd6a",
+      "course_id": "dermatology",
+      "parent_id": "448266e454a2fbf750991c11",
+      "node_type": "section",
+      "title": "遗传性大疱性表皮松解症",
+      "normalized_title": "遗传性大疱性表皮松解症",
+      "order": 129,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 186,
+        "source_label": "第四节",
+        "raw_text": "第四节　遗传性大疱性表皮松解症 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 186",
+        "bbox": [
+          0.37325894681665056,
+          0.7135214523360388,
+          0.5589314764984027,
+          0.7277929203315964
+        ]
+      }
+    },
+    {
+      "id": "eb88ce706cc8cc22edabd994",
+      "course_id": "dermatology",
+      "parent_id": "448266e454a2fbf750991c11",
+      "node_type": "section",
+      "title": "家族性良性慢性天疱疮",
+      "normalized_title": "家族性良性慢性天疱疮",
+      "order": 130,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 187,
+        "source_label": "第五节",
+        "raw_text": "第五节　家族性良性慢性天疱疮 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 187",
+        "bbox": [
+          0.37325894681665056,
+          0.7337485063228318,
+          0.5420521579596794,
+          0.7480199743183893
+        ]
+      }
+    },
+    {
+      "id": "1cee8467199a4232dd9fd0f6",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "营养与代谢障碍性皮肤病",
+      "normalized_title": "营养与代谢障碍性皮肤病",
+      "order": 131,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 189,
+        "source_label": "第二十七章",
+        "raw_text": "第二十七章  营养与代谢障碍性皮肤病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 189",
+        "bbox": [
+          0.37886760624497695,
+          0.7713276621784076,
+          0.5831073605635286,
+          0.7869991513745443
+        ]
+      }
+    },
+    {
+      "id": "8ed8a0a8057a925f8a95be70",
+      "course_id": "dermatology",
+      "parent_id": "1cee8467199a4232dd9fd0f6",
+      "node_type": "section",
+      "title": "肠病性肢端皮炎",
+      "normalized_title": "肠病性肢端皮炎",
+      "order": 132,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 189,
+        "source_label": "第一节",
+        "raw_text": "第一节　肠病性肢端皮炎  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 189",
+        "bbox": [
+          0.3732655660562509,
+          0.7916825520438081,
+          0.4914207958273138,
+          0.8059540200393657
+        ]
+      }
+    },
+    {
+      "id": "7e32c0516af891110b1c0a13",
+      "course_id": "dermatology",
+      "parent_id": "1cee8467199a4232dd9fd0f6",
+      "node_type": "section",
+      "title": "原发性皮肤淀粉样变",
+      "normalized_title": "原发性皮肤淀粉样变",
+      "order": 133,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 190,
+        "source_label": "第二节",
+        "raw_text": "第二节　原发性皮肤淀粉样变 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 190",
+        "bbox": [
+          0.37325894681665056,
+          0.811912015187324,
+          0.5251728394209562,
+          0.8261834831828815
+        ]
+      }
+    },
+    {
+      "id": "796c7bc8238ab4866d8d07e1",
+      "course_id": "dermatology",
+      "parent_id": "1cee8467199a4232dd9fd0f6",
+      "node_type": "section",
+      "title": "黄瘤病",
+      "normalized_title": "黄瘤病",
+      "order": 134,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 191,
+        "source_label": "第三节",
+        "raw_text": "第三节　黄瘤病 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 191",
+        "bbox": [
+          0.37325894681665056,
+          0.8321389938879694,
+          0.4238969024328204,
+          0.8464104618835269
+        ]
+      }
+    },
+    {
+      "id": "31eca717c9808a1aff156bf6",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "皮肤肿瘤",
+      "normalized_title": "皮肤肿瘤",
+      "order": 135,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 193,
+        "source_label": "第二十八章",
+        "raw_text": "第二十八章  皮肤肿瘤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 193",
+        "bbox": [
+          0.37886760624497695,
+          0.8697180744573977,
+          0.45313660781535936,
+          0.8853895636535344
+        ]
+      }
+    },
+    {
+      "id": "8ee0dd51f2e9e2fe6dc995c0",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "痣细胞痣",
+      "normalized_title": "痣细胞痣",
+      "order": 136,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 193,
+        "source_label": "第一节",
+        "raw_text": "第一节　痣细胞痣 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 193",
+        "bbox": [
+          0.3732655660562509,
+          0.8900731148950932,
+          0.44078284021114394,
+          0.9043445828906508
+        ]
+      }
+    },
+    {
+      "id": "2a8966ff66791624480e9bc0",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "皮脂腺痣",
+      "normalized_title": "皮脂腺痣",
+      "order": 137,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 194,
+        "source_label": "第二节",
+        "raw_text": "第二节　皮脂腺痣 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 194",
+        "bbox": [
+          0.37325894681665056,
+          0.910302427466314,
+          0.4407762467273398,
+          0.9245738954618715
+        ]
+      }
+    },
+    {
+      "id": "04c067092301f7caecbc2b49",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "血管瘤与脉管畸形",
+      "normalized_title": "血管瘤与脉管畸形",
+      "order": 138,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 194,
+        "source_label": "第三节",
+        "raw_text": "第三节　血管瘤与脉管畸形 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 194",
+        "bbox": [
+          0.37565124818254225,
+          0.0799805588581079,
+          0.5106858222481245,
+          0.09425201744289696
+        ]
+      }
+    },
+    {
+      "id": "56af84793bc10302766e63fa",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "瘢痕疙瘩",
+      "normalized_title": "瘢痕疙瘩",
+      "order": 139,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 196,
+        "source_label": "第四节",
+        "raw_text": "第四节　瘢痕疙瘩 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 196",
+        "bbox": [
+          0.3756510936477656,
+          0.09971637073187772,
+          0.44316834204686256,
+          0.11398782931666679
+        ]
+      }
+    },
+    {
+      "id": "e242d39fc697c809bfa7136c",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "脂溢性角化病",
+      "normalized_title": "脂溢性角化病",
+      "order": 140,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 197,
+        "source_label": "第五节",
+        "raw_text": "第五节　脂溢性角化病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 197",
+        "bbox": [
+          0.3756510936477656,
+          0.11945218260564755,
+          0.4769269791243091,
+          0.13372364119043662
+        ]
+      }
+    },
+    {
+      "id": "fe062e697ee9ca438c4c0ed8",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "汗管瘤",
+      "normalized_title": "汗管瘤",
+      "order": 141,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 198,
+        "source_label": "第六节",
+        "raw_text": "第六节　汗管瘤 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 198",
+        "bbox": [
+          0.3756510936477656,
+          0.13918799447941738,
+          0.4262890492639354,
+          0.15345945306420644
+        ]
+      }
+    },
+    {
+      "id": "2ff78494d0181ab48c0a6afc",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "粟丘疹",
+      "normalized_title": "粟丘疹",
+      "order": 142,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 198,
+        "source_label": "第七节",
+        "raw_text": "第七节　粟丘疹 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 198",
+        "bbox": [
+          0.3756510936477656,
+          0.1589238063531872,
+          0.4262890492639354,
+          0.1731952555272078
+        ]
+      }
+    },
+    {
+      "id": "6db6419239506a9505993093",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "皮角",
+      "normalized_title": "皮角",
+      "order": 143,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 199,
+        "source_label": "第八节",
+        "raw_text": "第八节　皮角..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 199",
+        "bbox": [
+          0.3756510936477656,
+          0.17865961822695703,
+          0.40940973072521214,
+          0.19293106740097762
+        ]
+      }
+    },
+    {
+      "id": "749b1f44cad4274d027eb71d",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "皮肤纤维瘤",
+      "normalized_title": "皮肤纤维瘤",
+      "order": 144,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 200,
+        "source_label": "第九节",
+        "raw_text": "第九节　皮肤纤维瘤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 200",
+        "bbox": [
+          0.3756510936477656,
+          0.19839543010072686,
+          0.4600476605855858,
+          0.21266687927474745
+        ]
+      }
+    },
+    {
+      "id": "dff4df2774d3dba0a2bbafca",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "光线性角化病",
+      "normalized_title": "光线性角化病",
+      "order": 145,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 200,
+        "source_label": "第十节",
+        "raw_text": "第十节　光线性角化病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 200",
+        "bbox": [
+          0.3756510936477656,
+          0.21813124197449665,
+          0.4769269791243091,
+          0.23240269114851728
+        ]
+      }
+    },
+    {
+      "id": "10b88bd43360b19afcc859e4",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "Bowen 病",
+      "normalized_title": "bowen病",
+      "order": 146,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 201,
+        "source_label": "第十一节",
+        "raw_text": "第十一节　Bowen 病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 201",
+        "bbox": [
+          0.3925304121864889,
+          0.23786705384826648,
+          0.47014151161591555,
+          0.25213850302228713
+        ]
+      }
+    },
+    {
+      "id": "8bdd64e79d07145af64586da",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "Paget 病",
+      "normalized_title": "paget病",
+      "order": 147,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 202,
+        "source_label": "第十二节",
+        "raw_text": "第十二节　Paget 病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 202",
+        "bbox": [
+          0.3925304121864889,
+          0.25760286572203633,
+          0.46188755163650785,
+          0.27187431489605696
+        ]
+      }
+    },
+    {
+      "id": "c2c974e17ba0703be9124dde",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "基底细胞癌",
+      "normalized_title": "基底细胞癌",
+      "order": 148,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 203,
+        "source_label": "第十三节",
+        "raw_text": "第十三节　基底细胞癌 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 203",
+        "bbox": [
+          0.3925304121864889,
+          0.27733867759580616,
+          0.4769269791243091,
+          0.2916101267698268
+        ]
+      }
+    },
+    {
+      "id": "49ab261263449f577adccce9",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "鳞状细胞癌",
+      "normalized_title": "鳞状细胞癌",
+      "order": 149,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 204,
+        "source_label": "第十四节",
+        "raw_text": "第十四节　鳞状细胞癌 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 204",
+        "bbox": [
+          0.3925304121864889,
+          0.297074489469576,
+          0.4769269791243091,
+          0.3113459386435966
+        ]
+      }
+    },
+    {
+      "id": "c0713e6c461a6d624ede3e91",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "蕈样肉芽肿",
+      "normalized_title": "蕈样肉芽肿",
+      "order": 150,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 205,
+        "source_label": "第十五节",
+        "raw_text": "第十五节　蕈样肉芽肿 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 205",
+        "bbox": [
+          0.3925304121864889,
+          0.3168102825218089,
+          0.4769269791243091,
+          0.3310817505173664
+        ]
+      }
+    },
+    {
+      "id": "25829e87cabd47beef5c93aa",
+      "course_id": "dermatology",
+      "parent_id": "31eca717c9808a1aff156bf6",
+      "node_type": "section",
+      "title": "黑素瘤",
+      "normalized_title": "黑素瘤",
+      "order": 151,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 207,
+        "source_label": "第十六节",
+        "raw_text": "第十六节　黑素瘤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 207",
+        "bbox": [
+          0.3925304121864889,
+          0.3365460943955787,
+          0.44316834204686256,
+          0.3508175623911362
+        ]
+      }
+    },
+    {
+      "id": "98126e07e4131acbf69b8445",
+      "course_id": "dermatology",
+      "parent_id": "b2e462c6abea82bcae827a35",
+      "node_type": "chapter",
+      "title": "性传播疾病",
+      "normalized_title": "性传播疾病",
+      "order": 152,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 210,
+        "source_label": "第二十九章",
+        "raw_text": "第二十九章  性传播疾病 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 210",
+        "bbox": [
+          0.38125990761086864,
+          0.3736340457812052,
+          0.47409615957384665,
+          0.3893055349773419
+        ]
+      }
+    },
+    {
+      "id": "0f4cb0fd351a2722b4c2388c",
+      "course_id": "dermatology",
+      "parent_id": "98126e07e4131acbf69b8445",
+      "node_type": "section",
+      "title": "概论",
+      "normalized_title": "概论",
+      "order": 153,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 210,
+        "source_label": "第一节",
+        "raw_text": "第一节　概论..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 210",
+        "bbox": [
+          0.3756578674221425,
+          0.3934956608075975,
+          0.4094165044995891,
+          0.407767128803155
+        ]
+      }
+    },
+    {
+      "id": "77303798eaa899a071795bcc",
+      "course_id": "dermatology",
+      "parent_id": "98126e07e4131acbf69b8445",
+      "node_type": "section",
+      "title": "梅毒",
+      "normalized_title": "梅毒",
+      "order": 154,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 212,
+        "source_label": "第二节",
+        "raw_text": "第二节　梅毒..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 212",
+        "bbox": [
+          0.3756510936477656,
+          0.4132360274932965,
+          0.40940973072521214,
+          0.42750749548885403
+        ]
+      }
+    },
+    {
+      "id": "00756a75df7be7b55907f63e",
+      "course_id": "dermatology",
+      "parent_id": "98126e07e4131acbf69b8445",
+      "node_type": "section",
+      "title": "淋病",
+      "normalized_title": "淋病",
+      "order": 155,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 218,
+        "source_label": "第三节",
+        "raw_text": "第三节　淋病..... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 218",
+        "bbox": [
+          0.3756510936477656,
+          0.43297183936706635,
+          0.40940973072521214,
+          0.44724330736262385
+        ]
+      }
+    },
+    {
+      "id": "dd9065f18e01ed2946119140",
+      "course_id": "dermatology",
+      "parent_id": "98126e07e4131acbf69b8445",
+      "node_type": "section",
+      "title": "生殖道衣原体感染",
+      "normalized_title": "生殖道衣原体感染",
+      "order": 156,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 220,
+        "source_label": "第四节",
+        "raw_text": "第四节　生殖道衣原体感染 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 220",
+        "bbox": [
+          0.3756510936477656,
+          0.4527076512408362,
+          0.5106856162017557,
+          0.4669791192363937
+        ]
+      }
+    },
+    {
+      "id": "e811f395685b110a1309f436",
+      "course_id": "dermatology",
+      "parent_id": "98126e07e4131acbf69b8445",
+      "node_type": "section",
+      "title": "尖锐湿疣",
+      "normalized_title": "尖锐湿疣",
+      "order": 157,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 221,
+        "source_label": "第五节",
+        "raw_text": "第五节　尖锐湿疣 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 221",
+        "bbox": [
+          0.3756510936477656,
+          0.472443463114606,
+          0.44316834204686256,
+          0.4867149311101635
+        ]
+      }
+    },
+    {
+      "id": "4f40da26075305a4e259c2c9",
+      "course_id": "dermatology",
+      "parent_id": "98126e07e4131acbf69b8445",
+      "node_type": "section",
+      "title": "生殖器疱疹",
+      "normalized_title": "生殖器疱疹",
+      "order": 158,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 223,
+        "source_label": "第六节",
+        "raw_text": "第六节　生殖器疱疹 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 223",
+        "bbox": [
+          0.3756510936477656,
+          0.4921792749883758,
+          0.4600476605855858,
+          0.5064507429839333
+        ]
+      }
+    },
+    {
+      "id": "cd3583f13171ec97e69ca1bc",
+      "course_id": "dermatology",
+      "parent_id": "98126e07e4131acbf69b8445",
+      "node_type": "section",
+      "title": "艾滋病",
+      "normalized_title": "艾滋病",
+      "order": 159,
+      "aliases": [],
+      "metadata": {
+        "source_file": "31皮肤性病学_目录.pdf",
+        "source_page": 5,
+        "printed_page": 224,
+        "source_label": "第七节",
+        "raw_text": "第七节　艾滋病 .. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 224",
+        "bbox": [
+          0.3756510936477656,
+          0.5119150868621456,
+          0.4262890492639354,
+          0.5261865548577032
+        ]
+      }
+    }
+  ]
+}

@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### Elapse Forge · optional foundation 0.1.0
+
+A separate scanned-question import workbench is now scaffolded at `/forge`: background jobs, MinerU provider integration, canonical curricula, source-linked review and a compatible Elapse export adapter. Existing practice and import flows are unchanged. **Real MinerU runtime acceptance is still pending; no OCR accuracy is claimed.** See [Forge setup](forge/README.md), [architecture](docs/FORGE_ARCHITECTURE.md) and [next-stage handoff](docs/FORGE_HANDOFF.md). Forge is not automatically deployed with the main app.
+
 ### v1.3.7 · Safer previous navigation
 
 AI explanations and follow-up chat no longer have an application-level daily quota or depend on the usage-counter database. Provider account limits still apply.

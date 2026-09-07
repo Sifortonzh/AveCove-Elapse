@@ -1,0 +1,3187 @@
+{
+  "id": "infectious-diseases",
+  "title": "传染病学",
+  "version": "user-provided-2026-09-06",
+  "source_file": "27传染病学_目录.pdf",
+  "source_sha256": "c2abf4f4541e687aeb5522b15c82275d005e70375e50d5ac8e533c048f57a806",
+  "nodes": [
+    {
+      "id": "6c27d8d879b031940fe506b7",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "总论",
+      "normalized_title": "总论",
+      "order": 0,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 1,
+        "source_label": "第一章",
+        "raw_text": "第一章  总论                                       1",
+        "bbox": [
+          0.2617074674054956,
+          0.1933315982252528,
+          0.3055005768521132,
+          0.2106429156029229
+        ]
+      }
+    },
+    {
+      "id": "0781d0ed115952f5a81221e1",
+      "course_id": "infectious-diseases",
+      "parent_id": "6c27d8d879b031940fe506b7",
+      "node_type": "section",
+      "title": "感染与免疫",
+      "normalized_title": "感染与免疫",
+      "order": 1,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 2,
+        "source_label": "第一节",
+        "raw_text": "第一节　感染与免疫... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2",
+        "bbox": [
+          0.33951811926588477,
+          0.23417880184955497,
+          0.43509833002983805,
+          0.2500475046395365
+        ]
+      }
+    },
+    {
+      "id": "d028d043d51ad28535fd5829",
+      "course_id": "infectious-diseases",
+      "parent_id": "0781d0ed115952f5a81221e1",
+      "node_type": "subsection",
+      "title": "感染的概念",
+      "normalized_title": "感染的概念",
+      "order": 2,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 2,
+        "source_label": "一、",
+        "raw_text": "一、  感染的概念.... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2",
+        "bbox": [
+          0.3391898645858624,
+          0.25502038104757513,
+          0.4260809917974249,
+          0.2695976535822497
+        ]
+      }
+    },
+    {
+      "id": "fbd873fd96d685edb7ef27e4",
+      "course_id": "infectious-diseases",
+      "parent_id": "0781d0ed115952f5a81221e1",
+      "node_type": "subsection",
+      "title": "感染过程的表现",
+      "normalized_title": "感染过程的表现",
+      "order": 3,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 2,
+        "source_label": "二、",
+        "raw_text": "二、 感染过程的表现.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2",
+        "bbox": [
+          0.3391898645858624,
+          0.2758282975083115,
+          0.46083743207522615,
+          0.290405570042986
+        ]
+      }
+    },
+    {
+      "id": "01729d7e72a5e6c4e21222f9",
+      "course_id": "infectious-diseases",
+      "parent_id": "0781d0ed115952f5a81221e1",
+      "node_type": "subsection",
+      "title": "感染过程中病原体的作用",
+      "normalized_title": "感染过程中病原体的作用",
+      "order": 4,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 4,
+        "source_label": "三、",
+        "raw_text": "三、 感染过程中病原体的作用. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4",
+        "bbox": [
+          0.3391898645858624,
+          0.2966306003086898,
+          0.5303503126308285,
+          0.3112078728433643
+        ]
+      }
+    },
+    {
+      "id": "36ecf07bce90fee5840926a4",
+      "course_id": "infectious-diseases",
+      "parent_id": "0781d0ed115952f5a81221e1",
+      "node_type": "subsection",
+      "title": "感染过程中免疫应答的作用",
+      "normalized_title": "感染过程中免疫应答的作用",
+      "order": 5,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 4,
+        "source_label": "四、",
+        "raw_text": "四、 感染过程中免疫应答的作用. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4",
+        "bbox": [
+          0.3391898645858624,
+          0.31743290310906813,
+          0.5477285327697291,
+          0.33201017564374263
+        ]
+      }
+    },
+    {
+      "id": "6d651cb69175fcacb7ce1c96",
+      "course_id": "infectious-diseases",
+      "parent_id": "6c27d8d879b031940fe506b7",
+      "node_type": "section",
+      "title": "传染病的发病机制",
+      "normalized_title": "传染病的发病机制",
+      "order": 6,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 5,
+        "source_label": "第二节",
+        "raw_text": "第二节　传染病的发病机制. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5",
+        "bbox": [
+          0.33951811926588477,
+          0.3381902389519896,
+          0.49244645648821006,
+          0.3540589417419711
+        ]
+      }
+    },
+    {
+      "id": "e2e83f5254e3cdea883b482f",
+      "course_id": "infectious-diseases",
+      "parent_id": "6d651cb69175fcacb7ce1c96",
+      "node_type": "subsection",
+      "title": "传染病的发生与发展",
+      "normalized_title": "传染病的发生与发展",
+      "order": 7,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 5,
+        "source_label": "一、",
+        "raw_text": "一、  传染病的发生与发展.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5",
+        "bbox": [
+          0.3391898645858624,
+          0.35903179892514553,
+          0.4955938723530273,
+          0.3736090906846843
+        ]
+      }
+    },
+    {
+      "id": "c9758310b775f8721c525a95",
+      "course_id": "infectious-diseases",
+      "parent_id": "6d651cb69175fcacb7ce1c96",
+      "node_type": "subsection",
+      "title": "组织损伤的发生机制",
+      "normalized_title": "组织损伤的发生机制",
+      "order": 8,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 6,
+        "source_label": "二、",
+        "raw_text": "二、 组织损伤的发生机制.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6",
+        "bbox": [
+          0.3391898645858624,
+          0.3798397922853388,
+          0.4955938723530273,
+          0.3944170840448776
+        ]
+      }
+    },
+    {
+      "id": "4099562bfad8c74a3bcc51c6",
+      "course_id": "infectious-diseases",
+      "parent_id": "6d651cb69175fcacb7ce1c96",
+      "node_type": "subsection",
+      "title": "重要的病理生理变化",
+      "normalized_title": "重要的病理生理变化",
+      "order": 9,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 6,
+        "source_label": "三、",
+        "raw_text": "三、 重要的病理生理变化.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6",
+        "bbox": [
+          0.3391898645858624,
+          0.4006420566359887,
+          0.4955938723530273,
+          0.41521934839552743
+        ]
+      }
+    },
+    {
+      "id": "e146f6baef5257f8ae7bc53e",
+      "course_id": "infectious-diseases",
+      "parent_id": "6c27d8d879b031940fe506b7",
+      "node_type": "section",
+      "title": "传染病的流行过程及影响因素",
+      "normalized_title": "传染病的流行过程及影响因素",
+      "order": 10,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 7,
+        "source_label": "第三节",
+        "raw_text": "第三节　传染病的流行过程及影响因素.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7",
+        "bbox": [
+          0.33951811926588477,
+          0.4213993732540459,
+          0.5880266672521633,
+          0.4372680760440274
+        ]
+      }
+    },
+    {
+      "id": "71caad9aa4662d91f1f82a98",
+      "course_id": "infectious-diseases",
+      "parent_id": "e146f6baef5257f8ae7bc53e",
+      "node_type": "subsection",
+      "title": "流行过程的基本条件",
+      "normalized_title": "流行过程的基本条件",
+      "order": 11,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 7,
+        "source_label": "一、",
+        "raw_text": "一、  流行过程的基本条件.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7",
+        "bbox": [
+          0.3391898645858624,
+          0.44224089477747336,
+          0.4955938723530273,
+          0.4568181865370121
+        ]
+      }
+    },
+    {
+      "id": "f43d226585ee493d7775baa9",
+      "course_id": "infectious-diseases",
+      "parent_id": "e146f6baef5257f8ae7bc53e",
+      "node_type": "subsection",
+      "title": "影响流行过程的因素",
+      "normalized_title": "影响流行过程的因素",
+      "order": 12,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 8,
+        "source_label": "二、",
+        "raw_text": "二、 影响流行过程的因素.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8",
+        "bbox": [
+          0.3391898645858624,
+          0.46304884968793814,
+          0.4955938723530273,
+          0.47762614144747695
+        ]
+      }
+    },
+    {
+      "id": "ffac6d1f5a8b41fd7631a910",
+      "course_id": "infectious-diseases",
+      "parent_id": "6c27d8d879b031940fe506b7",
+      "node_type": "section",
+      "title": "传染病的特征",
+      "normalized_title": "传染病的特征",
+      "order": 13,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 9,
+        "source_label": "第四节",
+        "raw_text": "第四节　传染病的特征.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9",
+        "bbox": [
+          0.33951811926588477,
+          0.48380628165518086,
+          0.4542143721826287,
+          0.49967498444516234
+        ]
+      }
+    },
+    {
+      "id": "254ede7b66c382e0269f23a9",
+      "course_id": "infectious-diseases",
+      "parent_id": "ffac6d1f5a8b41fd7631a910",
+      "node_type": "subsection",
+      "title": "基本特征",
+      "normalized_title": "基本特征",
+      "order": 14,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 9,
+        "source_label": "一、",
+        "raw_text": "一、  基本特征....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9",
+        "bbox": [
+          0.3391898645858624,
+          0.5046477647288798,
+          0.4087027716585243,
+          0.5192250564884185
+        ]
+      }
+    },
+    {
+      "id": "3a7982026df37be9e1953b67",
+      "course_id": "infectious-diseases",
+      "parent_id": "ffac6d1f5a8b41fd7631a910",
+      "node_type": "subsection",
+      "title": "临床特点",
+      "normalized_title": "临床特点",
+      "order": 15,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 10,
+        "source_label": "二、",
+        "raw_text": "二、 临床特点....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10",
+        "bbox": [
+          0.3391898645858624,
+          0.5254558349885301,
+          0.4087027716585243,
+          0.5400331267480688
+        ]
+      }
+    },
+    {
+      "id": "46c77ee4877bb1e86218b5f6",
+      "course_id": "infectious-diseases",
+      "parent_id": "6c27d8d879b031940fe506b7",
+      "node_type": "section",
+      "title": "传染病的诊断",
+      "normalized_title": "传染病的诊断",
+      "order": 16,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 12,
+        "source_label": "第五节",
+        "raw_text": "第五节　传染病的诊断.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12",
+        "bbox": [
+          0.33951830488530155,
+          0.5462133054055012,
+          0.45421453128498596,
+          0.5620820081954827
+        ]
+      }
+    },
+    {
+      "id": "a82f510cc5c85e7572c0a5fc",
+      "course_id": "infectious-diseases",
+      "parent_id": "46c77ee4877bb1e86218b5f6",
+      "node_type": "subsection",
+      "title": "临床资料",
+      "normalized_title": "临床资料",
+      "order": 17,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 12,
+        "source_label": "一、",
+        "raw_text": "一、 临床资料....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12",
+        "bbox": [
+          0.3391900236882196,
+          0.5670547884792002,
+          0.4087028777267625,
+          0.581632080238739
+        ]
+      }
+    },
+    {
+      "id": "f38854790dbbe2ea62af37e5",
+      "course_id": "infectious-diseases",
+      "parent_id": "46c77ee4877bb1e86218b5f6",
+      "node_type": "subsection",
+      "title": "流行病学资料",
+      "normalized_title": "流行病学资料",
+      "order": 18,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 12,
+        "source_label": "二、",
+        "raw_text": "二、 流行病学资料. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12",
+        "bbox": [
+          0.3391898645858624,
+          0.5878627818393934,
+          0.44345921193632554,
+          0.6024400735989323
+        ]
+      }
+    },
+    {
+      "id": "d613bd11f1a057baba05edf3",
+      "course_id": "infectious-diseases",
+      "parent_id": "46c77ee4877bb1e86218b5f6",
+      "node_type": "subsection",
+      "title": "实验室及其他检查资料",
+      "normalized_title": "实验室及其他检查资料",
+      "order": 19,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 12,
+        "source_label": "三、",
+        "raw_text": "三、 实验室及其他检查资料.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12",
+        "bbox": [
+          0.3391898645858624,
+          0.6086650846397718,
+          0.512972092491928,
+          0.6232423763993106
+        ]
+      }
+    },
+    {
+      "id": "6579b859233628b64932b0b3",
+      "course_id": "infectious-diseases",
+      "parent_id": "6c27d8d879b031940fe506b7",
+      "node_type": "section",
+      "title": "传染病的治疗",
+      "normalized_title": "传染病的治疗",
+      "order": 20,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 14,
+        "source_label": "第六节",
+        "raw_text": "第六节　传染病的治疗.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14",
+        "bbox": [
+          0.33951811926588477,
+          0.6294225166070144,
+          0.4542143721826287,
+          0.6452911809472675
+        ]
+      }
+    },
+    {
+      "id": "788b8997a640dcb74bbcf775",
+      "course_id": "infectious-diseases",
+      "parent_id": "6579b859233628b64932b0b3",
+      "node_type": "subsection",
+      "title": "治疗原则",
+      "normalized_title": "治疗原则",
+      "order": 21,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 14,
+        "source_label": "一、",
+        "raw_text": "一、 治疗原则....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14",
+        "bbox": [
+          0.3391898645858624,
+          0.650264038130442,
+          0.4087027716585243,
+          0.6648413298899807
+        ]
+      }
+    },
+    {
+      "id": "9abb43a4a4dcfc70e16ccc6b",
+      "course_id": "infectious-diseases",
+      "parent_id": "6579b859233628b64932b0b3",
+      "node_type": "subsection",
+      "title": "治疗方法",
+      "normalized_title": "治疗方法",
+      "order": 22,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 14,
+        "source_label": "二、",
+        "raw_text": "二、 治疗方法....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14",
+        "bbox": [
+          0.3391898645858624,
+          0.6710719545911783,
+          0.4087027716585243,
+          0.685649246350717
+        ]
+      }
+    },
+    {
+      "id": "cc4a8642f5329561b1097133",
+      "course_id": "infectious-diseases",
+      "parent_id": "6c27d8d879b031940fe506b7",
+      "node_type": "section",
+      "title": "传染病的预防",
+      "normalized_title": "传染病的预防",
+      "order": 23,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 16,
+        "source_label": "第七节",
+        "raw_text": "第七节　传染病的预防.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16",
+        "bbox": [
+          0.33951830488530155,
+          0.6918295019076064,
+          0.45421453128498596,
+          0.7076981662478594
+        ]
+      }
+    },
+    {
+      "id": "75f6ea33c8b60bee7ebd732e",
+      "course_id": "infectious-diseases",
+      "parent_id": "cc4a8642f5329561b1097133",
+      "node_type": "subsection",
+      "title": "管理传染源",
+      "normalized_title": "管理传染源",
+      "order": 24,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 16,
+        "source_label": "一、",
+        "raw_text": "一、 管理传染源.... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16",
+        "bbox": [
+          0.3391900236882196,
+          0.7126708696321199,
+          0.4260810978656631,
+          0.7272481613916587
+        ]
+      }
+    },
+    {
+      "id": "c12fb1a504191965532ec327",
+      "course_id": "infectious-diseases",
+      "parent_id": "cc4a8642f5329561b1097133",
+      "node_type": "subsection",
+      "title": "切断传播途径",
+      "normalized_title": "切断传播途径",
+      "order": 25,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 16,
+        "source_label": "二、",
+        "raw_text": "二、 切断传播途径. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16",
+        "bbox": [
+          0.3391898645858624,
+          0.7334790167912272,
+          0.44345921193632554,
+          0.7480563085507659
+        ]
+      }
+    },
+    {
+      "id": "12e5ceecd426e659d17bb57e",
+      "course_id": "infectious-diseases",
+      "parent_id": "cc4a8642f5329561b1097133",
+      "node_type": "subsection",
+      "title": "保护易感人群",
+      "normalized_title": "保护易感人群",
+      "order": 26,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 17,
+        "source_label": "三、",
+        "raw_text": "三、 保护易感人群. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17",
+        "bbox": [
+          0.3391898645858624,
+          0.7542813195916055,
+          0.44345921193632554,
+          0.7688586113511442
+        ]
+      }
+    },
+    {
+      "id": "db5e72303c96d1de7d3f51d1",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "新发感染病",
+      "normalized_title": "新发感染病",
+      "order": 27,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 18,
+        "source_label": "第二章",
+        "raw_text": "第二章  新发感染病                             18",
+        "bbox": [
+          0.26170765302491233,
+          0.7949937376927225,
+          0.3743184983113406,
+          0.8123050358455284
+        ]
+      }
+    },
+    {
+      "id": "e85a815ca8b7b7839cc807db",
+      "course_id": "infectious-diseases",
+      "parent_id": "db5e72303c96d1de7d3f51d1",
+      "node_type": "subsection",
+      "title": "基本概念和组成",
+      "normalized_title": "基本概念和组成",
+      "order": 28,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 18,
+        "source_label": "一、",
+        "raw_text": "一、 基本概念和组成.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18",
+        "bbox": [
+          0.3391898645858624,
+          0.8358857929252961,
+          0.46083743207522615,
+          0.8504630846848349
+        ]
+      }
+    },
+    {
+      "id": "a850fe4001d53a49b402f361",
+      "course_id": "infectious-diseases",
+      "parent_id": "db5e72303c96d1de7d3f51d1",
+      "node_type": "subsection",
+      "title": "流行病学特点",
+      "normalized_title": "流行病学特点",
+      "order": 29,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 21,
+        "source_label": "二、",
+        "raw_text": "二、 流行病学特点. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21",
+        "bbox": [
+          0.3391898645858624,
+          0.8566881726251314,
+          0.44345921193632554,
+          0.8712654643846701
+        ]
+      }
+    },
+    {
+      "id": "e89465dcea4d0a658e698d5e",
+      "course_id": "infectious-diseases",
+      "parent_id": "db5e72303c96d1de7d3f51d1",
+      "node_type": "subsection",
+      "title": "流行因素",
+      "normalized_title": "流行因素",
+      "order": 30,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 22,
+        "source_label": "三、",
+        "raw_text": "三、 流行因素....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22",
+        "bbox": [
+          0.3391898645858624,
+          0.8774904754255097,
+          0.4087027716585243,
+          0.8920677671850484
+        ]
+      }
+    },
+    {
+      "id": "d1c241610f90aad279c79c38",
+      "course_id": "infectious-diseases",
+      "parent_id": "db5e72303c96d1de7d3f51d1",
+      "node_type": "subsection",
+      "title": "防治对策",
+      "normalized_title": "防治对策",
+      "order": 31,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 24,
+        "source_label": "四、",
+        "raw_text": "四、 防治对策....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24",
+        "bbox": [
+          0.3391898645858624,
+          0.898292778225888,
+          0.4087027716585243,
+          0.9128700699854267
+        ]
+      }
+    },
+    {
+      "id": "2e1bc1e15c59252f2360243f",
+      "course_id": "infectious-diseases",
+      "parent_id": "db5e72303c96d1de7d3f51d1",
+      "node_type": "subsection",
+      "title": "展望",
+      "normalized_title": "展望",
+      "order": 32,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 1,
+        "printed_page": 25,
+        "source_label": "五、",
+        "raw_text": "五、 展望.. ........... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25",
+        "bbox": [
+          0.3391898645858624,
+          0.9190950041268093,
+          0.3739463048636636,
+          0.9336722958863481
+        ]
+      }
+    },
+    {
+      "id": "84bffdddb9f376d671ca41fe",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "病毒性疾病",
+      "normalized_title": "病毒性疾病",
+      "order": 33,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 26,
+        "source_label": "第三章",
+        "raw_text": "第三章  病毒性疾病                            26",
+        "bbox": [
+          0.2617074674054956,
+          0.07803325294007771,
+          0.37431831269192384,
+          0.09534456070531566
+        ]
+      }
+    },
+    {
+      "id": "c8abb0b29d55655377c8559a",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "病毒性肝炎",
+      "normalized_title": "病毒性肝炎",
+      "order": 34,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 26,
+        "source_label": "第一节",
+        "raw_text": "第一节　病毒性肝炎... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26",
+        "bbox": [
+          0.339517933646468,
+          0.11862560215158528,
+          0.4350981709274808,
+          0.1344943049415668
+        ]
+      }
+    },
+    {
+      "id": "adfcff032b0f84c29181fce6",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "肠道病毒感染",
+      "normalized_title": "肠道病毒感染",
+      "order": 35,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 50,
+        "source_label": "第二节",
+        "raw_text": "第二节　肠道病毒感染.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50",
+        "bbox": [
+          0.339517933646468,
+          0.13917313705105808,
+          0.4542142130802715,
+          0.15504183984103959
+        ]
+      }
+    },
+    {
+      "id": "8ba4eaac24bef76423d954e5",
+      "course_id": "infectious-diseases",
+      "parent_id": "adfcff032b0f84c29181fce6",
+      "node_type": "subsection",
+      "title": "脊髓灰质炎",
+      "normalized_title": "脊髓灰质炎",
+      "order": 36,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 50,
+        "source_label": "一、",
+        "raw_text": "一、 脊髓灰质炎.... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50",
+        "bbox": [
+          0.33918967896644564,
+          0.15976256292970936,
+          0.42608077966094865,
+          0.1743398354643839
+        ]
+      }
+    },
+    {
+      "id": "fbb1673a39bef087fb116e3d",
+      "course_id": "infectious-diseases",
+      "parent_id": "adfcff032b0f84c29181fce6",
+      "node_type": "subsection",
+      "title": "柯萨奇病毒感染",
+      "normalized_title": "柯萨奇病毒感染",
+      "order": 37,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 54,
+        "source_label": "二、",
+        "raw_text": "二、 柯萨奇病毒感染.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 54",
+        "bbox": [
+          0.33918967896644564,
+          0.18031294310908966,
+          0.4608372199387498,
+          0.1948902156437642
+        ]
+      }
+    },
+    {
+      "id": "ed2164f508fe437bde595e56",
+      "course_id": "infectious-diseases",
+      "parent_id": "adfcff032b0f84c29181fce6",
+      "node_type": "subsection",
+      "title": "手足口病",
+      "normalized_title": "手足口病",
+      "order": 38,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 58,
+        "source_label": "三、",
+        "raw_text": "三、 手足口病....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 58",
+        "bbox": [
+          0.33918967896644564,
+          0.20086047800856244,
+          0.40870255952204804,
+          0.215437750543237
+        ]
+      }
+    },
+    {
+      "id": "6f92f00c3924b789a3a83f5e",
+      "course_id": "infectious-diseases",
+      "parent_id": "adfcff032b0f84c29181fce6",
+      "node_type": "subsection",
+      "title": "病毒感染性腹泻",
+      "normalized_title": "病毒感染性腹泻",
+      "order": 39,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 64,
+        "source_label": "四、",
+        "raw_text": "四、 病毒感染性腹泻.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 64",
+        "bbox": [
+          0.33918967896644564,
+          0.22140808980749221,
+          0.4608372199387498,
+          0.23598536234216674
+        ]
+      }
+    },
+    {
+      "id": "97173ff26dba8236547cbe18",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "流行性感冒病毒感染",
+      "normalized_title": "流行性感冒病毒感染",
+      "order": 40,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 68,
+        "source_label": "第三节",
+        "raw_text": "第三节　流行性感冒病毒感染. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 68",
+        "bbox": [
+          0.339517933646468,
+          0.24191073464896512,
+          0.5115623395386435,
+          0.25777943743894666
+        ]
+      }
+    },
+    {
+      "id": "eefe702804ac90d102b0f607",
+      "course_id": "infectious-diseases",
+      "parent_id": "97173ff26dba8236547cbe18",
+      "node_type": "subsection",
+      "title": "流行性感冒",
+      "normalized_title": "流行性感冒",
+      "order": 41,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 68,
+        "source_label": "一、",
+        "raw_text": "一、 流行性感冒.... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 68",
+        "bbox": null
+      }
+    },
+    {
+      "id": "ba8f2826516e14ad37471011",
+      "course_id": "infectious-diseases",
+      "parent_id": "97173ff26dba8236547cbe18",
+      "node_type": "subsection",
+      "title": "甲型H1N1 流感",
+      "normalized_title": "甲型h1n1流感",
+      "order": 42,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 73,
+        "source_label": "二、",
+        "raw_text": "二、 甲型H1N1 流感.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 73",
+        "bbox": null
+      }
+    },
+    {
+      "id": "9a062e3b53962d41be97667c",
+      "course_id": "infectious-diseases",
+      "parent_id": "97173ff26dba8236547cbe18",
+      "node_type": "subsection",
+      "title": "人感染禽流感",
+      "normalized_title": "人感染禽流感",
+      "order": 43,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 74,
+        "source_label": "三、",
+        "raw_text": "三、 人感染禽流感. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 74",
+        "bbox": [
+          0.33918967896644564,
+          0.30359830630484036,
+          0.4434589997998492,
+          0.3181755788395149
+        ]
+      }
+    },
+    {
+      "id": "8eee3929957c7d703d24ff66",
+      "course_id": "infectious-diseases",
+      "parent_id": "97173ff26dba8236547cbe18",
+      "node_type": "subsection",
+      "title": "人感染H7N9 禽流感",
+      "normalized_title": "人感染h7n9禽流感",
+      "order": 44,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 76,
+        "source_label": "四、",
+        "raw_text": "四、 人感染H7N9 禽流感.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 76",
+        "bbox": null
+      }
+    },
+    {
+      "id": "e3ae4f8fd721335154a335d7",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "冠状病毒感染",
+      "normalized_title": "冠状病毒感染",
+      "order": 45,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 81,
+        "source_label": "第四节",
+        "raw_text": "第四节　冠状病毒感染.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 81",
+        "bbox": null
+      }
+    },
+    {
+      "id": "8d3ab0ed0f86c92331a4129c",
+      "course_id": "infectious-diseases",
+      "parent_id": "e3ae4f8fd721335154a335d7",
+      "node_type": "subsection",
+      "title": "严重急性呼吸综合征",
+      "normalized_title": "严重急性呼吸综合征",
+      "order": 46,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 81,
+        "source_label": "一、",
+        "raw_text": "一、 严重急性呼吸综合征.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 81",
+        "bbox": [
+          0.33918967896644564,
+          0.36523804649848707,
+          0.49559366021655105,
+          0.3798153382580258
+        ]
+      }
+    },
+    {
+      "id": "20fb1d30d9bb07432979912e",
+      "course_id": "infectious-diseases",
+      "parent_id": "e3ae4f8fd721335154a335d7",
+      "node_type": "subsection",
+      "title": "新型冠状病毒感染",
+      "normalized_title": "新型冠状病毒感染",
+      "order": 47,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 86,
+        "source_label": "二、",
+        "raw_text": "二、 新型冠状病毒感染.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 86",
+        "bbox": [
+          0.33918967896644564,
+          0.3857885804767813,
+          0.47821544007765043,
+          0.40036587223632003
+        ]
+      }
+    },
+    {
+      "id": "71d915913c3e964a0d934166",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "麻疹",
+      "normalized_title": "麻疹",
+      "order": 48,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 90,
+        "source_label": "第五节",
+        "raw_text": "第五节　麻疹............ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 90",
+        "bbox": [
+          0.339517933646468,
+          0.4062912829928469,
+          0.3777500179520493,
+          0.4221599857828284
+        ]
+      }
+    },
+    {
+      "id": "ffca57b8044968dfc7c02ead",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "风疹",
+      "normalized_title": "风疹",
+      "order": 49,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 95,
+        "source_label": "第六节",
+        "raw_text": "第六节　风疹............ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 95",
+        "bbox": [
+          0.339517933646468,
+          0.42683889479177667,
+          0.3777500179520493,
+          0.44270759758175815
+        ]
+      }
+    },
+    {
+      "id": "d0a8c5dfa97631c0dda1d466",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "水痘和带状疱疹",
+      "normalized_title": "水痘和带状疱疹",
+      "order": 50,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 99,
+        "source_label": "第七节",
+        "raw_text": "第七节　水痘和带状疱疹. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 99",
+        "bbox": [
+          0.339517933646468,
+          0.44738639124152096,
+          0.47333025523306216,
+          0.4632550940315025
+        ]
+      }
+    },
+    {
+      "id": "3d0c314907fc6e0dcdc85ac8",
+      "course_id": "infectious-diseases",
+      "parent_id": "d0a8c5dfa97631c0dda1d466",
+      "node_type": "subsection",
+      "title": "水痘",
+      "normalized_title": "水痘",
+      "order": 51,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 99,
+        "source_label": "一、",
+        "raw_text": "一、 水痘............. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 99",
+        "bbox": null
+      }
+    },
+    {
+      "id": "755befdb6b5b2d0ca14e804e",
+      "course_id": "infectious-diseases",
+      "parent_id": "d0a8c5dfa97631c0dda1d466",
+      "node_type": "subsection",
+      "title": "带状疱疹",
+      "normalized_title": "带状疱疹",
+      "order": 52,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 102,
+        "source_label": "二、",
+        "raw_text": "二、 带状疱疹....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 102",
+        "bbox": null
+      }
+    },
+    {
+      "id": "83da946cd2d20669d5536189",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "流行性腮腺炎",
+      "normalized_title": "流行性腮腺炎",
+      "order": 53,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 103,
+        "source_label": "第八节",
+        "raw_text": "第八节　流行性腮腺炎.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 103",
+        "bbox": [
+          0.339517933646468,
+          0.5090291497388533,
+          0.4542142130802715,
+          0.5248978525288348
+        ]
+      }
+    },
+    {
+      "id": "1fe68ccdeebd4ebc2bc85fc0",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "传染性单核细胞增多症",
+      "normalized_title": "传染性单核细胞增多症",
+      "order": 54,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 107,
+        "source_label": "第九节",
+        "raw_text": "第九节　传染性单核细胞增多症. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 107",
+        "bbox": [
+          0.339517933646468,
+          0.5295767230880546,
+          0.5306783816914341,
+          0.5454454258780361
+        ]
+      }
+    },
+    {
+      "id": "142f9912a79fcd2ff7a2a8d1",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "巨细胞病毒感染",
+      "normalized_title": "巨细胞病毒感染",
+      "order": 55,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 110,
+        "source_label": "第十节",
+        "raw_text": "第十节　巨细胞病毒感染. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 110",
+        "bbox": [
+          0.339517933646468,
+          0.5501242195377989,
+          0.47333025523306216,
+          0.5659929223277804
+        ]
+      }
+    },
+    {
+      "id": "1b86e334d5caff5c6728329b",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "流行性乙型脑炎",
+      "normalized_title": "流行性乙型脑炎",
+      "order": 56,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 113,
+        "source_label": "第十一节",
+        "raw_text": "第十一节　流行性乙型脑炎. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 113",
+        "bbox": [
+          0.35863397579925865,
+          0.5706717928870002,
+          0.4924462973858528,
+          0.5865404956769816
+        ]
+      }
+    },
+    {
+      "id": "0bbd8e9958f433c19d378c07",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "肾综合征出血热",
+      "normalized_title": "肾综合征出血热",
+      "order": 57,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 119,
+        "source_label": "第十二节",
+        "raw_text": "第十二节　肾综合征出血热. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 119",
+        "bbox": [
+          0.35863397579925865,
+          0.5912194815853868,
+          0.4924462973858528,
+          0.6070881843753684
+        ]
+      }
+    },
+    {
+      "id": "dc91672a681b961253de7c24",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "登革热",
+      "normalized_title": "登革热",
+      "order": 58,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 129,
+        "source_label": "第十三节",
+        "raw_text": "第十三节　登革热...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 129",
+        "bbox": [
+          0.35863397579925865,
+          0.6117669780351312,
+          0.41598212877469015,
+          0.6276356808251127
+        ]
+      }
+    },
+    {
+      "id": "2481ab2b710388bd7a75ae78",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "狂犬病",
+      "normalized_title": "狂犬病",
+      "order": 59,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 134,
+        "source_label": "第十四节",
+        "raw_text": "第十四节　狂犬病...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 134",
+        "bbox": [
+          0.35863397579925865,
+          0.632314589834061,
+          0.41598212877469015,
+          0.6481832926240425
+        ]
+      }
+    },
+    {
+      "id": "08dde1b4ab22c97a616ec949",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "艾滋病",
+      "normalized_title": "艾滋病",
+      "order": 60,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 137,
+        "source_label": "第十五节",
+        "raw_text": "第十五节　艾滋病...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 137",
+        "bbox": [
+          0.35863397579925865,
+          0.6528621631832623,
+          0.41598212877469015,
+          0.6687308275235153
+        ]
+      }
+    },
+    {
+      "id": "98e1e9060e5d0d86ebfed1e8",
+      "course_id": "infectious-diseases",
+      "parent_id": "84bffdddb9f376d671ca41fe",
+      "node_type": "section",
+      "title": "严重发热伴血小板减少综合征",
+      "normalized_title": "严重发热伴血小板减少综合征",
+      "order": 61,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 147,
+        "source_label": "第十六节",
+        "raw_text": "第十六节　严重发热伴血小板减少综合征.. . . . . . . . . . . . . . . . . . . . . . . . . . . . 147",
+        "bbox": [
+          0.35863397579925865,
+          0.6734096211832781,
+          0.6071425503025968,
+          0.6892782855235311
+        ]
+      }
+    },
+    {
+      "id": "ba96672351b97a6a196c1fa2",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "立克次体病",
+      "normalized_title": "立克次体病",
+      "order": 62,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 151,
+        "source_label": "第四章",
+        "raw_text": "第四章  立克次体病                            151",
+        "bbox": [
+          0.2617073083031384,
+          0.7139122575658108,
+          0.3743181535895666,
+          0.7312235557186166
+        ]
+      }
+    },
+    {
+      "id": "5bd8da7c897dfd2fe1a204c1",
+      "course_id": "infectious-diseases",
+      "parent_id": "ba96672351b97a6a196c1fa2",
+      "node_type": "section",
+      "title": "流行性与地方性斑疹伤寒",
+      "normalized_title": "流行性与地方性斑疹伤寒",
+      "order": 63,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 151,
+        "source_label": "第一节",
+        "raw_text": "第一节　流行性与地方性斑疹伤寒.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 151",
+        "bbox": [
+          0.339517933646468,
+          0.7545048663129855,
+          0.5497944238442248,
+          0.7703735306532385
+        ]
+      }
+    },
+    {
+      "id": "4af5236b7437d438b4e4c848",
+      "course_id": "infectious-diseases",
+      "parent_id": "5bd8da7c897dfd2fe1a204c1",
+      "node_type": "subsection",
+      "title": "流行性斑疹伤寒",
+      "normalized_title": "流行性斑疹伤寒",
+      "order": 64,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 151,
+        "source_label": "一、",
+        "raw_text": "一、 流行性斑疹伤寒.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 151",
+        "bbox": [
+          0.3391898645858624,
+          0.7750943114165011,
+          0.46083743207522615,
+          0.7896716031760399
+        ]
+      }
+    },
+    {
+      "id": "c27978b25c82885d311d107d",
+      "course_id": "infectious-diseases",
+      "parent_id": "5bd8da7c897dfd2fe1a204c1",
+      "node_type": "subsection",
+      "title": "地方性斑疹伤寒",
+      "normalized_title": "地方性斑疹伤寒",
+      "order": 65,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 154,
+        "source_label": "二、",
+        "raw_text": "二、 地方性斑疹伤寒.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 154",
+        "bbox": null
+      }
+    },
+    {
+      "id": "c00a9242bbe2beabc2d81f38",
+      "course_id": "infectious-diseases",
+      "parent_id": "ba96672351b97a6a196c1fa2",
+      "node_type": "section",
+      "title": "恙虫病",
+      "normalized_title": "恙虫病",
+      "order": 66,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 156,
+        "source_label": "第二节",
+        "raw_text": "第二节　恙虫病......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 156",
+        "bbox": [
+          0.339517933646468,
+          0.8161476248103179,
+          0.39686606010484,
+          0.8320162891505709
+        ]
+      }
+    },
+    {
+      "id": "18660506881080d2d54f15c2",
+      "course_id": "infectious-diseases",
+      "parent_id": "ba96672351b97a6a196c1fa2",
+      "node_type": "section",
+      "title": "人无形体病",
+      "normalized_title": "人无形体病",
+      "order": 67,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 159,
+        "source_label": "第三节",
+        "raw_text": "第三节　人无形体病... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 159",
+        "bbox": [
+          0.339517933646468,
+          0.8366951597097907,
+          0.4350981709274808,
+          0.8525638240500437
+        ]
+      }
+    },
+    {
+      "id": "d8a47bd4c0c767cee5052e3d",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "细菌性疾病",
+      "normalized_title": "细菌性疾病",
+      "order": 68,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 163,
+        "source_label": "第五章",
+        "raw_text": "第五章  细菌性疾病                           163",
+        "bbox": [
+          0.2617073083031384,
+          0.8771976422934095,
+          0.3743181535895666,
+          0.8945089404462152
+        ]
+      }
+    },
+    {
+      "id": "50f0e64084f7281c74a1d352",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "猩红热",
+      "normalized_title": "猩红热",
+      "order": 69,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 2,
+        "printed_page": 163,
+        "source_label": "第一节",
+        "raw_text": "第一节　猩红热......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 163",
+        "bbox": [
+          0.339517933646468,
+          0.9177901741411273,
+          0.39686606010484,
+          0.9336588384813803
+        ]
+      }
+    },
+    {
+      "id": "1125b6ec16363e913949451e",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "流行性脑脊髓膜炎",
+      "normalized_title": "流行性脑脊髓膜炎",
+      "order": 70,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 167,
+        "source_label": "第二节",
+        "raw_text": "第二节　流行性脑脊髓膜炎. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 167",
+        "bbox": [
+          0.33951811926588477,
+          0.0709351735270851,
+          0.49244645648821006,
+          0.08680387631706661
+        ]
+      }
+    },
+    {
+      "id": "0cc5ef1742fb795a9cd5a5b1",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "白喉",
+      "normalized_title": "白喉",
+      "order": 71,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 172,
+        "source_label": "第三节",
+        "raw_text": "第三节　白喉............ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 172",
+        "bbox": [
+          0.33951811926588477,
+          0.09239950375242435,
+          0.37775020357146605,
+          0.10826820654240586
+        ]
+      }
+    },
+    {
+      "id": "0de038ee932ade70da9bf34e",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "百日咳",
+      "normalized_title": "百日咳",
+      "order": 72,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 175,
+        "source_label": "第四节",
+        "raw_text": "第四节　百日咳......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 175",
+        "bbox": [
+          0.33951811926588477,
+          0.11386352637993576,
+          0.3968662457242567,
+          0.12973222916991728
+        ]
+      }
+    },
+    {
+      "id": "6ec8e3a98528cb6dd7826d61",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "沙门菌感染",
+      "normalized_title": "沙门菌感染",
+      "order": 73,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 177,
+        "source_label": "第五节",
+        "raw_text": "第五节　沙门菌感染... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 177",
+        "bbox": [
+          0.33951811926588477,
+          0.13532785660527502,
+          0.43509833002983805,
+          0.15119655939525653
+        ]
+      }
+    },
+    {
+      "id": "bf37d1623e745191ccee757e",
+      "course_id": "infectious-diseases",
+      "parent_id": "6ec8e3a98528cb6dd7826d61",
+      "node_type": "subsection",
+      "title": "伤寒",
+      "normalized_title": "伤寒",
+      "order": 74,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 177,
+        "source_label": "一、",
+        "raw_text": "一、 伤寒.. ........... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 177",
+        "bbox": null
+      }
+    },
+    {
+      "id": "8137bf53f2f3c4539a28bd49",
+      "course_id": "infectious-diseases",
+      "parent_id": "6ec8e3a98528cb6dd7826d61",
+      "node_type": "subsection",
+      "title": "副伤寒",
+      "normalized_title": "副伤寒",
+      "order": 75,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 185,
+        "source_label": "二、",
+        "raw_text": "二、 副伤寒.......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 185",
+        "bbox": [
+          0.3391898645858624,
+          0.17830109951612555,
+          0.3913245250025642,
+          0.19287837205080008
+        ]
+      }
+    },
+    {
+      "id": "2d4c776511a5f1c88d6bc847",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "细菌性痢疾",
+      "normalized_title": "细菌性痢疾",
+      "order": 76,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 185,
+        "source_label": "第六节",
+        "raw_text": "第六节　细菌性痢疾... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 185",
+        "bbox": [
+          0.33951811926588477,
+          0.19972053968346493,
+          0.43509833002983805,
+          0.21558924247344644
+        ]
+      }
+    },
+    {
+      "id": "dcf220c72a876ce6e1c5de6b",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "细菌感染性腹泻",
+      "normalized_title": "细菌感染性腹泻",
+      "order": 77,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 190,
+        "source_label": "第七节",
+        "raw_text": "第七节　细菌感染性腹泻. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 190",
+        "bbox": [
+          0.33951811926588477,
+          0.22118471610989024,
+          0.4733304143354194,
+          0.23705341889987175
+        ]
+      }
+    },
+    {
+      "id": "5301a4e0b8ba5857a5021582",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "细菌性食物中毒",
+      "normalized_title": "细菌性食物中毒",
+      "order": 78,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 196,
+        "source_label": "第八节",
+        "raw_text": "第八节　细菌性食物中毒. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 196",
+        "bbox": [
+          0.33951811926588477,
+          0.24264889253631558,
+          0.4733304143354194,
+          0.2585175953262971
+        ]
+      }
+    },
+    {
+      "id": "ede28f86a5131340032a314d",
+      "course_id": "infectious-diseases",
+      "parent_id": "5301a4e0b8ba5857a5021582",
+      "node_type": "subsection",
+      "title": "胃肠型食物中毒",
+      "normalized_title": "胃肠型食物中毒",
+      "order": 79,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 196,
+        "source_label": "一、",
+        "raw_text": "一、 胃肠型食物中毒.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 196",
+        "bbox": [
+          0.3391898645858624,
+          0.2641581128196547,
+          0.46083743207522615,
+          0.27873538535432923
+        ]
+      }
+    },
+    {
+      "id": "b6a10c8513cccf6e6c68176f",
+      "course_id": "infectious-diseases",
+      "parent_id": "5301a4e0b8ba5857a5021582",
+      "node_type": "subsection",
+      "title": "神经型食物中毒（肉毒中毒）",
+      "normalized_title": "神经型食物中毒肉毒中毒",
+      "order": 80,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 200,
+        "source_label": "二、",
+        "raw_text": "二、 神经型食物中毒（肉毒中毒）.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 200",
+        "bbox": [
+          0.3391898645858624,
+          0.28562213544716614,
+          0.5538109098183444,
+          0.30019940798184064
+        ]
+      }
+    },
+    {
+      "id": "79d7af2a04b820d0aca90bb8",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "霍乱",
+      "normalized_title": "霍乱",
+      "order": 81,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 203,
+        "source_label": "第九节",
+        "raw_text": "第九节　霍乱............ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 203",
+        "bbox": [
+          0.33951811926588477,
+          0.3070414218155916,
+          0.37775020357146605,
+          0.32291012460557306
+        ]
+      }
+    },
+    {
+      "id": "1f3f68386596870018985f97",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "布鲁菌病",
+      "normalized_title": "布鲁菌病",
+      "order": 82,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 211,
+        "source_label": "第十节",
+        "raw_text": "第十节　布鲁菌病...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 211",
+        "bbox": [
+          0.33951811926588477,
+          0.32850567514147383,
+          0.4159822878770474,
+          0.34437437793145537
+        ]
+      }
+    },
+    {
+      "id": "a8ead3471584a3273e81ae70",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "炭疽",
+      "normalized_title": "炭疽",
+      "order": 83,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 214,
+        "source_label": "第十一节",
+        "raw_text": "第十一节　炭疽......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 214",
+        "bbox": [
+          0.35863416141867543,
+          0.3499697746684422,
+          0.3968662457242567,
+          0.36583847745842374
+        ]
+      }
+    },
+    {
+      "id": "9df841ceca9f2b1c687d2d4d",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "鼠疫",
+      "normalized_title": "鼠疫",
+      "order": 84,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 217,
+        "source_label": "第十二节",
+        "raw_text": "第十二节　鼠疫......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 217",
+        "bbox": [
+          0.35863416141867543,
+          0.3714341048937815,
+          0.3968662457242567,
+          0.38730280768376296
+        ]
+      }
+    },
+    {
+      "id": "37da92c271293af8b77d4c90",
+      "course_id": "infectious-diseases",
+      "parent_id": "d8a47bd4c0c767cee5052e3d",
+      "node_type": "section",
+      "title": "结核病",
+      "normalized_title": "结核病",
+      "order": 85,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 222,
+        "source_label": "第十三节",
+        "raw_text": "第十三节　结核病...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 222",
+        "bbox": [
+          0.35863416141867543,
+          0.3928982428704783,
+          0.4159822878770474,
+          0.40876694566045985
+        ]
+      }
+    },
+    {
+      "id": "48be6632b56beabaaa72fa08",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "深部真菌病",
+      "normalized_title": "深部真菌病",
+      "order": 86,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 230,
+        "source_label": "第六章",
+        "raw_text": "第六章  深部真菌病                           230",
+        "bbox": [
+          0.2617074674054956,
+          0.4343175207799635,
+          0.37431831269192384,
+          0.45162881893276935
+        ]
+      }
+    },
+    {
+      "id": "8a42e4bb4323756ac0f3ec78",
+      "course_id": "infectious-diseases",
+      "parent_id": "48be6632b56beabaaa72fa08",
+      "node_type": "section",
+      "title": "念珠菌病",
+      "normalized_title": "念珠菌病",
+      "order": 87,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 230,
+        "source_label": "第一节",
+        "raw_text": "第一节　念珠菌病...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 230",
+        "bbox": [
+          0.33951830488530155,
+          0.47582657880544843,
+          0.4159824469794046,
+          0.49169528159542997
+        ]
+      }
+    },
+    {
+      "id": "b84fd3bd95d8d01cb3f328be",
+      "course_id": "infectious-diseases",
+      "parent_id": "48be6632b56beabaaa72fa08",
+      "node_type": "section",
+      "title": "新型隐球菌病",
+      "normalized_title": "新型隐球菌病",
+      "order": 88,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 234,
+        "source_label": "第二节",
+        "raw_text": "第二节　新型隐球菌病.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 234",
+        "bbox": [
+          0.33951830488530155,
+          0.4972908705810592,
+          0.45421453128498596,
+          0.5131595733710407
+        ]
+      }
+    },
+    {
+      "id": "8b2c4d1da7e7013939838f6f",
+      "course_id": "infectious-diseases",
+      "parent_id": "48be6632b56beabaaa72fa08",
+      "node_type": "section",
+      "title": "曲霉病",
+      "normalized_title": "曲霉病",
+      "order": 89,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 241,
+        "source_label": "第三节",
+        "raw_text": "第三节　曲霉病......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 241",
+        "bbox": [
+          0.33951830488530155,
+          0.518755008557756,
+          0.3968664313436735,
+          0.5346237113477376
+        ]
+      }
+    },
+    {
+      "id": "d52308cdfc5cee296e24d801",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "螺旋体病",
+      "normalized_title": "螺旋体病",
+      "order": 90,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 246,
+        "source_label": "第七章",
+        "raw_text": "第七章  螺旋体病                            246",
+        "bbox": null
+      }
+    },
+    {
+      "id": "d43bb27ed1cc6e11a27a3715",
+      "course_id": "infectious-diseases",
+      "parent_id": "d52308cdfc5cee296e24d801",
+      "node_type": "section",
+      "title": "钩端螺旋体病",
+      "normalized_title": "钩端螺旋体病",
+      "order": 91,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 246,
+        "source_label": "第一节",
+        "raw_text": "第一节　钩端螺旋体病.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 246",
+        "bbox": [
+          0.33951830488530155,
+          0.6016834598419116,
+          0.45421453128498596,
+          0.6175521626318932
+        ]
+      }
+    },
+    {
+      "id": "9f657c597116f60d7b9c65a4",
+      "course_id": "infectious-diseases",
+      "parent_id": "d52308cdfc5cee296e24d801",
+      "node_type": "section",
+      "title": "梅毒",
+      "normalized_title": "梅毒",
+      "order": 92,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 251,
+        "source_label": "第二节",
+        "raw_text": "第二节　梅毒............ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 251",
+        "bbox": [
+          0.33951830488530155,
+          0.6231477131677939,
+          0.37775038919088283,
+          0.6390164159577755
+        ]
+      }
+    },
+    {
+      "id": "2efe665451fe9b98fedc37c0",
+      "course_id": "infectious-diseases",
+      "parent_id": "d52308cdfc5cee296e24d801",
+      "node_type": "section",
+      "title": "莱姆病",
+      "normalized_title": "莱姆病",
+      "order": 93,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 256,
+        "source_label": "第三节",
+        "raw_text": "第三节　莱姆病......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 256",
+        "bbox": [
+          0.33951830488530155,
+          0.6446119664936762,
+          0.3968664313436735,
+          0.6604806692836577
+        ]
+      }
+    },
+    {
+      "id": "17c82ee931c915158d36f6c0",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "原虫病",
+      "normalized_title": "原虫病",
+      "order": 94,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 261,
+        "source_label": "第八章",
+        "raw_text": "第八章  原虫病                              261",
+        "bbox": [
+          0.26170765302491233,
+          0.6860312828528898,
+          0.32844000775146687,
+          0.7033425810056957
+        ]
+      }
+    },
+    {
+      "id": "55b3973c42f2b1e3e7145e68",
+      "course_id": "infectious-diseases",
+      "parent_id": "17c82ee931c915158d36f6c0",
+      "node_type": "section",
+      "title": "阿米巴病",
+      "normalized_title": "阿米巴病",
+      "order": 95,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 261,
+        "source_label": "第一节",
+        "raw_text": "第一节　阿米巴病...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 261",
+        "bbox": null
+      }
+    },
+    {
+      "id": "2c681001317721fd26a78e0b",
+      "course_id": "infectious-diseases",
+      "parent_id": "55b3973c42f2b1e3e7145e68",
+      "node_type": "subsection",
+      "title": "肠阿米巴病",
+      "normalized_title": "肠阿米巴病",
+      "order": 96,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 261,
+        "source_label": "一、",
+        "raw_text": "一、 肠阿米巴病.... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 261",
+        "bbox": [
+          0.3391900236882196,
+          0.7490496957357636,
+          0.4260810978656631,
+          0.7636269874953024
+        ]
+      }
+    },
+    {
+      "id": "2fa8ddd695cdf8f424f1c3fb",
+      "course_id": "infectious-diseases",
+      "parent_id": "55b3973c42f2b1e3e7145e68",
+      "node_type": "subsection",
+      "title": "阿米巴肝脓肿",
+      "normalized_title": "阿米巴肝脓肿",
+      "order": 97,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 265,
+        "source_label": "二、",
+        "raw_text": "二、 阿米巴肝脓肿. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 265",
+        "bbox": [
+          0.3391898645858624,
+          0.770513718363275,
+          0.44345921193632554,
+          0.7850910101228138
+        ]
+      }
+    },
+    {
+      "id": "d66d5de5604f38603e2b8adc",
+      "course_id": "infectious-diseases",
+      "parent_id": "17c82ee931c915158d36f6c0",
+      "node_type": "section",
+      "title": "疟疾",
+      "normalized_title": "疟疾",
+      "order": 98,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 269,
+        "source_label": "第二节",
+        "raw_text": "第二节　疟疾............ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 269",
+        "bbox": [
+          0.33951830488530155,
+          0.7919332162052071,
+          0.37775038919088283,
+          0.8078018805454602
+        ]
+      }
+    },
+    {
+      "id": "b9a9a8be0f9db1cc4ef472f2",
+      "course_id": "infectious-diseases",
+      "parent_id": "17c82ee931c915158d36f6c0",
+      "node_type": "section",
+      "title": "黑热病",
+      "normalized_title": "黑热病",
+      "order": 99,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 275,
+        "source_label": "第三节",
+        "raw_text": "第三节　黑热病......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 275",
+        "bbox": [
+          0.33951830488530155,
+          0.8133973926316325,
+          0.3968664313436735,
+          0.8292660569718855
+        ]
+      }
+    },
+    {
+      "id": "e32a036d2d56e8dfb59797d6",
+      "course_id": "infectious-diseases",
+      "parent_id": "17c82ee931c915158d36f6c0",
+      "node_type": "section",
+      "title": "弓形虫病",
+      "normalized_title": "弓形虫病",
+      "order": 100,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 280,
+        "source_label": "第四节",
+        "raw_text": "第四节　弓形虫病...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 280",
+        "bbox": [
+          0.33951830488530155,
+          0.8348615690580578,
+          0.4159824469794046,
+          0.8507302333983108
+        ]
+      }
+    },
+    {
+      "id": "51c12a7691583a6475dac6fd",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "蠕虫病",
+      "normalized_title": "蠕虫病",
+      "order": 101,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 284,
+        "source_label": "第九章",
+        "raw_text": "第九章  蠕虫病                             284",
+        "bbox": [
+          0.26170765302491233,
+          0.876280923867,
+          0.32844000775146687,
+          0.8935922220198058
+        ]
+      }
+    },
+    {
+      "id": "6de2bc728f4350f0d8f741f1",
+      "course_id": "infectious-diseases",
+      "parent_id": "51c12a7691583a6475dac6fd",
+      "node_type": "section",
+      "title": "吸虫病",
+      "normalized_title": "吸虫病",
+      "order": 102,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 3,
+        "printed_page": 284,
+        "source_label": "第一节",
+        "raw_text": "第一节　吸虫病......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 284",
+        "bbox": [
+          0.33951830488530155,
+          0.9177900972416703,
+          0.3968664313436735,
+          0.9336587615819233
+        ]
+      }
+    },
+    {
+      "id": "cefcba462efa3d454b9b3abc",
+      "course_id": "infectious-diseases",
+      "parent_id": "6de2bc728f4350f0d8f741f1",
+      "node_type": "subsection",
+      "title": "日本血吸虫病",
+      "normalized_title": "日本血吸虫病",
+      "order": 103,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 284,
+        "source_label": "一、",
+        "raw_text": "一、 日本血吸虫病. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 284",
+        "bbox": [
+          0.33918967896644564,
+          0.07098013567832588,
+          0.4434589997998492,
+          0.0855574226316486
+        ]
+      }
+    },
+    {
+      "id": "84dcb178891fd3251f32bcc5",
+      "course_id": "infectious-diseases",
+      "parent_id": "6de2bc728f4350f0d8f741f1",
+      "node_type": "subsection",
+      "title": "并殖吸虫病",
+      "normalized_title": "并殖吸虫病",
+      "order": 104,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 290,
+        "source_label": "二、",
+        "raw_text": "二、 并殖吸虫病.... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 290",
+        "bbox": [
+          0.33918967896644564,
+          0.09229167148890345,
+          0.42608077966094865,
+          0.10686895363601011
+        ]
+      }
+    },
+    {
+      "id": "da3e165bd573368d1f59f030",
+      "course_id": "infectious-diseases",
+      "parent_id": "6de2bc728f4350f0d8f741f1",
+      "node_type": "subsection",
+      "title": "华支睾吸虫病",
+      "normalized_title": "华支睾吸虫病",
+      "order": 105,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 295,
+        "source_label": "三、",
+        "raw_text": "三、 华支睾吸虫病. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 295",
+        "bbox": [
+          0.33918967896644564,
+          0.11303614589764852,
+          0.4434589997998492,
+          0.12761342804475517
+        ]
+      }
+    },
+    {
+      "id": "bf1078dbaa02d2ad7bd5f01d",
+      "course_id": "infectious-diseases",
+      "parent_id": "6de2bc728f4350f0d8f741f1",
+      "node_type": "subsection",
+      "title": "姜片虫病",
+      "normalized_title": "姜片虫病",
+      "order": 106,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 298,
+        "source_label": "四、",
+        "raw_text": "四、 姜片虫病....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 298",
+        "bbox": [
+          0.33918967896644564,
+          0.1337807741053075,
+          0.40870255952204804,
+          0.14835805625241416
+        ]
+      }
+    },
+    {
+      "id": "bddef5ad81d9ec0c1fcf7813",
+      "course_id": "infectious-diseases",
+      "parent_id": "51c12a7691583a6475dac6fd",
+      "node_type": "section",
+      "title": "线虫病",
+      "normalized_title": "线虫病",
+      "order": 107,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 300,
+        "source_label": "第二节",
+        "raw_text": "第二节　线虫病......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 300",
+        "bbox": [
+          0.33951811926588477,
+          0.15448035845605268,
+          0.3968662457242567,
+          0.1703490612460342
+        ]
+      }
+    },
+    {
+      "id": "380a5c439802fbee7d9e9e6a",
+      "course_id": "infectious-diseases",
+      "parent_id": "bddef5ad81d9ec0c1fcf7813",
+      "node_type": "subsection",
+      "title": "钩虫病",
+      "normalized_title": "钩虫病",
+      "order": 108,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 300,
+        "source_label": "一、",
+        "raw_text": "一、 钩虫病.......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 300",
+        "bbox": [
+          0.3391898645858624,
+          0.17527141471085073,
+          0.3913245250025642,
+          0.18984868724552528
+        ]
+      }
+    },
+    {
+      "id": "4e3576684980bc6e877ed7e2",
+      "course_id": "infectious-diseases",
+      "parent_id": "bddef5ad81d9ec0c1fcf7813",
+      "node_type": "subsection",
+      "title": "蛔虫病",
+      "normalized_title": "蛔虫病",
+      "order": 109,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 303,
+        "source_label": "二、",
+        "raw_text": "二、 蛔虫病.......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 303",
+        "bbox": [
+          0.33918967896644564,
+          0.19601427423099965,
+          0.3913243393831474,
+          0.2105915467656742
+        ]
+      }
+    },
+    {
+      "id": "e67a31b1ef21fb81158e954c",
+      "course_id": "infectious-diseases",
+      "parent_id": "bddef5ad81d9ec0c1fcf7813",
+      "node_type": "subsection",
+      "title": "蛲虫病",
+      "normalized_title": "蛲虫病",
+      "order": 110,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 305,
+        "source_label": "三、",
+        "raw_text": "三、 蛲虫病.......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 305",
+        "bbox": [
+          0.33918967896644564,
+          0.2167589793381156,
+          0.3913243393831474,
+          0.23133625187279014
+        ]
+      }
+    },
+    {
+      "id": "88ecc434642d537e460e6143",
+      "course_id": "infectious-diseases",
+      "parent_id": "bddef5ad81d9ec0c1fcf7813",
+      "node_type": "subsection",
+      "title": "旋毛虫病",
+      "normalized_title": "旋毛虫病",
+      "order": 111,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 307,
+        "source_label": "四、",
+        "raw_text": "四、 旋毛虫病....... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 307",
+        "bbox": [
+          0.33918967896644564,
+          0.23750329994794675,
+          0.40870255952204804,
+          0.2520805724826213
+        ]
+      }
+    },
+    {
+      "id": "bb8b8c776d9403cecfa6ab35",
+      "course_id": "infectious-diseases",
+      "parent_id": "51c12a7691583a6475dac6fd",
+      "node_type": "section",
+      "title": "绦虫病",
+      "normalized_title": "绦虫病",
+      "order": 112,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 309,
+        "source_label": "第三节",
+        "raw_text": "第三节　绦虫病......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 309",
+        "bbox": [
+          0.33951811926588477,
+          0.25820311499706283,
+          0.3968662457242567,
+          0.2740718177870443
+        ]
+      }
+    },
+    {
+      "id": "d41f8bcc6c56824c922efb11",
+      "course_id": "infectious-diseases",
+      "parent_id": "51c12a7691583a6475dac6fd",
+      "node_type": "section",
+      "title": "囊尾蚴病",
+      "normalized_title": "囊尾蚴病",
+      "order": 113,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 312,
+        "source_label": "第四节",
+        "raw_text": "第四节　囊尾蚴病...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 312",
+        "bbox": [
+          0.33951811926588477,
+          0.2789475894058079,
+          0.4159822878770474,
+          0.2948162921957894
+        ]
+      }
+    },
+    {
+      "id": "a107995d460bb9e431f848a4",
+      "course_id": "infectious-diseases",
+      "parent_id": "51c12a7691583a6475dac6fd",
+      "node_type": "section",
+      "title": "棘球蚴病（包虫病）",
+      "normalized_title": "棘球蚴病包虫病",
+      "order": 114,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 317,
+        "source_label": "第五节",
+        "raw_text": "第五节　棘球蚴病（包虫病）.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 317",
+        "bbox": [
+          0.33951811926588477,
+          0.29969221761346687,
+          0.4991370288143915,
+          0.3155609204034484
+        ]
+      }
+    },
+    {
+      "id": "7714bee3f11ed46fe9fedd6d",
+      "course_id": "infectious-diseases",
+      "parent_id": "a107995d460bb9e431f848a4",
+      "node_type": "subsection",
+      "title": "囊型棘球蚴病",
+      "normalized_title": "囊型棘球蚴病",
+      "order": 115,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 317,
+        "source_label": "一、",
+        "raw_text": "一、 囊型棘球蚴病. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 317",
+        "bbox": [
+          0.3391898645858624,
+          0.3204832738682649,
+          0.44345921193632554,
+          0.3350605464029395
+        ]
+      }
+    },
+    {
+      "id": "b176f74cd74190884ae2b9de",
+      "course_id": "infectious-diseases",
+      "parent_id": "a107995d460bb9e431f848a4",
+      "node_type": "subsection",
+      "title": "泡型棘球蚴病",
+      "normalized_title": "泡型棘球蚴病",
+      "order": 116,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 320,
+        "source_label": "二、",
+        "raw_text": "二、 泡型棘球蚴病. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 320",
+        "bbox": [
+          0.33918967896644564,
+          0.3412262679624635,
+          0.4434589997998492,
+          0.35580355972200234
+        ]
+      }
+    },
+    {
+      "id": "3336640dcb711f02af700ef5",
+      "course_id": "infectious-diseases",
+      "parent_id": "51c12a7691583a6475dac6fd",
+      "node_type": "section",
+      "title": "蠕虫蚴移行症",
+      "normalized_title": "蠕虫蚴移行症",
+      "order": 117,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 321,
+        "source_label": "第六节",
+        "raw_text": "第六节　蠕虫蚴移行症.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 321",
+        "bbox": [
+          0.33951811926588477,
+          0.361925871538073,
+          0.4542143721826287,
+          0.37779457432805447
+        ]
+      }
+    },
+    {
+      "id": "8b151a1869e440f3cb4648a1",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "其他感染相关问题",
+      "normalized_title": "其他感染相关问题",
+      "order": 118,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 325,
+        "source_label": "第十章",
+        "raw_text": "第十章  其他感染相关问题                      325",
+        "bbox": [
+          0.2617074674054956,
+          0.4026254474298779,
+          0.44313607504879404,
+          0.41993674558268373
+        ]
+      }
+    },
+    {
+      "id": "1cf18c4d54eb8f50a8d84494",
+      "course_id": "infectious-diseases",
+      "parent_id": "8b151a1869e440f3cb4648a1",
+      "node_type": "section",
+      "title": "败血症",
+      "normalized_title": "败血症",
+      "order": 119,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 325,
+        "source_label": "第一节",
+        "raw_text": "第一节　败血症......... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 325",
+        "bbox": [
+          0.33951811926588477,
+          0.44341488033713955,
+          0.3968662457242567,
+          0.45928358312712103
+        ]
+      }
+    },
+    {
+      "id": "04ef4c57523eabcddfbdf19b",
+      "course_id": "infectious-diseases",
+      "parent_id": "8b151a1869e440f3cb4648a1",
+      "node_type": "section",
+      "title": "感染性休克",
+      "normalized_title": "感染性休克",
+      "order": 120,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 331,
+        "source_label": "第二节",
+        "raw_text": "第二节　感染性休克... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 331",
+        "bbox": [
+          0.33951811926588477,
+          0.46415947009507,
+          0.43509833002983805,
+          0.48002817288505156
+        ]
+      }
+    },
+    {
+      "id": "c048fe2d52450aeed7a0f9cc",
+      "course_id": "infectious-diseases",
+      "parent_id": "8b151a1869e440f3cb4648a1",
+      "node_type": "section",
+      "title": "医院感染",
+      "normalized_title": "医院感染",
+      "order": 121,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 340,
+        "source_label": "第三节",
+        "raw_text": "第三节　医院感染...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 340",
+        "bbox": [
+          0.33951811926588477,
+          0.484904098302729,
+          0.4159822878770474,
+          0.5007728010927105
+        ]
+      }
+    },
+    {
+      "id": "f7dfe0f38ef0cf625e077a6a",
+      "course_id": "infectious-diseases",
+      "parent_id": "8b151a1869e440f3cb4648a1",
+      "node_type": "section",
+      "title": "抗菌药物的临床应用",
+      "normalized_title": "抗菌药物的临床应用",
+      "order": 122,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 345,
+        "source_label": "第四节",
+        "raw_text": "第四节　抗菌药物的临床应用. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 345",
+        "bbox": null
+      }
+    },
+    {
+      "id": "47824c72cbd583a7e6d04bdc",
+      "course_id": "infectious-diseases",
+      "parent_id": "f7dfe0f38ef0cf625e077a6a",
+      "node_type": "subsection",
+      "title": "抗菌药物的定义与范畴",
+      "normalized_title": "抗菌药物的定义与范畴",
+      "order": 123,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 345,
+        "source_label": "一、",
+        "raw_text": "一、 抗菌药物的定义与范畴.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 345",
+        "bbox": [
+          0.3391898645858624,
+          0.5264396097414079,
+          0.512972092491928,
+          0.5410169015009467
+        ]
+      }
+    },
+    {
+      "id": "7b89c4c275001b42916d185b",
+      "course_id": "infectious-diseases",
+      "parent_id": "f7dfe0f38ef0cf625e077a6a",
+      "node_type": "subsection",
+      "title": "抗菌药物的临床应用基本原则",
+      "normalized_title": "抗菌药物的临床应用基本原则",
+      "order": 124,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 345,
+        "source_label": "二、",
+        "raw_text": "二、 抗菌药物的临床应用基本原则.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 345",
+        "bbox": [
+          0.33918967896644564,
+          0.5471825846107422,
+          0.5651065407721534,
+          0.561759876370281
+        ]
+      }
+    },
+    {
+      "id": "84b691eb2ca22279e24f76f4",
+      "course_id": "infectious-diseases",
+      "parent_id": "f7dfe0f38ef0cf625e077a6a",
+      "node_type": "subsection",
+      "title": "常用抗菌药物的主要特点",
+      "normalized_title": "常用抗菌药物的主要特点",
+      "order": 125,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 349,
+        "source_label": "三、",
+        "raw_text": "三、 常用抗菌药物的主要特点. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 349",
+        "bbox": [
+          0.33918967896644564,
+          0.5679270590194874,
+          0.5303501004943523,
+          0.5825043507790261
+        ]
+      }
+    },
+    {
+      "id": "f612f0bc5b567bbeaf938b48",
+      "course_id": "infectious-diseases",
+      "parent_id": "f7dfe0f38ef0cf625e077a6a",
+      "node_type": "subsection",
+      "title": "抗菌药物临床应用策略与管理",
+      "normalized_title": "抗菌药物临床应用策略与管理",
+      "order": 126,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 353,
+        "source_label": "四、",
+        "raw_text": "四、 抗菌药物临床应用策略与管理.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 353",
+        "bbox": [
+          0.33918967896644564,
+          0.5886716487774178,
+          0.5651065407721534,
+          0.6032489405369567
+        ]
+      }
+    },
+    {
+      "id": "c0fc23ddc8173dbdc5616105",
+      "course_id": "infectious-diseases",
+      "parent_id": "8b151a1869e440f3cb4648a1",
+      "node_type": "section",
+      "title": "感染微生态学理论与实践",
+      "normalized_title": "感染微生态学理论与实践",
+      "order": 127,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 354,
+        "source_label": "第五节",
+        "raw_text": "第五节　感染微生态学理论与实践.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 354",
+        "bbox": [
+          0.33951811926588477,
+          0.6093712523530272,
+          0.549794582946582,
+          0.6252399551430088
+        ]
+      }
+    },
+    {
+      "id": "5577938a728eb27bbde1c240",
+      "course_id": "infectious-diseases",
+      "parent_id": "8b151a1869e440f3cb4648a1",
+      "node_type": "section",
+      "title": "人工肝脏",
+      "normalized_title": "人工肝脏",
+      "order": 128,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 359,
+        "source_label": "第六节",
+        "raw_text": "第六节　人工肝脏...... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 359",
+        "bbox": [
+          0.33951811926588477,
+          0.6301158421109577,
+          0.4159822878770474,
+          0.6459845064512107
+        ]
+      }
+    },
+    {
+      "id": "642b2f520e0e690178a121d6",
+      "course_id": "infectious-diseases",
+      "parent_id": "5577938a728eb27bbde1c240",
+      "node_type": "subsection",
+      "title": "人工肝概念",
+      "normalized_title": "人工肝概念",
+      "order": 129,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 360,
+        "source_label": "一、",
+        "raw_text": "一、 人工肝概念.... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 360",
+        "bbox": [
+          0.3391898645858624,
+          0.65090691759062,
+          0.4260809917974249,
+          0.6654842093501588
+        ]
+      }
+    },
+    {
+      "id": "2e8455702e4e734bf6dea49c",
+      "course_id": "infectious-diseases",
+      "parent_id": "5577938a728eb27bbde1c240",
+      "node_type": "subsection",
+      "title": "人工肝分型",
+      "normalized_title": "人工肝分型",
+      "order": 130,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 360,
+        "source_label": "二、",
+        "raw_text": "二、 人工肝分型.... . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 360",
+        "bbox": [
+          0.33918967896644564,
+          0.671649777110769,
+          0.42608077966094865,
+          0.6862270688703077
+        ]
+      }
+    },
+    {
+      "id": "7a61b3ae636ed5af71b662b6",
+      "course_id": "infectious-diseases",
+      "parent_id": "5577938a728eb27bbde1c240",
+      "node_type": "subsection",
+      "title": "非生物型人工肝原理和疗法",
+      "normalized_title": "非生物型人工肝原理和疗法",
+      "order": 131,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 361,
+        "source_label": "三、",
+        "raw_text": "三、 非生物型人工肝原理和疗法. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 361",
+        "bbox": [
+          0.33918967896644564,
+          0.692394328418971,
+          0.5477283206332528,
+          0.7069716201785098
+        ]
+      }
+    },
+    {
+      "id": "d3e240d70f5104b7a66352e0",
+      "course_id": "infectious-diseases",
+      "parent_id": "5577938a728eb27bbde1c240",
+      "node_type": "subsection",
+      "title": "非生物型人工肝治疗适应证",
+      "normalized_title": "非生物型人工肝治疗适应证",
+      "order": 132,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 362,
+        "source_label": "四、",
+        "raw_text": "四、 非生物型人工肝治疗适应证. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 362",
+        "bbox": [
+          0.33918967896644564,
+          0.713138802827716,
+          0.5477283206332528,
+          0.7277160945872548
+        ]
+      }
+    },
+    {
+      "id": "85110d1bf48b58c8c488a9ad",
+      "course_id": "infectious-diseases",
+      "parent_id": "5577938a728eb27bbde1c240",
+      "node_type": "subsection",
+      "title": "非生物型人工肝禁忌证",
+      "normalized_title": "非生物型人工肝禁忌证",
+      "order": 133,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 363,
+        "source_label": "五、",
+        "raw_text": "五、 非生物型人工肝禁忌证.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 363",
+        "bbox": [
+          0.33918967896644564,
+          0.733883431035375,
+          0.5129718803554516,
+          0.7484607227949138
+        ]
+      }
+    },
+    {
+      "id": "2c3802d48d077fa880291190",
+      "course_id": "infectious-diseases",
+      "parent_id": "5577938a728eb27bbde1c240",
+      "node_type": "subsection",
+      "title": "非生物型人工肝并发症",
+      "normalized_title": "非生物型人工肝并发症",
+      "order": 134,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 363,
+        "source_label": "六、",
+        "raw_text": "六、 非生物型人工肝并发症.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 363",
+        "bbox": [
+          0.33918967896644564,
+          0.7546279823435771,
+          0.5129718803554516,
+          0.7692052741031159
+        ]
+      }
+    },
+    {
+      "id": "e44583bbe654dd7a25b92fef",
+      "course_id": "infectious-diseases",
+      "parent_id": "5577938a728eb27bbde1c240",
+      "node_type": "subsection",
+      "title": "非生物型人工肝治疗的疗效和评估",
+      "normalized_title": "非生物型人工肝治疗的疗效和评估",
+      "order": 135,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 363,
+        "source_label": "七、",
+        "raw_text": "七、 非生物型人工肝治疗的疗效和评估.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 363",
+        "bbox": [
+          0.33918967896644564,
+          0.7753724567523221,
+          0.5998629810499546,
+          0.789949748511861
+        ]
+      }
+    },
+    {
+      "id": "9ee22df7c454ed455d6b95e4",
+      "course_id": "infectious-diseases",
+      "parent_id": "5577938a728eb27bbde1c240",
+      "node_type": "subsection",
+      "title": "小结",
+      "normalized_title": "小结",
+      "order": 136,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 363,
+        "source_label": "八、",
+        "raw_text": "八、 小结............. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 363",
+        "bbox": [
+          0.33918967896644564,
+          0.7961170849599811,
+          0.3739461192442468,
+          0.8106943767195199
+        ]
+      }
+    },
+    {
+      "id": "48c89ebc5c916994145379ce",
+      "course_id": "infectious-diseases",
+      "parent_id": null,
+      "node_type": "chapter",
+      "title": "附录",
+      "normalized_title": "附录",
+      "order": 137,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 364,
+        "source_label": "附录",
+        "raw_text": "附录                                     364",
+        "bbox": null
+      }
+    },
+    {
+      "id": "713c6cad3caf22e006596406",
+      "course_id": "infectious-diseases",
+      "parent_id": "48c89ebc5c916994145379ce",
+      "node_type": "section",
+      "title": "传染病的消毒与隔离",
+      "normalized_title": "传染病的消毒与隔离",
+      "order": 138,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 364,
+        "source_label": "附录一",
+        "raw_text": "附录一　传染病的消毒与隔离. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 364",
+        "bbox": [
+          0.33951811926588477,
+          0.877561299825369,
+          0.5115624986410007,
+          0.893429964165622
+        ]
+      }
+    },
+    {
+      "id": "8f209b47f5306d3c7625b7d8",
+      "course_id": "infectious-diseases",
+      "parent_id": "713c6cad3caf22e006596406",
+      "node_type": "subsection",
+      "title": "传染病的消毒",
+      "normalized_title": "传染病的消毒",
+      "order": 139,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 364,
+        "source_label": "一、",
+        "raw_text": "一、 传染病的消毒. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 364",
+        "bbox": null
+      }
+    },
+    {
+      "id": "b578489e1cde617bb29c03fa",
+      "course_id": "infectious-diseases",
+      "parent_id": "713c6cad3caf22e006596406",
+      "node_type": "subsection",
+      "title": "传染病的隔离",
+      "normalized_title": "传染病的隔离",
+      "order": 140,
+      "aliases": [],
+      "metadata": {
+        "source_file": "27传染病学_目录.pdf",
+        "source_page": 4,
+        "printed_page": 367,
+        "source_label": "二、",
+        "raw_text": "二、 传染病的隔离. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 367",
+        "bbox": [
+          0.33918967896644564,
+          0.9190953117246372,
+          0.4434589997998492,
+          0.933672603484176
+        ]
+      }
+    }
+  ]
+}

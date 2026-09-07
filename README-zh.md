@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### Elapse Forge · 可选基础模块 0.1.0
+
+新增 `/forge` 扫描题库导入工作台骨架：后台任务、MinerU Provider、标准课程树、来源定位复核，以及兼容现有 Elapse 的导出适配层。原刷题与导入流程不变。**真实 MinerU 运行验收尚未完成，目前不承诺识别准确率。** 参见 [运行说明](forge/README-zh.md)、[架构](docs/FORGE_ARCHITECTURE.md)和[下一阶段交接](docs/FORGE_HANDOFF.md)。Forge 不随主程序自动部署。
+
 ### v1.3.7 · 更安全的上一题导航
 
 已解除 AI 解析及追问的站内每日额度限制，个人 AI 不再依赖额度数据库。AI 服务商自身的余额及接口限制仍然适用。

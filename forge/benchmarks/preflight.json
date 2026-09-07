@@ -1,0 +1,40 @@
+{
+  "at": "2026-09-07T00:19:09.038051+00:00",
+  "samples": [
+    {
+      "file": "传染指导与习题集配套第九版_演示.pdf",
+      "sha256": "244938b3100fd470c011c5d63080d52c068199d92582e0bca39ee0bea8e36534",
+      "page_count": 21,
+      "role": "ocr-benchmark-not-canonical",
+      "pages_with_text_layer": 0,
+      "rotations": [
+        90
+      ],
+      "ground_truth": null
+    },
+    {
+      "file": "妇产科学复习考试指导（军医）_演示.pdf",
+      "sha256": "f9839e3de74078e39a8ba88b09ca9e80b5e179f92e75c8013441eff2ae4d0b35",
+      "page_count": 10,
+      "role": "ocr-benchmark-not-canonical",
+      "pages_with_text_layer": 0,
+      "rotations": [
+        90,
+        270
+      ],
+      "ground_truth": null
+    }
+  ],
+  "mineru": {
+    "provider": "mineru",
+    "mode": "native",
+    "ready": false,
+    "issues": [
+      "Executable not found: mineru"
+    ],
+    "note": "Readiness checks configuration only; model availability requires a real OCR run."
+  },
+  "mineru_executed": false,
+  "normalized_real_ocr_result": null,
+  "accuracy": null
+}
