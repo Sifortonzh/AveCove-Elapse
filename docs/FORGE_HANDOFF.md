@@ -2,6 +2,8 @@
 
 Read root `AGENTS.md`, all six `FORGE_*` design documents, `forge/README.md`, then current code. Do not reconstruct project context from the long conversation. Work on one bounded task per turn and rerun compatibility tests. Use the user's source PDFs only as authorized local benchmark material.
 
+**2026-09-07 deployment decision:** prioritize the official cloud API instead of installing inference on the small production host. Read [FORGE_CLOUD_HANDOFF.md](FORGE_CLOUD_HANDOFF.md) first; its cloud integration plan supersedes provisioning a new local OCR host as the immediate next step. The cloud Provider is not implemented yet.
+
 ## Foundation delivered
 
 - Isolated Next UI/relay; FastAPI upload, jobs, page image, review, export.
