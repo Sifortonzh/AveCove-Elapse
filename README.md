@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### v1.4.1 · Low-memory production deployment
+
+Production releases are now built as complete Docker images on GitHub Actions. The server only loads the finished image and restarts the app without running `npm ci` or `next build`, preventing updates from exhausting small production hosts. Concurrent production releases cancel older runs so only the newest commit is deployed.
+
 ### v1.4.0 · Medical grouped questions and Slash Skip
 
 Medical imports now preserve A1, A2, A3, A4, B1, C, and X type identities. A3/A4 case groups show their shared stem and linked subquestions together; B1 groups reuse their source option pool. The new **Slash Skip** action can exclude one question or a chapter-scoped original-number range such as `1-31`; skipped questions show `/` on the answer sheet, synchronize across devices, and are excluded from accuracy and Western Medicine 306 scoring. Forge and the general AI importer now explicitly support book-wide answer registries placed after all questions, while generated private banks can include concise table-of-contents question ranges in their description. Source books and converted personal banks remain outside the public repository.
@@ -44,7 +48,7 @@ Swipe an option or use its annotation button; comments and handwriting are saved
 </p>
 
 <p align="center">
-  <img alt="Version 1.4.0" src="https://img.shields.io/badge/version-1.4.0-b43d35" />
+  <img alt="Version 1.4.1" src="https://img.shields.io/badge/version-1.4.1-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />

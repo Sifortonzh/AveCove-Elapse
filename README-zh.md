@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### v1.4.1 · 低内存生产发布
+
+正式版本改为由 GitHub Actions 构建完整 Docker 镜像，服务器只加载成品镜像并重启应用，不再现场执行 `npm ci` 或 `next build`，避免更新时耗尽小内存主机。并发发布会自动取消旧任务，确保只部署最新提交。
+
 ### v1.4.0 · 医学组题与“斩”题
 
 医学导入现可保留 A1、A2、A3、A4、B1、C、X 七类题型。A3/A4 会把共用病例题干与同组子题放在一个连续工作区，B1 会复用原文件的共用备选答案。新增“斩”题：可斩当前题，也可按当前章节原题号批量输入 `1-31` 等范围；答题卡以 `/` 标记，多端同步，并从做题数、正确率及西综 306 得分中剔除。Forge 与通用 AI 导入同时补强“全书题目结束后统一答案表”的关联规则，生成的个人题库简介可写入目录式章节题号范围。原书与转换后的私人题库仍不会进入公开仓库。
@@ -44,7 +48,7 @@ Forge 0.2 支持接管已完成的官方 MinerU 结果，避免重复 OCR，并�
 </p>
 
 <p align="center">
-  <img alt="版本 1.4.0" src="https://img.shields.io/badge/version-1.4.0-b43d35" />
+  <img alt="版本 1.4.1" src="https://img.shields.io/badge/version-1.4.1-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />

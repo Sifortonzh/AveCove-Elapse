@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: production-deploy
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -15,6 +15,12 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+      - name: Build production image on GitHub
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_SITE_URL=https://allo.avecrouge.top \
+            --tag "allo-app:${GITHUB_SHA}" .
+          docker save "allo-app:${GITHUB_SHA}" | gzip -1 > "/tmp/allo-app-${GITHUB_SHA}.tar.gz"
       - name: Prepare SSH
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -32,11 +38,26 @@ jobs:
         run: |
           rsync -az --delete --exclude '.env' --exclude 'backups' --exclude '.git' \
             -e 'ssh -i ~/.ssh/deploy_key' ./ "$SERVER_USER@$SERVER_HOST:$SERVER_PATH/"
-      - name: Build and restart
+      - name: Upload production image
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            "/tmp/allo-app-${GITHUB_SHA}.tar.gz" \
+            "$SERVER_USER@$SERVER_HOST:/tmp/allo-app-${GITHUB_SHA}.tar.gz"
+      - name: Load and restart without server-side build
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_PATH: ${{ secrets.SERVER_PATH }}
         run: |
           ssh -i ~/.ssh/deploy_key "$SERVER_USER@$SERVER_HOST" \
-            "cd '$SERVER_PATH' && docker compose up -d --build --remove-orphans && docker compose ps"
+            "set -eu; \
+             gzip -dc '/tmp/allo-app-${GITHUB_SHA}.tar.gz' | docker load; \
+             docker tag 'allo-app:${GITHUB_SHA}' allo-app:latest; \
+             cd '$SERVER_PATH'; \
+             docker compose up -d --no-build --remove-orphans; \
+             printf '%s\n' '${GITHUB_SHA}' > .deployed-commit; \
+             rm -f '/tmp/allo-app-${GITHUB_SHA}.tar.gz'; \
+             docker compose ps"
