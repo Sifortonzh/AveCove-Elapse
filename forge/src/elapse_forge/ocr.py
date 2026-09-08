@@ -49,6 +49,15 @@ class _MinerUTableParser(HTMLParser):
             self._row = None
 
 
+def parse_mineru_table_html(html: str) -> list[list[dict]]:
+    """Parse MinerU's Markdown/JSON table HTML into normalized cell rows."""
+
+    parser = _MinerUTableParser()
+    parser.feed(html)
+    parser.close()
+    return parser.rows
+
+
 def _hybrid_text(raw: dict) -> tuple[str, dict]:
     metadata: dict = {}
 
@@ -65,12 +74,10 @@ def _hybrid_text(raw: dict) -> tuple[str, dict]:
                 )
             if isinstance(value.get("html"), str):
                 html = value["html"]
-                parser = _MinerUTableParser()
-                parser.feed(html)
                 metadata["table_html"] = html
-                metadata["table_rows"] = parser.rows
+                metadata["table_rows"] = parse_mineru_table_html(html)
                 return "\n".join(
-                    "\t".join(c["text"] for c in row) for row in parser.rows
+                    "\t".join(c["text"] for c in row) for row in metadata["table_rows"]
                 )
             if isinstance(value.get("image_path"), str):
                 metadata.setdefault("image_paths", []).append(value["image_path"])

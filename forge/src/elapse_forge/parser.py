@@ -42,10 +42,11 @@ def _question_type_heading(line: str) -> tuple[QuestionType, str] | None:
 def _table_answers(block, source, document, scope, default_kind, result):
     rows = block.metadata.get("table_rows")
     if not isinstance(rows, list):
-        return False
+        return None
     column_kinds: dict[int, QuestionType] = {}
     occupied: dict[int, int] = {}
     found = False
+    first_kind: QuestionType | None = None
     for row in rows:
         if not isinstance(row, list):
             continue
@@ -67,6 +68,7 @@ def _table_answers(block, source, document, scope, default_kind, result):
                 None,
             )
             if heading:
+                first_kind = first_kind or heading
                 for offset in range(colspan):
                     column_kinds[column + offset] = heading
             else:
@@ -96,7 +98,7 @@ def _table_answers(block, source, document, scope, default_kind, result):
                     occupied[column + offset] = rowspan
             column += colspan
         occupied = {key: value - 1 for key, value in occupied.items() if value > 1}
-    return found
+    return first_kind if found else None
 
 
 def parse_document(document: Document) -> ParseResult:
@@ -115,12 +117,18 @@ def parse_document(document: Document) -> ParseResult:
     shared_question_count = 0
 
     def clear_shared():
-        nonlocal shared_mode, shared_group, shared_buffer, shared_options, shared_question_count
+        nonlocal \
+            shared_mode, \
+            shared_group, \
+            shared_buffer, \
+            shared_options, \
+            shared_question_count
         shared_mode = None
         shared_group = ""
         shared_buffer = []
         shared_options = []
         shared_question_count = 0
+
     for page in sorted(document.pages, key=lambda p: p.page_number):
         for block in sorted(page.blocks, key=lambda b: b.reading_order):
             if block.type in ("header", "footer", "page_number", "image"):
@@ -134,7 +142,11 @@ def parse_document(document: Document) -> ParseResult:
                 ocr_provider=document.provider,
             )
             if block.type == "table":
-                if _table_answers(block, source, document, scope, kind, result):
+                table_kind = _table_answers(
+                    block, source, document, scope, kind, result
+                )
+                if table_kind:
+                    kind = table_kind
                     mode, current, entry, option = "answers", None, None, None
                 else:
                     result.unparsed_blocks.append(block.id)
@@ -186,7 +198,9 @@ def parse_document(document: Document) -> ParseResult:
                     clear_shared()
                     if kind == QuestionType.A4:
                         shared_mode = "stem"
-                        shared_group = f"{document.id}:{scope}:A4:auto:{len(result.questions)}"
+                        shared_group = (
+                            f"{document.id}:{scope}:A4:auto:{len(result.questions)}"
+                        )
                     if not line:
                         continue
                 shared_heading = re.fullmatch(
@@ -292,7 +306,9 @@ def parse_document(document: Document) -> ParseResult:
                         source=[source],
                     )
                     if shared_mode == "options" and shared_options:
-                        current.options = [item.model_copy(deep=True) for item in shared_options]
+                        current.options = [
+                            item.model_copy(deep=True) for item in shared_options
+                        ]
                     shared_question_count += 1
                     result.questions.append(current)
                     option = None
@@ -322,7 +338,9 @@ def parse_document(document: Document) -> ParseResult:
                                 else len(line)
                             ].strip()
                             if text:
-                                shared_options.append(Option(label=choice[1], text=text))
+                                shared_options.append(
+                                    Option(label=choice[1], text=text)
+                                )
                     elif shared_options:
                         shared_options[-1].text += "\n" + line
                     else:

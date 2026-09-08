@@ -16,9 +16,11 @@ from elapse_forge.curriculum import match_curriculum, node_path
 from elapse_forge.export import export_bank
 from elapse_forge.jobs import Conflict, JobStore
 from elapse_forge.models import (
+    Block,
     Box,
     Curriculum,
     Document,
+    Page,
     Question,
     validate_json,
 )
@@ -106,7 +108,10 @@ def test_medical_shared_stems_and_option_groups_are_preserved():
         metadata={"source_file": "groups.md"},
         provider="mineru-markdown",
         raw_output_reference=[],
-        pages=[page(1, """第一章 示例
+        pages=[
+            page(
+                1,
+                """第一章 示例
 A3型题
 (1 ~ 2 题共用题干)
 患者发热三天，伴明显乏力。
@@ -126,7 +131,9 @@ B. 己
 A3型题
 1.A 2.B
 B1型题
-3.A 4.B""")],
+3.A 4.B""",
+            )
+        ],
     )
     questions = reconcile(parse_document(doc)).questions
     assert [q.type for q in questions] == ["A3", "A3", "B1", "B1"]
@@ -192,6 +199,69 @@ def test_answer_table_can_recover_missing_question_type_heading():
     assert [q.answer for q in parsed.questions] == [["A", "B"], ["A"]]
     assert all(q.type == "multiple" for q in parsed.questions)
     assert all("question_type_from_answer_section" in q.flags for q in parsed.questions)
+
+
+def test_chapter_answer_table_keeps_a_x_and_following_judgement_scoped():
+    question_text = """第一章 示例
+[A型题]
+1. 单选题干
+A. 甲
+B. 乙
+[X型题]
+1. 多选题干
+A. 丙
+B. 丁
+[判断题]
+1. 判断题干"""
+    table_html = """<table><tr><td>[A型题]</td><td>[X型题]</td></tr>
+<tr><td>1. B</td><td>1. AB</td></tr></table>"""
+    table_rows = [
+        [
+            {"text": "[A型题]", "colspan": 1, "rowspan": 1},
+            {"text": "[X型题]", "colspan": 1, "rowspan": 1},
+        ],
+        [
+            {"text": "1. B", "colspan": 1, "rowspan": 1},
+            {"text": "1. AB", "colspan": 1, "rowspan": 1},
+        ],
+    ]
+    doc = Document(
+        id="chapter-table",
+        metadata={"source_file": "军医.md"},
+        provider="mineru-markdown",
+        raw_output_reference=[],
+        pages=[
+            Page(
+                page_number=1,
+                width=1,
+                height=1,
+                blocks=[
+                    Block(
+                        id="questions", type="text", text=question_text, reading_order=0
+                    ),
+                    Block(
+                        id="answers",
+                        type="table",
+                        text="[A型题]\t[X型题]\n1. B\t1. AB",
+                        reading_order=1,
+                        metadata={"table_html": table_html, "table_rows": table_rows},
+                    ),
+                    Block(
+                        id="judgement-answers",
+                        type="text",
+                        text="[判断题]\n1. √",
+                        reading_order=2,
+                    ),
+                ],
+            )
+        ],
+    )
+    questions = reconcile(parse_document(doc)).questions
+    assert [(str(q.type), q.answer) for q in questions] == [
+        ("single", ["B"]),
+        ("multiple", ["A", "B"]),
+        ("judgement", ["A"]),
+    ]
 
 
 def test_duplicate_and_scope_do_not_guess():

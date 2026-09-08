@@ -273,6 +273,72 @@ D、CR
   assert.equal(chapterBank[2].multiple, true);
   assert.equal(chapterBank[3].stem, "MRI使用电离辐射。");
   assert.ok(chapterBank.every((question) => question.answerSource?.includes("总论")));
+
+  const dermatologyBank = parseQuestionText(`第一章：皮肤的结构
+三 选择题
+【A型题】
+1. 皮肤内的排泄器官有＿＿。C
+A. 真皮的基质
+B. 毛囊
+C. 小汗腺
+D. 淋巴管
+E. 胶原纤维
+【B型题】
+A. 角质层 B. 透明层 C. 颗粒层 D. 棘层 E. 基底层
+2. 正常情况下不断增殖的生发层＿＿。E
+A. ANA B. dsDNA C. 狼疮细胞 D. CPK E. 以上都不是
+3. 硬皮病特异性较高的是＿＿。E
+【X型题】
+4. 皮肤附属器包括＿＿。AC
+A. 毛发
+B. 淋巴管
+C. 指甲
+D. 神经
+E. 血管
+五 问答题
+1. 试述皮肤结构。
+1. 答：A. 表皮；B. 真皮。
+参考答案
+三 选择题
+1.C 2.E 3.E 4.AC`, "皮肤性病学");
+  assert.equal(dermatologyBank.length, 4);
+  assert.deepEqual(dermatologyBank.map((question) => question.questionType), ["A", "B", "B", "X"]);
+  assert.deepEqual(dermatologyBank.map((question) => question.answer), [["C"], ["E"], ["E"], ["A", "C"]]);
+  assert.ok(dermatologyBank.every((question) => question.category === "皮肤的结构"));
+  assert.equal(dermatologyBank[2].options[0].text, "ANA");
+
+  const legacyWordWithoutListLabels = parseQuestionText(`第一章 皮肤的结构
+【A型题】
+皮肤内的排泄器官有＿＿。C
+真皮的基质
+毛囊
+小汗腺
+淋巴管
+胶原纤维
+表皮最厚的一层是＿＿。C
+颗粒层
+角质层
+棘细胞层
+透明层
+基底层
+【B型题】
+A. 角质层 B. 透明层 C. 颗粒层 D. 棘层 E. 基底层
+正常情况下不断增殖的生发层＿＿。E
+【C型题】
+A. 掌跖部 B. 背部 C. 两者均是 D. 两者均不是
+无皮脂腺分布的部位＿＿。A
+【X型题】
+皮肤附属器包括＿＿。AC
+毛发
+淋巴管
+指甲
+神经
+血管
+五 问答题
+试述皮肤结构。`, "皮肤性病学");
+  assert.equal(legacyWordWithoutListLabels.length, 5);
+  assert.deepEqual(legacyWordWithoutListLabels.map((question) => question.answer), [["C"], ["C"], ["E"], ["A"], ["A", "C"]]);
+  assert.deepEqual(legacyWordWithoutListLabels.map((question) => question.sourceNumber), ["1", "2", "3", "4", "5"]);
 });
 
 test("ships a small, clearly labelled demo bank", async () => {
