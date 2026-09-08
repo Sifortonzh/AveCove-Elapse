@@ -952,7 +952,7 @@ test("ships the v1.3 practice and library experience on the restrained Spatial B
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.4\.4"/);
+  assert.match(packageJson, /"version": "1\.4\.5"/);
   assert.match(readme, /Version `1\.2\.0`/);
   assert.match(readmeZh, /`1\.1\.0` 采用克制的 Spatial Bento/);
   assert.match(page, /className="home-bento"/);
@@ -1148,11 +1148,14 @@ test("keeps touch practice controls, in-quiz search, and reusable note tags disc
   assert.match(page, /onDoubleClick=.*onExcludeOption/);
   assert.match(page, /单击选择或取消 · 双击排除干扰项/);
   assert.match(page, /className="tablet-quiz-action"/);
+  assert.match(page, /className="question-previous-top subtle-button"/);
   assert.match(page, /returnToQuiz=\{view === "quiz"/);
   assert.match(page, /关闭搜索即可回到刚才的题目与已选答案/);
   assert.match(page, /已存标签/);
   assert.match(page, /Markdown 显示效果/);
   assert.match(styles, /pointer:coarse/);
+  assert.match(styles, /\.question-previous-top\{position:fixed;z-index:24;top:calc\(108px \+ env\(safe-area-inset-top\)\)/);
+  assert.match(styles, /@media\(max-width:620px\)\{\.question-previous-top\{display:none\}\}/);
   assert.match(styles, /answer-option\.excluded/);
   assert.match(styles, /note-preview-compact/);
 });
