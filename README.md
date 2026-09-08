@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### v1.4.2 · Military medical and legacy bank imports
+
+Forge now handles official MinerU 3.x Hybrid JSON, medical answer tables, and chapter/type-scoped answer association more reliably. The private military obstetrics and gynecology conversion profile keeps only objective questions whose options and source answers can be safely matched; legacy `.doc` imports also recover choice labels and automatic question numbering more accurately. Source books and generated personal banks remain outside the repository.
+
 ### v1.4.1 · Low-memory production deployment
 
 Production releases are now built as complete Docker images on GitHub Actions. The server only loads the finished image and restarts the app without running `npm ci` or `next build`, preventing updates from exhausting small production hosts. Concurrent production releases cancel older runs so only the newest commit is deployed.
@@ -48,7 +52,7 @@ Swipe an option or use its annotation button; comments and handwriting are saved
 </p>
 
 <p align="center">
-  <img alt="Version 1.4.1" src="https://img.shields.io/badge/version-1.4.1-b43d35" />
+  <img alt="Version 1.4.2" src="https://img.shields.io/badge/version-1.4.2-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
