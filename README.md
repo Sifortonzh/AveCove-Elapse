@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 1.4.6" src="https://img.shields.io/badge/version-1.4.6-b43d35" />
+    <img alt="Version 1.4.7" src="https://img.shields.io/badge/version-1.4.7-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v1.4.6.** Medical practice, library management, optional synchronization, and the Western Medicine 306 workflow are the stable core. English Lab remains a preview, and automated OCR/AI extraction must always be reviewed against the source.
+> **Current release: v1.4.7.** Medical practice, library management, optional synchronization, and the Western Medicine 306 workflow are the stable core. English Lab remains a preview, and automated OCR/AI extraction must always be reviewed against the source.
 
 ## Product map
 
@@ -216,6 +216,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v1.4.7** — Added resilient deployment startup checks for a busy or recently restarted server.
 - **v1.4.6** — Reorganized bilingual project documentation and GitHub presentation.
 - **v1.4.5** — Fixed iPad previous-question control during long-page scrolling.
 - **v1.4.4** — Added full-book ENT/head-and-neck MinerU conversion support.

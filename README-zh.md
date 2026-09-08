@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 1.4.6" src="https://img.shields.io/badge/version-1.4.6-b43d35" />
+    <img alt="版本 1.4.7" src="https://img.shields.io/badge/version-1.4.7-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v1.4.6。** 医学刷题、题库管理、可选多端同步和西医综合 306 已构成稳定主线；English Lab 仍是预览功能。OCR 与 AI 自动整理必须对照原文件抽查，不应把模型推测当成原书答案。
+> **当前版本：v1.4.7。** 医学刷题、题库管理、可选多端同步和西医综合 306 已构成稳定主线；English Lab 仍是预览功能。OCR 与 AI 自动整理必须对照原文件抽查，不应把模型推测当成原书答案。
 
 ## 产品地图
 
@@ -216,6 +216,7 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 <details>
 <summary><strong>版本记录</strong></summary>
 
+- **v1.4.7** — 为服务器繁忙或刚重启的场景增加自动部署等待与重试。
 - **v1.4.6** — 重构中英双语 README 与 GitHub 项目首页信息层级。
 - **v1.4.5** — 修复 iPad 长题滚动时“上一题”按钮不可持续使用的问题。
 - **v1.4.4** — 增加耳鼻咽喉头颈外科 MinerU 全书转换支持。

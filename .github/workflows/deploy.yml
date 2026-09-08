@@ -29,7 +29,18 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s' "$DEPLOY_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+          for attempt in $(seq 1 30); do
+            if ssh-keyscan -T 10 -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
+              echo "SSH is ready."
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "SSH did not become ready after 10 minutes." >&2
+              exit 1
+            fi
+            echo "Waiting for the server to finish starting (${attempt}/30)..."
+            sleep 20
+          done
       - name: Upload source
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
