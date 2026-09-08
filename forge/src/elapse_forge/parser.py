@@ -28,7 +28,9 @@ TYPE_HEADINGS = {
 
 def _question_type_heading(line: str) -> tuple[QuestionType, str] | None:
     match = re.match(
-        r"^[【\[]?\s*(A[1-4]?型题|B1?型题|C型题|X型题|单选题|多选题|判断题|填空题|名词解释|简答题|问答题)\s*[】\]]?\s*(.*)$",
+        r"^(?:[【\[])?\s*(?:[（(]\s*[一二三四五六七八九十百\d]+\s*[）)]\s*)?"
+        r"(A[1-4]?型题|B1?型题|C型题|X型题|单选题|多选题|判断题|填空题|名词解释|简答题|问答题)"
+        r"\s*(?:[】\]])?\s*(.*)$",
         line,
         re.IGNORECASE,
     )

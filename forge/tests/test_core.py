@@ -102,6 +102,25 @@ def test_type_heading_can_share_line_with_first_question():
     assert [option.label for option in parsed.questions[0].options] == ["A", "B"]
 
 
+def test_numbered_non_objective_heading_ends_choice_section():
+    doc = Document(
+        id="numbered-heading",
+        metadata={"source_file": "numbered.pdf"},
+        provider="synthetic-not-ocr",
+        raw_output_reference=[],
+        pages=[
+            page(
+                1,
+                "第一章 示例\n【B1型题】\n1. 选择题\nA. 甲\nB. 乙\n（二）问答题\n1. 这不是选择题",
+            )
+        ],
+    )
+    parsed = parse_document(doc)
+    assert [question.type for question in parsed.questions] == ["B1", "essay"]
+    assert parsed.questions[0].stem == "选择题"
+    assert parsed.questions[1].stem == "这不是选择题"
+
+
 def test_medical_shared_stems_and_option_groups_are_preserved():
     doc = Document(
         id="medical-groups",
