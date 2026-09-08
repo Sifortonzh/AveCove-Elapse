@@ -13,12 +13,14 @@ TYPE_HEADINGS = {
     "A3": "A3",
     "A4": "A4",
     "B1": "B1",
+    "B型": "B1",
     "C": "C",
     "A型": "single",
     "X型": "multiple",
     "单选": "single",
     "多选": "multiple",
     "判断": "judgement",
+    "是非": "judgement",
     "填空": "fill",
     "名词解释": "term",
     "简答": "short",
@@ -28,8 +30,10 @@ TYPE_HEADINGS = {
 
 def _question_type_heading(line: str) -> tuple[QuestionType, str] | None:
     match = re.match(
-        r"^(?:[【\[])?\s*(?:[（(]\s*[一二三四五六七八九十百\d]+\s*[）)]\s*)?"
-        r"(A[1-4]?型题|B1?型题|C型题|X型题|单选题|多选题|判断题|填空题|名词解释|简答题|问答题)"
+        r"^(?:[【\[])?\s*(?:(?:[（(]\s*[一二三四五六七八九十百\d]+\s*[）)]|"
+        r"[一二三四五六七八九十百]+\s*、)\s*)?"
+        r"(A\s*[1-4]?\s*型题|B\s*1?\s*型题|C\s*型题|X\s*型题|"
+        r"单选题|多选题|判断题|是非题|填空题|名词解释|简答题|问答题)"
         r"\s*(?:[】\]])?\s*(.*)$",
         line,
         re.IGNORECASE,
@@ -37,7 +41,8 @@ def _question_type_heading(line: str) -> tuple[QuestionType, str] | None:
     if not match:
         return None
     heading, remainder = match.groups()
-    key = next((key for key in TYPE_HEADINGS if key in heading), None)
+    compact_heading = re.sub(r"\s+", "", heading)
+    key = next((key for key in TYPE_HEADINGS if key in compact_heading), None)
     return (QuestionType(TYPE_HEADINGS[key]), remainder) if key else None
 
 
@@ -48,7 +53,7 @@ def _table_answers(block, source, document, scope, default_kind, result):
     column_kinds: dict[int, QuestionType] = {}
     occupied: dict[int, int] = {}
     found = False
-    first_kind: QuestionType | None = None
+    last_kind: QuestionType | None = None
     for row in rows:
         if not isinstance(row, list):
             continue
@@ -65,30 +70,36 @@ def _table_answers(block, source, document, scope, default_kind, result):
                 (
                     QuestionType(value)
                     for key, value in TYPE_HEADINGS.items()
-                    if key in text and re.search(r"题|型", text)
+                    if key in re.sub(r"\s+", "", text)
+                    and re.search(r"题|型", text)
                 ),
                 None,
             )
             if heading:
-                first_kind = first_kind or heading
+                last_kind = heading
                 for offset in range(colspan):
                     column_kinds[column + offset] = heading
             else:
                 kind = column_kinds.get(column, default_kind)
                 for pair in re.finditer(
-                    r"(?:^|\s)(\d+)\s*[.．、]\s*([A-G]+|[√×])(?=\s|$|[。；;])",
+                    r"(?:^|\s)(\d+)\s*[.．、]\s*([A-G]+|[√×YN])(?=\s|$|[。；;])",
                     text,
                 ):
                     value = pair[2]
+                    answer_kind = (
+                        QuestionType.JUDGEMENT
+                        if value in ("√", "×", "Y", "N")
+                        else kind
+                    )
                     result.answers.append(
                         RegistryEntry(
                             document_id=document.id,
                             scope=scope,
-                            question_type=kind,
+                            question_type=answer_kind,
                             source_question_number=pair[1],
                             value=(
-                                ["A" if value == "√" else "B"]
-                                if value in ("√", "×")
+                                ["A" if value in ("√", "Y") else "B"]
+                                if value in ("√", "×", "Y", "N")
                                 else list(value)
                             ),
                             source=[source],
@@ -100,7 +111,7 @@ def _table_answers(block, source, document, scope, default_kind, result):
                     occupied[column + offset] = rowspan
             column += colspan
         occupied = {key: value - 1 for key, value in occupied.items() if value > 1}
-    return first_kind if found else None
+    return last_kind if found else None
 
 
 def parse_document(document: Document) -> ParseResult:
@@ -158,11 +169,30 @@ def parse_document(document: Document) -> ParseResult:
                 line = raw.strip()
                 if not line:
                     continue
-                if line == "总论":
+                if line == "总论" and not re.fullmatch(
+                    r"第[一二三四五六七八九十百\d]+篇", chapter
+                ):
                     clear_shared()
                     chapter = scope = line
                     kind = QuestionType.UNKNOWN
                     mode, current, entry, option = "ignore", None, None, None
+                    continue
+                if re.fullmatch(r"第[一二三四五六七八九十百\d]+篇", line):
+                    clear_shared()
+                    chapter = scope = line
+                    kind = QuestionType.UNKNOWN
+                    mode, current, entry, option = "ignore", None, None, None
+                    continue
+                compact_line = re.sub(r"\s+", "", line)
+                if (
+                    re.fullmatch(r"第[一二三四五六七八九十百\d]+篇", chapter)
+                    and re.fullmatch(
+                        r"总论|耳科学|鼻科学|咽科学|喉科学|气管食管科学|颈科学|"
+                        r"耳鼻咽喉头颈部特殊性感染",
+                        compact_line,
+                    )
+                ):
+                    chapter = scope = f"{chapter} {compact_line}"
                     continue
                 if re.match(r"^第[一二三四五六七八九十百\d]+章", line):
                     clear_shared()
@@ -221,23 +251,37 @@ def parse_document(document: Document) -> ParseResult:
                 if mode == "answers":
                     pairs = list(
                         re.finditer(
-                            r"(?:^|\s)(\d+)\s*[.．、]\s*([A-G]+|[√×])(?=\s|$|[。；;])",
+                            r"(?:^|\s)(\d+)\s*[.．、]\s*([A-G]+|[√×YN])(?=\s|$|[。；;])",
                             line,
                         )
                     )
                     if pairs:
+                        answer_kind = kind
+                        if all(pair[2] in ("√", "×", "Y", "N") for pair in pairs):
+                            answer_kind = kind = QuestionType.JUDGEMENT
+                        elif (
+                            kind == QuestionType.B1
+                            and pairs[0][1] == "1"
+                            and any(
+                                item.scope == scope
+                                and item.question_type == QuestionType.B1
+                                and item.source_question_number == "1"
+                                for item in result.answers
+                            )
+                        ):
+                            answer_kind = kind = QuestionType.C
                         for pair in pairs:
                             value = pair[2]
                             labels = (
-                                ["A" if value == "√" else "B"]
-                                if value in ("√", "×")
+                                ["A" if value in ("√", "Y") else "B"]
+                                if value in ("√", "×", "Y", "N")
                                 else list(value)
                             )
                             result.answers.append(
                                 RegistryEntry(
                                     document_id=document.id,
                                     scope=scope,
-                                    question_type=kind,
+                                    question_type=answer_kind,
                                     source_question_number=pair[1],
                                     value=labels,
                                     source=[source],

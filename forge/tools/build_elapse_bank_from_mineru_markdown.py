@@ -63,6 +63,18 @@ PROFILES = {
         require_five_options=False,
         require_multiple_answers=False,
     ),
+    "ent-head-neck": BuildProfile(
+        source_file="耳鼻咽喉头颈外科学学习指导与习题集（第2版）",
+        id_prefix="ent-head-neck-2e",
+        bank_name="耳鼻咽喉头颈外科学学习指导与习题集（第2版）· 全量结构版",
+        group_name="耳鼻咽喉头颈外科学 · 第2版",
+        answer_source="《耳鼻咽喉头颈外科学学习指导与习题集》第2版参考答案；MinerU Hybrid JSON 转换，使用时请结合原书复核。",
+        purpose="耳鼻咽喉头颈外科学 A/B/C/X 型选择题与判断题练习。",
+        source_description="《耳鼻咽喉头颈外科学学习指导与习题集》第2版；答案按各篇参考答案区与题型、原题号关联。",
+        include_judgement=True,
+        require_five_options=False,
+        require_multiple_answers=False,
+    ),
 }
 
 
@@ -356,6 +368,15 @@ def main():
         )
         unique.setdefault(key, question)
     selected = list(unique.values())
+    for question in selected:
+        valid_labels = (
+            {"A", "B"}
+            if str(question.type) == "judgement"
+            else {option.label for option in question.options}
+        )
+        if not set(question.answer) <= valid_labels:
+            question.flags.append("answer_outside_available_options")
+            question.answer = []
     pending = sum(not question.answer for question in selected)
     chapters = Counter(
         question.scope.split("/")[0].strip() or "未分章" for question in selected

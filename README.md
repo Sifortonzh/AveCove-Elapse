@@ -1,5 +1,9 @@
 # AveCove Elapse
 
+### v1.4.4 · ENT/head-and-neck full-book conversion
+
+Forge now recognizes part-based medical workbooks and spaced A/B/C/X headings, keeps table answer continuations in the correct question type, and supports Y/N or true/false answer sections. The new private ENT/head-and-neck profile converts the complete second-edition workbook into eight source parts while leaving OCR omissions explicitly pending instead of guessing answers.
+
 ### v1.4.3 · Full-structure MinerU bank conversion
 
 The private-bank conversion tool can now join sequential MinerU 3.x Hybrid JSON volumes and export a full-structure practice bank. Every structurally complete objective question is retained; source answers are never guessed, and questions whose answer label was omitted by OCR stay explicitly marked as pending test items. Numbered non-objective headings such as “(二) 问答题” no longer leak into B1 or X sections.
@@ -56,7 +60,7 @@ Swipe an option or use its annotation button; comments and handwriting are saved
 </p>
 
 <p align="center">
-  <img alt="Version 1.4.3" src="https://img.shields.io/badge/version-1.4.3-b43d35" />
+  <img alt="Version 1.4.4" src="https://img.shields.io/badge/version-1.4.4-b43d35" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
   <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />

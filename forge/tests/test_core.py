@@ -22,6 +22,7 @@ from elapse_forge.models import (
     Document,
     Page,
     Question,
+    QuestionType,
     validate_json,
 )
 from elapse_forge.normalizer import MedicalNormalizer
@@ -281,6 +282,130 @@ B. 丁
         ("multiple", ["A", "B"]),
         ("judgement", ["A"]),
     ]
+
+
+def test_part_scope_spaced_medical_headings_and_yn_judgement_answers():
+    text = """第一篇
+总论
+习题
+一、选择题
+(一) A 型题
+1. 单选题干
+A. 甲
+B. 乙
+(二) B 型题
+(1～2题共用备选答案)
+A. 丙
+B. 丁
+1. 第一小题
+2. 第二小题
+(三) C 型题
+1. C型题干
+A. 戊
+B. 己
+(四) X 型题
+1. 多选题干
+A. 庚
+B. 辛
+三、判断题（正确为Y，错误为N）
+1. 判断题干
+参考答案
+一、选择题
+(一) A 型题
+1. B
+(二) B 型题
+1. A 2. B
+(三) C 型题
+1. A
+(四) X 型题
+1. AB
+三、判断题
+1. Y"""
+    doc = Document(
+        id="part-spaced",
+        metadata={"source_file": "耳鼻喉.json"},
+        provider="mineru-cloud-hybrid",
+        raw_output_reference=[],
+        pages=[page(1, text)],
+    )
+    questions = reconcile(parse_document(doc)).questions
+    assert {question.scope for question in questions} == {"第一篇 总论"}
+    assert [(str(q.type), q.source_question_number, q.answer) for q in questions] == [
+        ("single", "1", ["B"]),
+        ("B1", "1", ["A"]),
+        ("B1", "2", ["B"]),
+        ("C", "1", ["A"]),
+        ("multiple", "1", ["A", "B"]),
+        ("judgement", "1", ["A"]),
+    ]
+
+
+def test_answer_continuation_keeps_last_table_kind_and_recovers_missing_c_heading():
+    text = """第一篇
+总论
+习题
+(二) B 型题
+(1～2题共用备选答案)
+A. 甲
+B. 乙
+1. 第一小题
+2. 第二小题
+(三) C 型题
+1. C型题干
+A. 丙
+B. 丁
+(四) X 型题
+1. 多选题干
+A. 戊
+B. 己
+参考答案
+(二) B 型题
+1. A 2. B
+1. B
+(四) X 型题
+"""
+    table_rows = [
+        [{"text": "(四) X 型题", "colspan": 1, "rowspan": 1}],
+        [{"text": "1. AB", "colspan": 1, "rowspan": 1}],
+    ]
+    doc = Document(
+        id="continuation",
+        metadata={"source_file": "耳鼻喉.json"},
+        provider="mineru-cloud-hybrid",
+        raw_output_reference=[],
+        pages=[
+            Page(
+                page_number=1,
+                width=1,
+                height=1,
+                blocks=[
+                    Block(id="body", type="text", text=text, reading_order=0),
+                    Block(
+                        id="table",
+                        type="table",
+                        text="(四) X 型题\n1. AB",
+                        reading_order=1,
+                        metadata={"table_rows": table_rows},
+                    ),
+                ],
+            ),
+            page(2, "2. AB\n三、是非题\n1. Y"),
+        ],
+    )
+    parsed = parse_document(doc)
+    assert any(
+        answer.question_type == QuestionType.C and answer.value == ["B"]
+        for answer in parsed.answers
+    )
+    assert any(
+        answer.question_type == QuestionType.MULTIPLE
+        and answer.source_question_number == "2"
+        for answer in parsed.answers
+    )
+    assert any(
+        answer.question_type == QuestionType.JUDGEMENT and answer.value == ["A"]
+        for answer in parsed.answers
+    )
 
 
 def test_duplicate_and_scope_do_not_guess():
