@@ -42,7 +42,7 @@ type Western306SubjectScope = "all" | Western306Subject;
 type ThemeMode = "system" | "light" | "dark";
 type StudyMode = "standard" | "blind" | "memorize";
 type AiMode = "summary" | "pitfall" | "companion";
-type View = "home" | "quiz" | "banks" | "copyright";
+type View = "home" | "quiz" | "banks" | "bank-requests" | "copyright";
 type AccountSession = { nickname: string; email?: string; expiresAt: number };
 type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "cancelled" | "ai-ready"; detail: string };
 type AiFallbackFile = { id: string; fileName: string; extractedText: string };
@@ -69,6 +69,19 @@ type Western306ImportReport = {
   oneToOneVerified?: boolean;
   suggestedGroupName?: string;
   warnings?: string[];
+};
+
+type BankRequestStatus = "looking" | "found" | "paused";
+type BankRequest = {
+  id: string;
+  title: string;
+  stage: string;
+  subject: string;
+  preferredSource: string;
+  details: string;
+  status: BankRequestStatus;
+  createdAt: string;
+  updatedAt: string;
 };
 
 async function readImportApiPayload<T>(response: Response): Promise<T> {
@@ -523,6 +536,10 @@ export default function HomePage() {
       id: "__demo__",
       name: bankName,
       description: "",
+      sourceTitle: "",
+      edition: "",
+      author: "",
+      copyrightNotice: "",
       groupName: "",
       featured: false,
       questions,
@@ -1252,8 +1269,8 @@ export default function HomePage() {
     }
   }
 
-  async function updateSavedBankDetails(id: string, name: string, description: string, groupName: string) {
-    const updated = await updateQuestionBankDetails(id, { name, description, groupName });
+  async function updateSavedBankDetails(id: string, details: { name: string; description: string; sourceTitle: string; edition: string; author: string; copyrightNotice: string; groupName: string }) {
+    const updated = await updateQuestionBankDetails(id, details);
     setQuestionBanks((banks) => banks.map((bank) => bank.id === id ? updated : bank));
     if (activeBankId === id) setBankName(updated.name);
     setToast(`“${updated.name}”的题库信息已保存 ✍️📚`);
@@ -1412,6 +1429,7 @@ export default function HomePage() {
           activeBankId={activeBankId}
           onHome={() => setView("home")}
           onImport={() => setShowImport(true)}
+          onRequests={() => setView("bank-requests")}
           onImportAnswers={(bank) => setAnswerTargetBank(bank)}
           onSelect={(id) => selectQuestionBank(id, "home")}
           onUpdate={updateSavedBankDetails}
@@ -1423,6 +1441,8 @@ export default function HomePage() {
           favorites={favorites}
           notes={notes}
         />
+      ) : view === "bank-requests" ? (
+        <QuestionBankRequestPage onBack={() => setView("banks")} />
       ) : view === "copyright" ? (
         <CopyrightPage bankName={bankName} onHome={() => setView("home")} onRestoreDemo={restoreDemoBank} />
       ) : current ? (
@@ -1581,7 +1601,7 @@ function reconcileQuestionBankOrder(order: string[], ids: string[]) {
   return [...order.filter((id, index) => available.has(id) && order.indexOf(id) === index), ...ids.filter((id) => !order.includes(id))];
 }
 
-function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onHome, onImport, onImportAnswers, onSelect, onUpdate, onToggleFeatured, onDelete, onReset, onOpenQuestion }: {
+function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onHome, onImport, onRequests, onImportAnswers, onSelect, onUpdate, onToggleFeatured, onDelete, onReset, onOpenQuestion }: {
   banks: SavedQuestionBank[];
   activeBankId: string | null;
   progress: Progress;
@@ -1589,9 +1609,10 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   notes: Record<string, string>;
   onHome: () => void;
   onImport: () => void;
+  onRequests: () => void;
   onImportAnswers: (bank: SavedQuestionBank) => void;
   onSelect: (id: string) => Promise<void>;
-  onUpdate: (id: string, name: string, description: string, groupName: string) => Promise<void>;
+  onUpdate: (id: string, details: { name: string; description: string; sourceTitle: string; edition: string; author: string; copyrightNotice: string; groupName: string }) => Promise<void>;
   onToggleFeatured: (id: string, featured: boolean) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReset: (bank: SavedQuestionBank) => Promise<void>;
@@ -1601,6 +1622,10 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editSourceTitle, setEditSourceTitle] = useState("");
+  const [editEdition, setEditEdition] = useState("");
+  const [editAuthor, setEditAuthor] = useState("");
+  const [editCopyrightNotice, setEditCopyrightNotice] = useState("");
   const [editGroupName, setEditGroupName] = useState("");
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -1613,8 +1638,6 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   const [groupVisibleLimit, setGroupVisibleLimit] = useState(6);
   const [draggedGroup, setDraggedGroup] = useState<string | null>(null);
   const keyword = query.trim();
-  const totalQuestions = banks.reduce((sum, bank) => sum + bank.questions.length, 0);
-  const multipleQuestions = banks.reduce((sum, bank) => sum + bank.questions.filter((question) => question.multiple).length, 0);
   const searchResults = useMemo(() => searchQuestionBanks(banks, query, 100), [banks, query]);
   const availableGroupNames = useMemo(
     () => [...new Set(banks.map((bank) => bank.groupName || UNGROUPED_BANKS))],
@@ -1738,10 +1761,14 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   async function submitEdit(bank: SavedQuestionBank) {
     const name = editName.trim().slice(0, 60);
     const description = editDescription.trim().slice(0, 4_000);
+    const sourceTitle = editSourceTitle.trim().slice(0, 160);
+    const edition = editEdition.trim().slice(0, 80);
+    const author = editAuthor.trim().slice(0, 120);
+    const copyrightNotice = editCopyrightNotice.trim().slice(0, 500);
     const groupName = editGroupName.trim().slice(0, 60);
     if (!name) return;
-    if (name !== bank.name || description !== bank.description || groupName !== bank.groupName) {
-      await onUpdate(bank.id, name, description, groupName);
+    if (name !== bank.name || description !== bank.description || sourceTitle !== bank.sourceTitle || edition !== bank.edition || author !== bank.author || copyrightNotice !== bank.copyrightNotice || groupName !== bank.groupName) {
+      await onUpdate(bank.id, { name, description, sourceTitle, edition, author, copyrightNotice, groupName });
     }
     setEditingId(null);
   }
@@ -1750,6 +1777,10 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
     setEditingId(bank.id);
     setEditName(bank.name);
     setEditDescription(bank.description);
+    setEditSourceTitle(bank.sourceTitle);
+    setEditEdition(bank.edition);
+    setEditAuthor(bank.author);
+    setEditCopyrightNotice(bank.copyrightNotice);
     setEditGroupName(bank.groupName);
   }
 
@@ -1758,11 +1789,10 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   }
 
   return <div className="bank-page">
-    <header className="bank-page-header"><button className="icon-button" onClick={onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div><span>本机题库空间</span><strong>我的题库</strong></div><button className="primary-action" onClick={onImport}><Import size={17} />导入题库</button></header>
+    <header className="bank-page-header"><button className="icon-button" onClick={onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><button className="request-bank-action" onClick={onRequests}><Library size={17} />藏经阁</button><button className="primary-action" onClick={onImport}><Import size={17} />导入题库</button></header>
     <main>
-      <section className="bank-page-intro"><div><span className="overline"><Database size={15} /> QUESTION LIBRARY</span><h1>把散落的题目，<br />收进自己的知识书架。</h1><p>已导入题库都保存在当前浏览器。可随时切换、重命名、跨题库检索，或在确认版权边界后分享给同学。</p></div><div className="bank-overview"><article><b>{banks.length}</b><span>已导入题库</span></article><article><b>{totalQuestions}</b><span>收录题目</span></article><article><b>{multipleQuestions}</b><span>多选题</span></article></div></section>
       <label className="bank-global-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="全局搜索：题库名、疾病、症状或知识点" /><span>{keyword ? `${searchResults.length} 条结果` : "搜索全部题库"}</span></label>
-      {keyword ? <section className="bank-search-section"><div className="bank-section-title"><div><span>GLOBAL SEARCH · 按相关度排序</span><h2>全局搜索结果</h2></div><button onClick={() => setQuery("")}><X size={16} />清除搜索</button></div>{searchResults.length ? <div className="bank-question-results">{searchResults.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => onOpenQuestion(bank, question.id)}><span className={question.multiple ? "multi" : ""}>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b><i>·</i>分组：<b>{bank.groupName || "未分组"}</b><i>·</i>分类：<b><HighlightMatches text={question.category} query={query} /></b><i>·</i>原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight /></button>)}</div> : <div className="bank-empty"><CircleHelp /><h2>还没有找到这条知识线索</h2><p>可输入多个关键词并用空格分隔，例如“肺炎 发热”；系统会要求每个关键词都有命中。</p></div>}</section> : <section className="bank-library-section"><div className="bank-section-title"><div><span>LOCAL COLLECTION</span><h2>已导入的题库</h2></div><div className="bank-sort-control"><label htmlFor="bank-sort-mode">题库排序</label><select id="bank-sort-mode" value={sortMode} onChange={(event) => changeSortMode(event.target.value as QuestionBankSortMode)}><option value="imported-desc">最近导入</option><option value="imported-asc">最早导入</option><option value="name-asc">名称排序</option><option value="custom">自定义排序</option></select></div></div>{banks.length ? <div className="bank-library-content"><section className="featured-bank-section" aria-labelledby="featured-bank-title"><header><div><span className="featured-bank-mark"><Sparkles /></span><span><small>CURATED PAPERS</small><h2 id="featured-bank-title">精选试卷</h2><p>把近期重点、经典真题或高频复习卷固定在这里。</p></span></div><em>{featuredBanks.length} 份精选</em></header>{featuredBanks.length ? <div className="featured-bank-grid">{featuredBanks.map((bank) => {
+      {keyword ? <section className="bank-search-section"><div className="bank-section-title"><div><span>GLOBAL SEARCH · 按相关度排序</span><h2>全局搜索结果</h2></div><button onClick={() => setQuery("")}><X size={16} />清除搜索</button></div>{searchResults.length ? <div className="bank-question-results">{searchResults.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => onOpenQuestion(bank, question.id)}><span className={question.multiple ? "multi" : ""}>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b><i>·</i>分组：<b>{bank.groupName || "未分组"}</b><i>·</i>分类：<b><HighlightMatches text={question.category} query={query} /></b><i>·</i>原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight /></button>)}</div> : <div className="bank-empty"><CircleHelp /><h2>还没有找到这条知识线索</h2><p>可输入多个关键词并用空格分隔，例如“肺炎 发热”；系统会要求每个关键词都有命中。</p></div>}</section> : <section className="bank-library-section"><div className="bank-section-title compact"><div><span>LOCAL COLLECTION</span><h2>全部题库 <em>{banks.length}</em></h2></div><div className="bank-sort-control"><label htmlFor="bank-sort-mode">题库排序</label><select id="bank-sort-mode" value={sortMode} onChange={(event) => changeSortMode(event.target.value as QuestionBankSortMode)}><option value="imported-desc">最近导入</option><option value="imported-asc">最早导入</option><option value="name-asc">名称排序</option><option value="custom">自定义排序</option></select></div></div>{banks.length ? <div className="bank-library-content"><section className="featured-bank-section" aria-labelledby="featured-bank-title"><header><div><span className="featured-bank-mark"><Sparkles /></span><span><small>CURATED PAPERS</small><h2 id="featured-bank-title">精选试卷</h2><p>把近期重点、经典真题或高频复习卷固定在这里，可直接切换使用。</p></span></div><em>{featuredBanks.length} 份精选</em></header>{featuredBanks.length ? <div className="featured-bank-grid">{featuredBanks.map((bank) => {
         const completed = bank.questions.filter((question) => Boolean(progress[question.id])).length;
         const completion = bank.questions.length ? Math.round((completed / bank.questions.length) * 100) : 0;
         const isActive = bank.id === activeBankId;
@@ -1787,10 +1817,14 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
           {isEditing ? <form className="bank-edit" onSubmit={(event) => { event.preventDefault(); void submitEdit(bank); }}>
             <label><span>题库名称</span><input autoFocus value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={60} /></label>
             <label><span>所属分组</span><input value={editGroupName} onChange={(event) => setEditGroupName(event.target.value)} maxLength={60} list="question-bank-groups" placeholder="例如：考研西综306；留空则不分组" /><datalist id="question-bank-groups">{groupedBanks.filter((item) => item.name !== "未分组题库").map((item) => <option key={item.name} value={item.name} />)}</datalist></label>
+            <div className="bank-source-edit-grid"><label><span>题库来源</span><input value={editSourceTitle} onChange={(event) => setEditSourceTitle(event.target.value)} maxLength={160} placeholder="如：人民卫生出版社教材" /></label><label><span>版本</span><input value={editEdition} onChange={(event) => setEditEdition(event.target.value)} maxLength={80} placeholder="如：第 9 版" /></label></div>
+            <label><span>作者 / 编者</span><input value={editAuthor} onChange={(event) => setEditAuthor(event.target.value)} maxLength={120} placeholder="按原资料如实填写" /></label>
+            <label><span>版权与使用说明</span><textarea value={editCopyrightNotice} onChange={(event) => setEditCopyrightNotice(event.target.value)} maxLength={500} rows={3} placeholder="如：仅限个人学习；转载或分享须取得权利人许可。" /></label>
             <label><span>题库简介</span><textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={4_000} rows={7} placeholder="可填写题库范围、章节目录、来源说明或适用考试；请勿录入患者及其他敏感信息。" /></label>
             <small>{editDescription.length} / 4000</small>
             <div><button type="submit" disabled={!editName.trim()}><Check size={15} />保存信息</button><button type="button" onClick={() => setEditingId(null)}><X size={15} />取消</button></div>
           </form> : <><span className="bank-group-chip">{bank.groupName || "未分组"}</span><h3>{bank.name}</h3><p>{bank.questions.length} 道题 · 单选 {singleCount} · 多选 {multipleCount}</p>
+            {(bank.sourceTitle || bank.edition || bank.author || bank.copyrightNotice) && <section className="bank-source-summary"><div><ShieldCheck size={14} /><strong>{[bank.sourceTitle, bank.edition].filter(Boolean).join(" · ") || "来源信息待补充"}</strong></div>{bank.author && <p>作者 / 编者：{bank.author}</p>}{bank.copyrightNotice && <p>版权说明：{bank.copyrightNotice}</p>}</section>}
             {bank.description && <section className={`bank-description ${descriptionExpanded ? "expanded" : ""}`}><div><span><FileText size={14} />题库简介</span>{descriptionIsLong && <button type="button" aria-expanded={descriptionExpanded} onClick={() => toggleDescription(bank.id)}>{descriptionExpanded ? "收起" : "展开全文"}<ChevronRight size={14} /></button>}</div><p>{bank.description}</p></section>}
             <div className="bank-card-progress" aria-label={`已完成 ${completedCount} 道，共 ${bank.questions.length} 道`}><div><span>学习进度 · {completedCount}/{bank.questions.length}</span><b>{completion}%</b></div><i><b style={{ width: `${completion}%` }} /></i></div>
           </>}
@@ -1803,6 +1837,99 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
     </main>
     {sharingBank && <ShareBankModal bank={sharingBank} onClose={() => setSharingBank(null)} />}
     {resettingBank && <ResetBankProgressModal bank={resettingBank} progress={progress} favorites={favorites} notes={notes} onReset={onReset} onClose={() => setResettingBank(null)} />}
+  </div>;
+}
+
+const BANK_REQUESTS_KEY = "hongdou-bank-requests-v1";
+const BANK_REQUEST_STAGES = ["大一上", "大一下", "大二上", "大二下", "大三", "大四", "实习", "考研", "其他"];
+const BANK_REQUEST_STATUS: Record<BankRequestStatus, string> = { looking: "征集中", found: "已找到", paused: "已暂停" };
+
+function QuestionBankRequestPage({ onBack }: { onBack: () => void }) {
+  const emptyDraft = { title: "", stage: "大一上", subject: "", preferredSource: "", details: "" };
+  const [requests, setRequests] = useState<BankRequest[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const value = JSON.parse(localStorage.getItem(BANK_REQUESTS_KEY) ?? "[]") as unknown;
+      return Array.isArray(value) ? value.filter((item): item is BankRequest => Boolean(item && typeof item === "object" && "id" in item && "title" in item)) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [draft, setDraft] = useState(emptyDraft);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [stageFilter, setStageFilter] = useState("全部年级");
+  const [statusFilter, setStatusFilter] = useState<"all" | BankRequestStatus>("all");
+  const [message, setMessage] = useState("");
+
+  function persist(next: BankRequest[]) {
+    setRequests(next);
+    localStorage.setItem(BANK_REQUESTS_KEY, JSON.stringify(next));
+  }
+
+  function saveRequest(event: React.FormEvent) {
+    event.preventDefault();
+    const title = draft.title.trim().slice(0, 80);
+    const subject = draft.subject.trim().slice(0, 60);
+    if (!title || !subject) return;
+    const now = new Date().toISOString();
+    if (editingId) {
+      persist(requests.map((item) => item.id === editingId ? { ...item, ...draft, title, subject, preferredSource: draft.preferredSource.trim().slice(0, 160), details: draft.details.trim().slice(0, 800), updatedAt: now } : item));
+      setMessage("藏经阁条目已更新");
+    } else {
+      persist([{ id: crypto.randomUUID(), ...draft, title, subject, preferredSource: draft.preferredSource.trim().slice(0, 160), details: draft.details.trim().slice(0, 800), status: "looking", createdAt: now, updatedAt: now }, ...requests]);
+      setMessage("寻卷需求已收入藏经阁，可直接分享给同学");
+    }
+    setEditingId(null);
+    setDraft(emptyDraft);
+  }
+
+  function beginEdit(request: BankRequest) {
+    setEditingId(request.id);
+    setDraft({ title: request.title, stage: request.stage, subject: request.subject, preferredSource: request.preferredSource, details: request.details });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function updateStatus(id: string, status: BankRequestStatus) {
+    persist(requests.map((item) => item.id === id ? { ...item, status, updatedAt: new Date().toISOString() } : item));
+  }
+
+  function requestText(request: BankRequest) {
+    return [
+      `【藏经阁寻卷】${request.title}`,
+      `学习阶段：${request.stage}`,
+      `科目：${request.subject}`,
+      request.preferredSource ? `希望版本 / 来源：${request.preferredSource}` : "",
+      request.details ? `补充说明：${request.details}` : "",
+      "仅用于个人学习交流；请尊重原作者及出版机构版权。",
+      "来自「红豆生南国 · Elapse」",
+    ].filter(Boolean).join("\n");
+  }
+
+  async function shareRequest(request: BankRequest) {
+    const text = requestText(request);
+    const usingSystemShare = typeof navigator.share === "function";
+    try {
+      if (usingSystemShare) await navigator.share({ title: request.title, text });
+      else await navigator.clipboard.writeText(text);
+      setMessage(usingSystemShare ? "已打开系统分享" : "寻卷内容已复制");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      try { await navigator.clipboard.writeText(text); setMessage("寻卷内容已复制"); } catch { setMessage("暂时无法分享，请稍后重试"); }
+    }
+  }
+
+  const visibleRequests = useMemo(() => requests.filter((request) => (
+    (stageFilter === "全部年级" || request.stage === stageFilter)
+    && (statusFilter === "all" || request.status === statusFilter)
+  )), [requests, stageFilter, statusFilter]);
+
+  return <div className="bank-request-page">
+    <header className="bank-page-header"><button className="icon-button" onClick={onBack} aria-label="返回题库"><ChevronLeft /></button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><strong className="bank-request-page-title">藏经阁 · Demo</strong></header>
+    <main>
+      <section className="bank-request-compose"><header><div><span>QUESTION BANK PAVILION · DEMO</span><h1>{editingId ? "修改寻卷需求" : "藏经阁：整理你想找的题库"}</h1><p>这是预览版：按学习阶段和科目管理寻卷需求，可复制或分享给同学；暂不接入公开社区，也不会上传题库文件。</p></div><Library /></header><form onSubmit={saveRequest}><div className="bank-request-form-grid"><label><span>需求标题 *</span><input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={80} placeholder="如：求传染病学期中复习题" /></label><label><span>学习阶段</span><select value={draft.stage} onChange={(event) => setDraft({ ...draft, stage: event.target.value })}>{BANK_REQUEST_STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select></label><label><span>科目 *</span><input value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} maxLength={60} placeholder="如：儿科学、眼科学" /></label><label><span>希望版本 / 来源</span><input value={draft.preferredSource} onChange={(event) => setDraft({ ...draft, preferredSource: event.target.value })} maxLength={160} placeholder="如：人民卫生出版社第 9 版配套习题" /></label></div><label><span>补充说明</span><textarea value={draft.details} onChange={(event) => setDraft({ ...draft, details: event.target.value })} maxLength={800} rows={4} placeholder="可注明考试时间、题型范围或希望包含的章节；不要填写患者或个人敏感信息。" /></label><footer>{editingId && <button type="button" className="ghost-action" onClick={() => { setEditingId(null); setDraft(emptyDraft); }}>取消修改</button>}<button className="primary-action" disabled={!draft.title.trim() || !draft.subject.trim()}><Check />{editingId ? "保存修改" : "加入寻卷清单"}</button></footer></form></section>
+      <section className="bank-request-list"><header><div><span>REQUEST MANAGER</span><h2>需求清单 <em>{requests.length}</em></h2></div><div><select aria-label="按学习阶段筛选" value={stageFilter} onChange={(event) => setStageFilter(event.target.value)}><option>全部年级</option>{BANK_REQUEST_STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select><select aria-label="按状态筛选" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | BankRequestStatus)}><option value="all">全部状态</option><option value="looking">征集中</option><option value="found">已找到</option><option value="paused">已暂停</option></select></div></header>{visibleRequests.length ? <div className="bank-request-grid">{visibleRequests.map((request) => <article key={request.id} className={request.status}><header><span>{request.stage}</span><em>{BANK_REQUEST_STATUS[request.status]}</em></header><h3>{request.title}</h3><p className="bank-request-subject">{request.subject}</p>{request.preferredSource && <p><b>版本 / 来源</b>{request.preferredSource}</p>}{request.details && <p><b>补充说明</b>{request.details}</p>}<small>更新于 {new Date(request.updatedAt).toLocaleDateString("zh-CN")}</small><footer><button onClick={() => void shareRequest(request)}><Share2 />分享求助</button><button aria-label={`编辑 ${request.title}`} title="编辑" onClick={() => beginEdit(request)}><Pencil /></button><select aria-label={`${request.title}的状态`} value={request.status} onChange={(event) => updateStatus(request.id, event.target.value as BankRequestStatus)}><option value="looking">征集中</option><option value="found">已找到</option><option value="paused">已暂停</option></select><button className="danger" aria-label={`删除 ${request.title}`} title="删除" onClick={() => persist(requests.filter((item) => item.id !== request.id))}><Trash2 /></button></footer></article>)}</div> : <div className="bank-request-empty"><MessageCircle /><strong>这里还没有符合条件的需求</strong><p>创建一条后，可以复制文字或调用系统分享发给同学。</p></div>}</section>
+    </main>
+    {message && <SuccessToast message={message} onClose={() => setMessage("")} />}
   </div>;
 }
 
@@ -1912,7 +2039,8 @@ function ShareBankModal({ bank, onClose }: { bank: SavedQuestionBank; onClose: (
     }
   }
 
-  return <div className="modal-layer" onMouseDown={onClose}><section className="share-bank-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>SHARE WITH CARE</span><h2>分享“{bank.name}”</h2></div><button onClick={onClose}><X /></button></header><div className="share-copyright-alert"><ShieldCheck /><div><strong>分享之前，请先确认版权与隐私边界</strong><p>请确认你拥有这份题库的使用与传播权限。不要分享未经授权的教材、课程内容，也不要包含姓名、学号、患者资料或其他敏感信息。</p></div></div><div className="share-summary"><Database /><div><strong>{bank.questions.length} 道题</strong><span>文件或链接都会包含题库简介、题干、选项与答案，并采用当前修订后的版本</span></div></div>{bank.description && <div className="share-bank-description"><FileText /><div><strong>随题库分享的简介</strong><p>{bank.description}</p></div></div>}<button className={`copyright-check ${accepted ? "checked" : ""}`} role="checkbox" aria-checked={accepted} onClick={() => setAccepted((value) => !value)}><i>{accepted && <Check />}</i><span>我已确认拥有必要权限，并会尊重题库原作者与相关权利人的版权。</span></button>{shareUrl && <div className="share-link-result"><Link2 /><div><strong>导入链接已生成 · 7 天有效</strong><input aria-label="题库导入链接" readOnly value={shareUrl} onFocus={(event) => event.currentTarget.select()} /></div><button type="button" aria-label="复制导入链接" onClick={() => void copyShareLink(shareUrl)}><Copy /></button><a href={shareUrl} target="_blank" rel="noreferrer" aria-label="在新窗口测试导入链接"><ExternalLink /></a></div>}{message && <p className="share-message">{message}</p>}<footer><button className="ghost-action" onClick={() => accepted && downloadFile(makeFile())} disabled={!accepted}><Download />保存分享文件</button><button className="ghost-action share-link-action" onClick={() => void createImportLink()} disabled={!accepted || creatingLink}><Link2 />{creatingLink ? "正在生成…" : shareUrl ? "复制导入链接" : "生成导入链接"}</button><button className="primary-action" onClick={() => void systemShare()} disabled={!accepted}><Share2 />系统分享</button></footer></section></div>;
+  const sourceLine = [bank.sourceTitle, bank.edition].filter(Boolean).join(" · ");
+  return <div className="modal-layer" onMouseDown={onClose}><section className="share-bank-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>SHARE WITH CARE</span><h2>分享“{bank.name}”</h2></div><button onClick={onClose}><X /></button></header><div className="share-copyright-alert"><ShieldCheck /><div><strong>分享之前，请先确认版权与隐私边界</strong><p>请确认你拥有这份题库的使用与传播权限。不要分享未经授权的教材、课程内容，也不要包含姓名、学号、患者资料或其他敏感信息。</p></div></div><div className="share-summary"><Database /><div><strong>{bank.questions.length} 道题</strong><span>文件或链接都会包含题库简介、来源署名、题干、选项与答案，并采用当前修订后的版本</span></div></div>{(sourceLine || bank.author || bank.copyrightNotice) && <div className="share-bank-source"><ShieldCheck /><div><strong>{sourceLine || "题库来源待补充"}</strong>{bank.author && <p>作者 / 编者：{bank.author}</p>}{bank.copyrightNotice && <p>版权说明：{bank.copyrightNotice}</p>}</div></div>}{bank.description && <div className="share-bank-description"><FileText /><div><strong>随题库分享的简介</strong><p>{bank.description}</p></div></div>}<button className={`copyright-check ${accepted ? "checked" : ""}`} role="checkbox" aria-checked={accepted} onClick={() => setAccepted((value) => !value)}><i>{accepted && <Check />}</i><span>我已确认拥有必要权限，并会尊重题库原作者与相关权利人的版权。</span></button>{shareUrl && <div className="share-link-result"><Link2 /><div><strong>导入链接已生成 · 7 天有效</strong><input aria-label="题库导入链接" readOnly value={shareUrl} onFocus={(event) => event.currentTarget.select()} /></div><button type="button" aria-label="复制导入链接" onClick={() => void copyShareLink(shareUrl)}><Copy /></button><a href={shareUrl} target="_blank" rel="noreferrer" aria-label="在新窗口测试导入链接"><ExternalLink /></a></div>}{message && <p className="share-message">{message}</p>}<footer><button className="ghost-action" onClick={() => accepted && downloadFile(makeFile())} disabled={!accepted}><Download />保存分享文件</button><button className="ghost-action share-link-action" onClick={() => void createImportLink()} disabled={!accepted || creatingLink}><Link2 />{creatingLink ? "正在生成…" : shareUrl ? "复制导入链接" : "生成导入链接"}</button><button className="primary-action" onClick={() => void systemShare()} disabled={!accepted}><Share2 />系统分享</button></footer></section></div>;
 }
 
 function IncomingBankShareModal({ share, onImport, onClose }: {
@@ -1923,7 +2051,7 @@ function IncomingBankShareModal({ share, onImport, onClose }: {
   const loading = share.status === "loading";
   const importing = share.status === "importing";
   const bank = share.bank;
-  return <div className="modal-layer incoming-share-layer"><section className="incoming-share-modal"><header><div><span>QUESTION BANK INVITATION</span><h2>{loading ? "正在打开题库分享…" : share.status === "error" ? "分享链接暂时无法打开" : `收到“${bank?.name}”`}</h2></div><button onClick={onClose} disabled={importing}><X /></button></header>{loading ? <div className="incoming-share-loading"><RefreshCw className="spinning" /><p>正在安全读取题库信息，请稍候…</p></div> : share.status === "error" ? <div className="incoming-share-error"><AlertCircle /><div><strong>没有导入任何内容</strong><p>{share.error}</p></div></div> : bank && <><div className="incoming-share-summary"><Database /><div><strong>{bank.questions.length} 道题 · {bank.groupName || "未分组"}</strong><p>{bank.description || "分享者没有填写题库简介。导入后可在“我的题库”中补充。"}</p></div></div><div className="share-copyright-alert"><ShieldCheck /><div><strong>导入不代表获得转载或再分发授权</strong><p>请仅在分享者授权范围内学习和使用。导入后请抽查题干、选项与答案；不要传播含敏感信息或未经授权的内容。</p></div></div>{share.expiresAt && <p className="incoming-share-expiry">此链接有效期至 {new Date(share.expiresAt).toLocaleString("zh-CN")}。</p>}</>}<footer><button className="ghost-action" onClick={onClose} disabled={importing}>{share.status === "error" ? "关闭" : "暂不导入"}</button>{bank && <button className="primary-action" onClick={onImport} disabled={importing}><Import />{importing ? "正在导入…" : "确认并导入我的题库"}</button>}</footer></section></div>;
+  return <div className="modal-layer incoming-share-layer"><section className="incoming-share-modal"><header><div><span>QUESTION BANK INVITATION</span><h2>{loading ? "正在打开题库分享…" : share.status === "error" ? "分享链接暂时无法打开" : `收到“${bank?.name}”`}</h2></div><button onClick={onClose} disabled={importing}><X /></button></header>{loading ? <div className="incoming-share-loading"><RefreshCw className="spinning" /><p>正在安全读取题库信息，请稍候…</p></div> : share.status === "error" ? <div className="incoming-share-error"><AlertCircle /><div><strong>没有导入任何内容</strong><p>{share.error}</p></div></div> : bank && <><div className="incoming-share-summary"><Database /><div><strong>{bank.questions.length} 道题 · {bank.groupName || "未分组"}</strong><p>{bank.description || "分享者没有填写题库简介。导入后可在题库信息中补充。"}</p></div></div>{(bank.sourceTitle || bank.edition || bank.author || bank.copyrightNotice) && <div className="incoming-share-source"><ShieldCheck /><div><strong>{[bank.sourceTitle, bank.edition].filter(Boolean).join(" · ") || "来源信息待补充"}</strong>{bank.author && <p>作者 / 编者：{bank.author}</p>}{bank.copyrightNotice && <p>版权说明：{bank.copyrightNotice}</p>}</div></div>}<div className="share-copyright-alert"><ShieldCheck /><div><strong>导入不代表获得转载或再分发授权</strong><p>请仅在分享者授权范围内学习和使用。导入后请抽查题干、选项与答案；不要传播含敏感信息或未经授权的内容。</p></div></div>{share.expiresAt && <p className="incoming-share-expiry">此链接有效期至 {new Date(share.expiresAt).toLocaleString("zh-CN")}。</p>}</>}<footer><button className="ghost-action" onClick={onClose} disabled={importing}>{share.status === "error" ? "关闭" : "暂不导入"}</button>{bank && <button className="primary-action" onClick={onImport} disabled={importing}><Import />{importing ? "正在导入…" : "确认并导入题库"}</button>}</footer></section></div>;
 }
 
 function QuizView(props: {

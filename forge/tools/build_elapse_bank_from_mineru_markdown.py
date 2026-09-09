@@ -75,6 +75,18 @@ PROFILES = {
         require_five_options=False,
         require_multiple_answers=False,
     ),
+    "dermatology-xuejun": BuildProfile(
+        source_file="皮肤性病学习题集（张学军）",
+        id_prefix="dermatology-xuejun",
+        bank_name="皮肤性病学习题集（张学军）· 客观题全量版",
+        group_name="皮肤性病学 · 张学军",
+        answer_source="《皮肤性病学习题集》（张学军）各章参考答案；MinerU Hybrid JSON 转换，使用时请结合原书复核。",
+        purpose="皮肤性病学章节化单项选择题与多项选择题练习。",
+        source_description="《皮肤性病学习题集》（张学军）；答案按各章参考答案区、题型和原题号关联。",
+        include_judgement=False,
+        require_five_options=False,
+        require_multiple_answers=False,
+    ),
 }
 
 

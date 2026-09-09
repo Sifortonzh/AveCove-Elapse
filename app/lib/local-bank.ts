@@ -5,6 +5,10 @@ export type SavedQuestionBank = {
   id: string;
   name: string;
   description: string;
+  sourceTitle: string;
+  edition: string;
+  author: string;
+  copyrightNotice: string;
   groupName: string;
   featured: boolean;
   questions: QuizQuestion[];
@@ -16,6 +20,10 @@ export type QuestionBankInput = {
   id?: string;
   name: string;
   description?: string;
+  sourceTitle?: string;
+  edition?: string;
+  author?: string;
+  copyrightNotice?: string;
   groupName?: string;
   featured?: boolean;
   questions: QuizQuestion[];
@@ -30,6 +38,10 @@ export type SharedQuestionBankPackage = {
   bank: {
     name: string;
     description?: string;
+    sourceTitle?: string;
+    edition?: string;
+    author?: string;
+    copyrightNotice?: string;
     groupName?: string;
     questions: QuizQuestion[];
   };
@@ -44,6 +56,10 @@ export type Western306StandardPackage = {
   bank: {
     name: string;
     description?: string;
+    sourceTitle?: string;
+    edition?: string;
+    author?: string;
+    copyrightNotice?: string;
     groupName?: string;
     questions: QuizQuestion[];
   };
@@ -121,6 +137,10 @@ function normalizeBank(input: QuestionBankInput): SavedQuestionBank {
     id,
     name,
     description: typeof input.description === "string" ? input.description.trim().slice(0, 4_000) : "",
+    sourceTitle: typeof input.sourceTitle === "string" ? input.sourceTitle.trim().slice(0, 160) : "",
+    edition: typeof input.edition === "string" ? input.edition.trim().slice(0, 80) : "",
+    author: typeof input.author === "string" ? input.author.trim().slice(0, 120) : "",
+    copyrightNotice: typeof input.copyrightNotice === "string" ? input.copyrightNotice.trim().slice(0, 500) : "",
     groupName: storedGroupName || (input.groupName === undefined ? suggestQuestionBankGroup(name, questions) : ""),
     featured: input.featured === true,
     questions,
@@ -299,7 +319,7 @@ export async function renameQuestionBank(id: string, name: string): Promise<Save
 
 export async function updateQuestionBankDetails(
   id: string,
-  details: { name?: string; description?: string; groupName?: string; featured?: boolean },
+  details: { name?: string; description?: string; sourceTitle?: string; edition?: string; author?: string; copyrightNotice?: string; groupName?: string; featured?: boolean },
 ): Promise<SavedQuestionBank> {
   const bank = await loadQuestionBank(id);
   if (!bank) throw new Error("找不到要编辑的题库");
@@ -307,6 +327,10 @@ export async function updateQuestionBankDetails(
     ...bank,
     name: details.name ?? bank.name,
     description: details.description ?? bank.description,
+    sourceTitle: details.sourceTitle ?? bank.sourceTitle,
+    edition: details.edition ?? bank.edition,
+    author: details.author ?? bank.author,
+    copyrightNotice: details.copyrightNotice ?? bank.copyrightNotice,
     groupName: details.groupName ?? bank.groupName,
     featured: details.featured ?? bank.featured,
     updatedAt: new Date().toISOString(),
@@ -393,6 +417,10 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
       id: candidate.id,
       name: typeof candidate.name === "string" ? candidate.name.slice(0, 160) : "同步题库",
       description: typeof candidate.description === "string" ? candidate.description.slice(0, 4_000) : "",
+      sourceTitle: typeof candidate.sourceTitle === "string" ? candidate.sourceTitle.slice(0, 160) : "",
+      edition: typeof candidate.edition === "string" ? candidate.edition.slice(0, 80) : "",
+      author: typeof candidate.author === "string" ? candidate.author.slice(0, 120) : "",
+      copyrightNotice: typeof candidate.copyrightNotice === "string" ? candidate.copyrightNotice.slice(0, 500) : "",
       groupName: typeof candidate.groupName === "string" ? candidate.groupName : "",
       featured: candidate.featured === true,
       questions: candidate.questions,
@@ -423,7 +451,16 @@ export function createSharedQuestionBankPackage(bank: SavedQuestionBank): Shared
     format: "hongdou-question-bank",
     version: 1,
     exportedAt: new Date().toISOString(),
-    bank: { name: bank.name, description: bank.description, groupName: bank.groupName, questions: bank.questions },
+    bank: {
+      name: bank.name,
+      description: bank.description,
+      sourceTitle: bank.sourceTitle,
+      edition: bank.edition,
+      author: bank.author,
+      copyrightNotice: bank.copyrightNotice,
+      groupName: bank.groupName,
+      questions: bank.questions,
+    },
   };
 }
 
@@ -439,6 +476,10 @@ export function parseSharedQuestionBankPackage(value: unknown): QuestionBankInpu
   return {
     name: typeof payload.bank.name === "string" ? payload.bank.name : "分享题库",
     description: typeof payload.bank.description === "string" ? payload.bank.description.slice(0, 4_000) : "",
+    sourceTitle: typeof payload.bank.sourceTitle === "string" ? payload.bank.sourceTitle.slice(0, 160) : "",
+    edition: typeof payload.bank.edition === "string" ? payload.bank.edition.slice(0, 80) : "",
+    author: typeof payload.bank.author === "string" ? payload.bank.author.slice(0, 120) : "",
+    copyrightNotice: typeof payload.bank.copyrightNotice === "string" ? payload.bank.copyrightNotice.slice(0, 500) : "",
     groupName: typeof payload.bank.groupName === "string" ? payload.bank.groupName : "",
     questions,
     importedAt: new Date().toISOString(),

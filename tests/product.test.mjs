@@ -341,6 +341,18 @@ A. 掌跖部 B. 背部 C. 两者均是 D. 两者均不是
   assert.deepEqual(legacyWordWithoutListLabels.map((question) => question.sourceNumber), ["1", "2", "3", "4", "5"]);
 });
 
+test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
+  const [converter, genericConverter] = await Promise.all([
+    text("forge/tools/build_dermatology_bank_from_mineru.py"),
+    text("forge/tools/build_elapse_bank_from_mineru_markdown.py"),
+  ]);
+
+  assert.match(converter, /Move MinerU's cross-page look-ahead spans onto the following page/);
+  assert.match(converter, /Sequential association is accepted only when the section counts match/);
+  assert.match(converter, /皮肤性病学习题集（张学军）· 客观题整理版/);
+  assert.match(genericConverter, /"dermatology-xuejun": BuildProfile/);
+});
+
 test("ships a small, clearly labelled demo bank", async () => {
   const questions = JSON.parse(await text("app/questions.json"));
 
@@ -522,7 +534,10 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /featured: input\.featured === true/);
   assert.match(localBank, /storedGroupName = normalizeQuestionBankGroup/);
   assert.match(localBank, /input\.groupName === undefined \? suggestQuestionBankGroup/);
-  assert.match(localBank, /bank: \{ name: bank\.name, description: bank\.description, groupName: bank\.groupName, questions: bank\.questions \}/);
+  assert.match(localBank, /sourceTitle: bank\.sourceTitle/);
+  assert.match(localBank, /edition: bank\.edition/);
+  assert.match(localBank, /author: bank\.author/);
+  assert.match(localBank, /copyrightNotice: bank\.copyrightNotice/);
   assert.match(localBank, /hongdou-question-bank/);
   assert.match(localBank, /avecove-western-306/);
   assert.match(localBank, /multiple: question\.questionType === "X" \|\| answer\.length > 1/);
@@ -542,6 +557,12 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(page, /reconcileQuestionBankOrder/);
   assert.match(page, /function toggleSavedBankFeatured/);
   assert.match(page, /精选试卷/);
+  assert.match(page, /全部题库 <em>\{banks\.length\}<\/em>/);
+  assert.match(page, /藏经阁 · Demo/);
+  assert.match(page, /const BANK_REQUESTS_KEY = "hongdou-bank-requests-v1"/);
+  assert.match(page, /暂不接入公开社区，也不会上传题库文件/);
+  assert.match(page, /题库来源/);
+  assert.match(page, /版权与使用说明/);
   assert.match(page, /className="featured-bank-section"/);
   assert.match(page, /aria-pressed=\{bank\.featured\}/);
   assert.match(page, /题库排序/);
@@ -558,12 +579,16 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(shareRoute, /randomBytes\(24\)/);
   assert.match(shareRoute, /7 \* 24 \* 60 \* 60_000/);
   assert.match(shareRoute, /parseSharedQuestionBankPackage/);
+  assert.match(shareRoute, /sourceTitle: parsed\.sourceTitle/);
+  assert.match(shareRoute, /copyrightNotice: parsed\.copyrightNotice/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS shared_question_banks/);
   assert.match(styles, /\.bank-group-order/);
   assert.match(styles, /\.bank-sort-control/);
   assert.match(styles, /\.bank-item-order/);
   assert.match(styles, /\.bank-group-toggle/);
   assert.match(styles, /\.featured-bank-grid/);
+  assert.match(styles, /\.bank-source-summary/);
+  assert.match(styles, /\.bank-request-page/);
   assert.match(styles, /\.bank-feature-toggle/);
   assert.match(styles, /\.share-link-result/);
   assert.match(styles, /\.incoming-share-modal/);
@@ -941,7 +966,7 @@ test("offers five-subject filtering only for modern Western Medicine 306 banks",
   assert.match(styles, /\.western306-subject-grid/);
 });
 
-test("ships the v1.3 practice and library experience on the restrained Spatial Bento interface", async () => {
+test("ships the current practice and library experience on the restrained Spatial Bento interface", async () => {
   const [page, styles, packageJson, readme, readmeZh, nextConfig, dockerfile] = await Promise.all([
     text("app/page.tsx"),
     text("app/globals.css"),
@@ -952,7 +977,7 @@ test("ships the v1.3 practice and library experience on the restrained Spatial B
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.4\.7"/);
+  assert.match(packageJson, /"version": "1\.4\.8"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);

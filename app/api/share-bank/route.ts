@@ -67,6 +67,10 @@ export async function POST(request: Request) {
     bank: {
       name: parsed.name.slice(0, 160),
       description: parsed.description?.slice(0, 4_000),
+      sourceTitle: parsed.sourceTitle?.slice(0, 160),
+      edition: parsed.edition?.slice(0, 80),
+      author: parsed.author?.slice(0, 120),
+      copyrightNotice: parsed.copyrightNotice?.slice(0, 500),
       groupName: parsed.groupName?.slice(0, 60),
       questions: parsed.questions,
     },

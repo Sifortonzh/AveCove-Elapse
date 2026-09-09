@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 1.4.7" src="https://img.shields.io/badge/version-1.4.7-b43d35" />
+    <img alt="版本 1.4.8" src="https://img.shields.io/badge/version-1.4.8-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,13 +27,13 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v1.4.7。** 医学刷题、题库管理、可选多端同步和西医综合 306 已构成稳定主线；English Lab 仍是预览功能。OCR 与 AI 自动整理必须对照原文件抽查，不应把模型推测当成原书答案。
+> **当前版本：v1.4.8。** 医学刷题、题库管理、可选多端同步和西医综合 306 已构成稳定主线；English Lab 仍是预览功能。OCR 与 AI 自动整理必须对照原文件抽查，不应把模型推测当成原书答案。
 
 ## 产品地图
 
 | 模块 | 当前能力 | 阶段 |
 | --- | --- | :---: |
-| **我的题库** | 多题库保存、简介、搜索、分组、自定义排序、精选试卷、便携文件与 7 天导入链接 | 稳定 |
+| **我的题库** | 多题库保存、两行折叠简介、来源与版权信息、搜索、分组、自定义排序、精选试卷、便携文件、7 天导入链接及本机“藏经阁”Demo | 稳定 |
 | **刷题与复盘** | 标准、盲刷、背题；答题卡、错题复盘、斩题、纠错、笔记与原题解析 | 稳定 |
 | **医学题型** | 单选、多选、判断，以及带共用题干或备选项的 A1/A2/A3/A4/B1/C/X | 重点推进 |
 | **西医综合 306** | 现代 165 题 / 300 分审校、旧卷 C 型、首次评分和五科单独练习 | 重点推进 |
@@ -216,6 +216,7 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 <details>
 <summary><strong>版本记录</strong></summary>
 
+- **v1.4.8** — 精简题库页面，补充来源与版权信息，并加入仅存本机的“藏经阁”Demo。
 - **v1.4.7** — 为服务器繁忙或刚重启的场景增加自动部署等待与重试。
 - **v1.4.6** — 重构中英双语 README 与 GitHub 项目首页信息层级。
 - **v1.4.5** — 修复 iPad 长题滚动时“上一题”按钮不可持续使用的问题。
