@@ -46,6 +46,12 @@ async function loadQuestionParser() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadMineruImport() {
+  const source = (await text("app/lib/mineru-import.ts")).replace(/^import .*?;\n/, "");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 test("recovers medical questions from partially malformed AI JSON and applies 306 scoring", async () => {
   const {
     detectMedicalExamProfile,
@@ -341,16 +347,54 @@ A. 掌跖部 B. 背部 C. 两者均是 D. 两者均不是
   assert.deepEqual(legacyWordWithoutListLabels.map((question) => question.sourceNumber), ["1", "2", "3", "4", "5"]);
 });
 
+test("keeps every structured Word objective question even when answers are missing", async () => {
+  const { parseQuestionText } = await loadQuestionParser();
+  const questions = parseQuestionText(`临床客观题练习
+1. 首道题没有答案，但题干和选项完整
+A. 选项甲
+B. 选项乙
+C. 选项丙
+D. 选项丁
+2. 第二道题也留待导入后核对
+A. 方案甲
+B. 方案乙
+C. 方案丙
+D. 方案丁`, "Word 待核对题库");
+
+  assert.equal(questions.length, 2);
+  assert.deepEqual(questions.map((question) => question.answer), [[], []]);
+  assert.ok(questions.every((question) => question.answerPending));
+  assert.deepEqual(questions.map((question) => question.options.length), [4, 4]);
+});
+
+test("recognizes official MinerU Hybrid JSON and keeps page reading order", async () => {
+  const { extractMineruHybridText, isMineruHybridJson } = await loadMineruImport();
+  const payload = {
+    pdf_info: [{ para_blocks: [{ lines: [{ bbox: [0, 20], spans: [{ bbox: [20, 20], content: "题干" }, { bbox: [0, 20], content: "1. " }] }] }] }],
+  };
+  assert.equal(isMineruHybridJson(payload), true);
+  assert.equal(extractMineruHybridText(payload), "[[PAGE 1]]\n1. 题干");
+
+  const source = await text("app/lib/mineru-import.ts");
+  assert.match(source, /parseEnt\(pages\)/);
+  assert.match(source, /parseDermatology\(pages\.join\("\\n"\)\)/);
+  assert.match(source, /原文此选项 OCR 缺失，可在纠错中补录/);
+});
+
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
-  const [converter, genericConverter] = await Promise.all([
+  const [converter, genericConverter, medicalConverter] = await Promise.all([
     text("forge/tools/build_dermatology_bank_from_mineru.py"),
     text("forge/tools/build_elapse_bank_from_mineru_markdown.py"),
+    text("forge/tools/build_mineru_medical_bank.py"),
   ]);
 
   assert.match(converter, /Move MinerU's cross-page look-ahead spans onto the following page/);
   assert.match(converter, /Sequential association is accepted only when the section counts match/);
   assert.match(converter, /皮肤性病学习题集（张学军）· 客观题整理版/);
   assert.match(genericConverter, /"dermatology-xuejun": BuildProfile/);
+  assert.match(medicalConverter, /ent-junyi/);
+  assert.match(medicalConverter, /dermatology-renwei/);
+  assert.match(medicalConverter, /answerPending/);
 });
 
 test("ships a small, clearly labelled demo bank", async () => {
@@ -977,7 +1021,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.4\.8"/);
+  assert.match(packageJson, /"version": "1\.4\.9"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);

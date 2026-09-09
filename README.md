@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 1.4.8" src="https://img.shields.io/badge/version-1.4.8-b43d35" />
+    <img alt="Version 1.4.9" src="https://img.shields.io/badge/version-1.4.9-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v1.4.8.** Medical practice, library management, optional synchronization, and the Western Medicine 306 workflow are the stable core. English Lab remains a preview, and automated OCR/AI extraction must always be reviewed against the source.
+> **Current release: v1.4.9.** Medical practice, library management, optional synchronization, and the Western Medicine 306 workflow are the stable core. Official MinerU Hybrid JSON can now be imported directly for supported medical-book layouts. English Lab remains a preview, and automated OCR/AI extraction must always be reviewed against the source.
 
 ## Product map
 
@@ -63,7 +63,8 @@ flowchart LR
 
 ### Import and library management
 
-- Import `.doc`, `.docx`, text PDF, scanned PDF, and AveCove portable JSON.
+- Import `.doc`, `.docx`, text PDF, scanned PDF, AveCove portable JSON, and official MinerU Hybrid JSON. ENT military-medical inline keys and Renwei dermatology chapter keys have dedicated deterministic profiles.
+- Keep structurally complete Word objective questions even when no answer is recognized; they remain visibly pending and editable instead of being discarded.
 - Add a description with chapter-to-question ranges and group related yearly or subject banks.
 - Search titles, descriptions, groups, stems, options, categories, and source numbers.
 - Rename, delete, reset only the learning record, feature a paper, or sort by custom order, import time, or name.
@@ -216,6 +217,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v1.4.9** — Added direct MinerU Hybrid JSON import for ENT military-medical and Renwei dermatology layouts, plus answer-optional Word question retention.
 - **v1.4.8** — Streamlined the library, added source and copyright metadata, and introduced the local-only Scripture Pavilion demo.
 - **v1.4.7** — Added resilient deployment startup checks for a busy or recently restarted server.
 - **v1.4.6** — Reorganized bilingual project documentation and GitHub presentation.

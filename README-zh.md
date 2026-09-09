@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 1.4.8" src="https://img.shields.io/badge/version-1.4.8-b43d35" />
+    <img alt="版本 1.4.9" src="https://img.shields.io/badge/version-1.4.9-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v1.4.8。** 医学刷题、题库管理、可选多端同步和西医综合 306 已构成稳定主线；English Lab 仍是预览功能。OCR 与 AI 自动整理必须对照原文件抽查，不应把模型推测当成原书答案。
+> **当前版本：v1.4.9。** 医学刷题、题库管理、可选多端同步和西医综合 306 已构成稳定主线；受支持的医学教材版式现在可直接导入官方 MinerU Hybrid JSON。English Lab 仍是预览功能，OCR 与 AI 自动整理仍须对照原文件抽查。
 
 ## 产品地图
 
@@ -63,7 +63,8 @@ flowchart LR
 
 ### 导入与题库管理
 
-- 支持 `.doc`、`.docx`、文字 PDF、扫描 PDF 与 AveCove 便携 JSON。
+- 支持 `.doc`、`.docx`、文字 PDF、扫描 PDF、AveCove 便携 JSON 与官方 MinerU Hybrid JSON；耳鼻喉军医题号前答案和皮肤病人卫分章答案已使用专用确定性规则。
+- Word 中只要题干与至少两个选项结构完整，即使没有识别出答案也会保留为“待核对”，可在刷题纠错中后补。
 - 可填写题库简介和“章节—题号范围”，并把历年卷或同一学科题库放进同一分组。
 - 搜索题库名、简介、分组、题干、选项、分类和原题号，并高亮结果。
 - 支持重命名、删除、仅清除学习记录、设为精选，以及按自定义顺序、导入时间或名称排序。
@@ -216,6 +217,7 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 <details>
 <summary><strong>版本记录</strong></summary>
 
+- **v1.4.9** — 支持直接导入耳鼻喉军医与皮肤病人卫版式的 MinerU Hybrid JSON，并让 Word 无答案客观题先完整入库、后续纠错。
 - **v1.4.8** — 精简题库页面，补充来源与版权信息，并加入仅存本机的“藏经阁”Demo。
 - **v1.4.7** — 为服务器繁忙或刚重启的场景增加自动部署等待与重试。
 - **v1.4.6** — 重构中英双语 README 与 GitHub 项目首页信息层级。

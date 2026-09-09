@@ -477,11 +477,64 @@ function parseAnswerDelimitedQuestions(text: string, category = "导入题库"):
   return parsed;
 }
 
+function parseLooseObjectiveQuestions(text: string, category = "导入题库"): QuizQuestion[] {
+  const normalized = text.replace(/\r/g, "");
+  const starts = [...normalized.matchAll(/^\s*(\d{1,4})\s*[.．、]\s*(?=\S)/gm)];
+  const parsed: QuizQuestion[] = [];
+  for (let index = 0; index < starts.length; index += 1) {
+    const start = starts[index];
+    const end = starts[index + 1]?.index ?? normalized.length;
+    const body = normalized.slice((start.index ?? 0) + start[0].length, end).trim();
+    const markers = optionMarkers(body);
+    const firstA = markers.findIndex((marker) => marker.label === "A");
+    if (firstA < 0) continue;
+    const accepted: typeof markers = [];
+    let expected = "A";
+    for (const marker of markers.slice(firstA)) {
+      if (marker.label !== expected) break;
+      accepted.push(marker);
+      expected = String.fromCharCode(expected.charCodeAt(0) + 1);
+    }
+    if (accepted.length < 2) continue;
+    const answer = inlineAnswerFromBody(body);
+    const stem = removeAnswerNotation(body.slice(0, accepted[0].index)).replace(/\n+/g, " ").trim();
+    const options = accepted.map((marker, optionIndex) => {
+      const optionEnd = accepted[optionIndex + 1]?.index ?? body.length;
+      return {
+        label: marker.label,
+        text: body.slice(marker.end, optionEnd)
+          .replace(/(?:正确)?答案\s*[:：]\s*[A-GＡ-Ｇ、，,\s]+/gi, " ")
+          .replace(/\n+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim(),
+      };
+    }).filter((option) => option.text);
+    const labels = new Set(options.map((option) => option.label));
+    const validAnswer = answer.filter((label) => labels.has(label));
+    if (stem.length < 2 || options.length < 2) continue;
+    parsed.push({
+      id: `imported-${Date.now()}-loose-${parsed.length}`,
+      sourceNumber: start[1],
+      category,
+      stem,
+      options,
+      answer: validAnswer,
+      answerPending: !validAnswer.length,
+      multiple: validAnswer.length > 1,
+      questionType: validAnswer.length > 1 ? "X" : "A",
+      medicalQuestionType: validAnswer.length > 1 ? "X" : "A1",
+      answerSource: validAnswer.length ? "题干内标注" : undefined,
+    });
+  }
+  return parsed;
+}
+
 export function parseQuestionText(text: string, category = "导入题库"): QuizQuestion[] {
-  const candidates = [
+  const structuredCandidates = [
     ...parseAnswerDelimitedQuestions(text, category),
     ...parseGeneralMedicalQuestions(text, category),
   ];
+  const candidates = structuredCandidates.length ? structuredCandidates : parseLooseObjectiveQuestions(text, category);
   const selected = new Map<string, QuizQuestion>();
   for (const question of candidates) {
     const key = `${question.sourceNumber}|${question.stem.replace(/\s+/g, "").slice(0, 180)}`;

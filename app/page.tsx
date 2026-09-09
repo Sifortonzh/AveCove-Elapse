@@ -27,6 +27,7 @@ import {
   type RecordLedger,
 } from "./lib/record-sync";
 import { parseQuestionText, type QuizQuestion } from "./lib/question-parser";
+import { isMineruHybridJson, parseMineruHybridQuestionBank } from "./lib/mineru-import";
 import {
   standardizeParsedWestern306Questions, WESTERN_306_SUBJECTS, western306Score,
   western306SubjectForQuestion, type Western306Subject,
@@ -1018,22 +1019,37 @@ export default function HomePage() {
         let importedName = file.name.replace(/\.(doc|docx|pdf|json)$/i, "");
         let importedDescription = "";
         let importedGroupName = "";
+        let importedSourceTitle = "";
+        let importedEdition = "";
+        let importedAuthor = "";
+        let importedCopyrightNotice = "";
         let importedQuestions: QuizQuestion[];
         let usedOcr = false;
         let answeredCount = 0;
         let pendingAnswerCount = 0;
         if (/\.json$/i.test(file.name)) {
-          const shared = parseSharedQuestionBankPackage(JSON.parse(await withImportTimeout(file.text(), 30_000, {
+          const rawJson = JSON.parse(await withImportTimeout(file.text(), 30_000, {
             signal: fileController.signal,
             onTimeout: () => fileController.abort(),
-          })) as unknown);
-          importedName = shared.name;
-          importedDescription = shared.description ?? "";
-          importedGroupName = shared.groupName ?? "";
-          importedQuestions = shared.questions;
+          })) as unknown;
+          const imported = isMineruHybridJson(rawJson)
+            ? parseMineruHybridQuestionBank(rawJson, file.name)
+            : parseSharedQuestionBankPackage(rawJson);
+          importedName = imported.name;
+          importedDescription = imported.description ?? "";
+          importedGroupName = imported.groupName ?? "";
+          importedSourceTitle = imported.sourceTitle ?? "";
+          importedEdition = imported.edition ?? "";
+          importedAuthor = imported.author ?? "";
+          importedCopyrightNotice = imported.copyrightNotice ?? "";
+          importedQuestions = imported.questions;
           answeredCount = importedQuestions.filter((question) => question.answer.length).length;
           pendingAnswerCount = importedQuestions.length - answeredCount;
-          setImportState({ phase: "正在接收分享题库", progress: 82, detail: `[${index + 1}/${batch.length}] ${file.name}` });
+          setImportState({
+            phase: isMineruHybridJson(rawJson) ? "正在读取 MinerU JSON" : "正在接收分享题库",
+            progress: 82,
+            detail: `[${index + 1}/${batch.length}] ${file.name}`,
+          });
         } else {
           const result = await withImportTimeout(importQuestionFile(file, (update) => {
             if (acceptUpdates) setImportState({ ...update, detail: `[${index + 1}/${batch.length}] ${file.name} · ${update.detail}` });
@@ -1050,6 +1066,10 @@ export default function HomePage() {
         const saved = await saveActiveBank({
           name: importedName,
           description: importedDescription,
+          sourceTitle: importedSourceTitle,
+          edition: importedEdition,
+          author: importedAuthor,
+          copyrightNotice: importedCopyrightNotice,
           groupName: importedGroupName || suggestQuestionBankGroup(importedName, importedQuestions),
           questions: importedQuestions,
           importedAt: new Date().toISOString(),
@@ -2298,7 +2318,7 @@ function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose
   return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal spatial-import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>IMPORT WORKBENCH · 文件默认在本机处理</span><h2>把资料整理成可练习的题库</h2><p>一次导入多份文件；系统会先提取文字，再识别题型、答案与章节结构。</p></div><button onClick={onClose} disabled={busy} aria-label="关闭导入工作台"><X /></button></header>
     <ol className="import-stage-strip" aria-label="导入流程">{stages.map((label, index) => { const number = index + 1; return <li className={number < importStage ? "done" : number === importStage ? "active" : ""} key={label}><i>{number < importStage ? <Check size={14} /> : number}</i><span>{label}</span></li>; })}</ol>
     <div className="import-workbench-grid">
-      <div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div>
+      <div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF、MinerU Hybrid JSON 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div>
       <aside className="import-capability-panel"><span className="overline">SPECIALIZED FLOW</span><button type="button" className="western306-entry" onClick={on306} disabled={busy}><Target /><span><strong>西综 306 标准化工作台</strong><small>165 题新卷、含 C 型题旧卷、答案配套与缺题检查</small></span><ArrowRight /></button><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>题干末尾答案、章节答案表与历年回忆题</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>单选、多选与判断；自动跳过填空和问答</small></span></div></div></aside>
     </div>
     {(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={onCancel}><X />取消当前导入</button>}</div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "cancelled" ? <X /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">.docx 与 PDF 默认在浏览器本地处理；由于旧版 .doc 是二进制格式，选择后会临时发送到你部署的本站服务器内存提取文字，不落盘、不保留原文件。普通识别失败时仍会先征求同意，再决定是否交给 AI 整理。</p></section></div>;
