@@ -78,6 +78,9 @@ export async function POST(request: Request) {
   const category = fileName.replace(/\.(doc|docx|pdf)$/i, "") || "AI 整理题库";
   const profile = detectMedicalExamProfile(fileName, text);
   const blueprint = profile === "western-medicine-306" ? detectWestern306Blueprint(fileName, text) : undefined;
+  if (profile === "western-medicine-306" && blueprint?.format !== "modern-165") {
+    return Response.json({ error: "306 工作台仅支持 2017 年及以后固定 165 题的新卷；更早试卷请使用普通导入。" }, { status: 422 });
+  }
   const allowUnanswered = profile === "western-medicine-306";
   // 306 papers are dense: a short source fragment can expand to many JSON records.
   // Smaller overlapping fragments prevent a single model response from truncating after ~60 questions.
@@ -127,7 +130,8 @@ export async function POST(request: Request) {
   }
   const expectedQuestionCount = blueprint?.expectedQuestionCount;
   const knownNumbers = new Set(merged.map((question) => String(Number.parseInt(question.sourceNumber.match(/\d+/)?.[0] ?? "", 10))).filter((number) => number !== "NaN"));
-  const typeCounts = Object.fromEntries(["A", "B", "C", "X"].map((type) => [type, merged.filter((question) => question.questionType === type).length]));
+  const typeCounts = Object.fromEntries((profile === "western-medicine-306" ? ["A", "B", "X"] : ["A", "B", "C", "X"])
+    .map((type) => [type, merged.filter((question) => question.questionType === type).length]));
   const duplicateSourceNumbers = [...new Set(questions.map((question) => question.sourceNumber).filter((number, index, all) => all.indexOf(number) !== index))];
   return Response.json({
     questions: merged,

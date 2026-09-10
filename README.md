@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 1.4.10" src="https://img.shields.io/badge/version-1.4.10-b43d35" />
+    <img alt="Version 1.4.11" src="https://img.shields.io/badge/version-1.4.11-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v1.4.10.** Medical practice, library management, optional synchronization, and the Western Medicine 306 workflow are the stable core. In-practice correction now supports missing-answer entry, medical question-type correction, option insertion or removal, and inserting a complete new question between existing questions. English Lab remains a preview, and automated OCR/AI extraction must always be reviewed against the source.
+> **Current release: v1.4.11.** Medical practice, library management, optional synchronization, and the Western Medicine 306 workflow are the stable core. PDF import now recognizes source answers shown by yellow option highlighting as well as explicit answer marks placed after an option. English Lab remains a preview, and automated OCR/AI extraction must always be reviewed against the source.
 
 ## Product map
 
@@ -36,7 +36,7 @@
 | **Question Library** | Multi-bank storage, two-line expandable descriptions, source/copyright metadata, search, groups, custom ordering, featured papers, portable files, seven-day import links, and a local-only Pavilion demo | Stable |
 | **Practice** | Standard, Blind Review, and Answer-first Memorization; answer sheet, wrong-answer review, Slash Skip, corrections, notes, and source explanations | Stable |
 | **Medical formats** | Single/multiple choice, true/false, and A1/A2/A3/A4/B1/C/X structures with shared stems or option pools | Active focus |
-| **Western Medicine 306** | Modern 165-question / 300-point audit, legacy C type, first-attempt scoring, and five-subject practice | Active focus |
+| **Western Medicine 306** | Fixed post-2017 165-question / 300-point audit, A/B/X sections, strict A-D options, first-attempt scoring, and five-subject practice | Active focus |
 | **AI assistance** | Personal or site-wide OpenAI-compatible providers, import structuring, explanations, follow-up, and note writing | Optional |
 | **Cross-device sync** | Parsed banks, progress, wrong answers, featured items, notes, settings, groups, and deletion tombstones | Optional |
 | **English Lab** | Interactive demos for cloze, reading, listening, matching, translation, and writing | Preview |
@@ -63,7 +63,7 @@ flowchart LR
 
 ### Import and library management
 
-- Import `.doc`, `.docx`, text PDF, scanned PDF, AveCove portable JSON, and official MinerU Hybrid JSON. ENT military-medical inline keys and Renwei dermatology chapter keys have dedicated deterministic profiles.
+- Import `.doc`, `.docx`, text PDF, scanned PDF, AveCove portable JSON, and official MinerU Hybrid JSON. Text PDFs can retain yellow-highlighted correct options, while explicit answer marks after an option are also recognized. ENT military-medical inline keys and Renwei dermatology chapter keys have dedicated deterministic profiles.
 - Keep structurally complete Word objective questions even when no answer is recognized; they remain visibly pending and editable instead of being discarded.
 - Add a description with chapter-to-question ranges and group related yearly or subject banks.
 - Search titles, descriptions, groups, stems, options, categories, and source numbers.
@@ -89,7 +89,8 @@ flowchart LR
 - Preserves A1, A2, A3, A4, B1, C, and X identities instead of flattening every question into generic choice items.
 - A3/A4 groups keep the shared case stem and linked subquestions together; B1 groups reuse their source option pool.
 - Handles end-of-book answer tables and source explanations without merging them into AI-generated analysis.
-- The 306 workbench audits expected count, A/B/C/X distribution, source numbers, duplicates, and answer coverage.
+- The 306 workbench follows the 2017 template: A questions 1–115, B questions 116–135, and X questions 136–165. It no longer reserves a C-type gap and strictly keeps four A-D options per item.
+- B sections copy each shared A-D option pool into its paired subquestions. Green answer letters in the supplied explanation PDF can be extracted deterministically and reconciled by source number.
 - Modern 165-question papers support Physiology, Biochemistry, Pathology, Internal Medicine, or Surgery-only practice.
 - First-attempt scoring is immutable: answering correctly on a later attempt does not raise the original exam score.
 - Missing items or answers are reported explicitly; the importer does not fill them with medical-knowledge guesses.
@@ -217,6 +218,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v1.4.11** — Rebuilt the post-2017 306 workbench around the fixed 165-question A/B/X and A-D format, with paired B pools, green explanation keys, yellow PDF highlights, and explicit option-answer markers.
 - **v1.4.10** — Added manual answer entry for answerless questions, medical type correction, editable option counts, complete question insertion with sequential renumbering, and a leaner study panel.
 - **v1.4.9** — Added direct MinerU Hybrid JSON import for ENT military-medical and Renwei dermatology layouts, plus answer-optional Word question retention.
 - **v1.4.8** — Streamlined the library, added source and copyright metadata, and introduced the local-only Scripture Pavilion demo.

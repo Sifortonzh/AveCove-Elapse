@@ -28,8 +28,10 @@ async function loadRecordSync() {
 }
 
 async function loadMedicalAiImport() {
-  const source = (await text("app/lib/medical-ai-import.ts"))
-    .replace(/^import type \{[\s\S]*?\} from "\.\/question-parser";\n/, "");
+  const parserSource = await text("app/lib/question-parser.ts");
+  const medicalSource = (await text("app/lib/medical-ai-import.ts"))
+    .replace(/^import \{[\s\S]*?\} from "\.\/question-parser";\n/, "");
+  const source = `${parserSource}\n${medicalSource}`;
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
@@ -48,6 +50,12 @@ async function loadQuestionParser() {
 
 async function loadQuestionEdit() {
   const source = (await text("app/lib/question-edit.ts")).replace(/^import type .*?;\n/, "");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
+async function loadPdfAnswerHighlights() {
+  const source = await text("app/lib/pdf-answer-highlights.ts");
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
@@ -157,6 +165,45 @@ D.干扰信息
   assert.equal(cType.questions[0].examFormat, "legacy-c-type");
 });
 
+test("keeps yellow-highlighted PDF answers and option-suffix answer marks", async () => {
+  const { greenAnswerTableFromPdfItems, pdfPageTextWithHighlightedAnswers } = await loadPdfAnswerHighlights();
+  const { parseQuestionText } = await loadQuestionParser();
+  const text = pdfPageTextWithHighlightedAnswers(
+    [
+      { str: "1、洗胃最有效的时间是", width: 130, height: 12, transform: [12, 0, 0, 12, 50, 600], hasEOL: true },
+      { str: "A、24 小时", width: 70, height: 12, transform: [12, 0, 0, 12, 70, 580], hasEOL: true },
+      { str: "B、4～6 小时", width: 85, height: 12, transform: [12, 0, 0, 12, 70, 560], hasEOL: true },
+    ],
+    {
+      fnArray: [1, 2],
+      argsArray: [["#ffff00"], [22, [], new Float32Array([70, 557, 155, 575])]],
+    },
+    { setFillRGBColor: 1, constructPath: 2 },
+  );
+  assert.match(text, /B、4～6 小时 答案：B/);
+  const highlighted = parseQuestionText(text, "急诊医学");
+  assert.equal(highlighted.length, 1);
+  assert.deepEqual(highlighted[0].answer, ["B"]);
+
+  const suffix = parseQuestionText(`2、正确的急救方法是\nA、甲\nB、乙【答案】\nC、丙`, "急诊医学");
+  assert.equal(suffix.length, 1);
+  assert.deepEqual(suffix[0].answer, ["B"]);
+  assert.equal(suffix[0].options[1].text, "乙");
+
+  const pixels = new Uint8ClampedArray(80 * 60 * 4).fill(255);
+  for (let y = 30; y <= 41; y += 1) for (let x = 50; x <= 60; x += 1) {
+    const offset = (y * 80 + x) * 4;
+    pixels.set([0, 128, 0, 255], offset);
+  }
+  assert.equal(greenAnswerTableFromPdfItems(
+    [{ str: "1. ABCD", width: 60, height: 10, transform: [10, 0, 0, 10, 0, 40] }],
+    pixels,
+    80,
+    60,
+    { transform: [1, 0, 0, 1, 0, 0] },
+  ), "1.D");
+});
+
 test("joins cross-page 306 seams, reconciles explicit source answers, and suggests bank groups", async () => {
   const { reconcileMedicalQuestionsWithSourceAnswers, splitWestern306SourceText } = await loadMedicalAiImport();
   const { suggestQuestionBankGroup } = await loadBankGrouping();
@@ -220,8 +267,27 @@ test("standardizes a nearly complete inline-answer 306 paper locally without AI"
   assert.equal(result.questions.length, 152);
   assert.equal(result.report.answeredCount, 152);
   assert.deepEqual(result.report.missingSourceNumbers, [...missing].map(String));
-  assert.deepEqual(result.report.typeCounts, { A: 105, B: 20, C: 0, X: 27 });
+  assert.deepEqual(result.report.typeCounts, { A: 105, B: 20, X: 27 });
   assert.equal(result.questions.find((question) => question.sourceNumber === "136")?.multiple, true);
+});
+
+test("parses the fixed post-2017 306 B section as paired A-D questions without a C gap", async () => {
+  const { detectWestern306Blueprint, parseModernWestern306Questions } = await loadMedicalAiImport();
+  const source = `2017年全国硕士研究生招生考试西医综合试题
+二、B 型题：116～135小题。A、B、C、D 是其下两道小题的备选项
+A.甲 B.乙 C.丙 D.丁
+116.第一道共用选项题
+117.第二道共用选项题
+A.戊 B.己 C.庚 D.辛
+118.第三道共用选项题
+119.第四道共用选项题
+三、X 型题：136～165小题`;
+  const blueprint = detectWestern306Blueprint("2017年考研西医综合真题.pdf", `${source}\nC型题广告噪声`);
+  const questions = parseModernWestern306Questions(source, "2017 西综").filter((question) => Number(question.sourceNumber) >= 116);
+  assert.equal(blueprint.format, "modern-165");
+  assert.deepEqual(questions.map((question) => question.sourceNumber), ["116", "117", "118", "119"]);
+  assert.ok(questions.every((question) => question.options.map((option) => option.label).join("") === "ABCD"));
+  assert.deepEqual(questions.slice(0, 2).map((question) => question.sharedOptionGroup), ["modern-306-b-116-117", "modern-306-b-116-117"]);
 });
 
 test("imports inline-answer Word banks and chapter-scoped medical answer tables", async () => {
@@ -507,7 +573,7 @@ test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recogn
   assert.match(fileImport, /enhanceOcrCanvas/);
   assert.match(fileImport, /chi_sim", "eng/);
   assert.match(fileImport, /user_defined_dpi: "300"/);
-  assert.match(fileImport, /rotateAuto: true/);
+  assert.match(fileImport, /rotateAuto: !hasGreenAnswerKeys/);
   assert.match(fileImport, /signal\?: AbortSignal/);
   assert.match(fileImport, /mergedTexts\[pageNumber - 1\]/);
   assert.match(page, /取消当前导入/);
@@ -534,7 +600,7 @@ test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recogn
   assert.match(page, /西综 306 标准化工作台/);
   assert.match(page, /本地确定性识别/);
   assert.match(page, /AI 标准化超过了网页网关的等待时间/);
-  assert.match(page, /现代 165 题 \/ 300 分结构/);
+  assert.match(page, /固定 165 题 \/ 300 分结构/);
   assert.match(aiImportRoute, /Promise\.allSettled/);
   assert.match(aiImportRoute, /480_000/);
   assert.match(emailRoute, /垃圾邮件 \/ Spam 文件夹/);
@@ -1069,7 +1135,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.4\.10"/);
+  assert.match(packageJson, /"version": "1\.4\.11"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);

@@ -1,4 +1,5 @@
 import { parseQuestionText, type QuizQuestion } from "./question-parser";
+import { greenAnswerTableFromPdfItems, greenAnswerTableFromTsv, mergeAnswerTables, pdfPageTextWithHighlightedAnswers } from "./pdf-answer-highlights";
 
 export type ImportUpdate = { phase: string; progress: number; detail: string };
 
@@ -139,16 +140,14 @@ async function extractPdf(file: File, onUpdate: (update: ImportUpdate) => void, 
   const cancelPdf = () => { void closePdf(); };
   signal?.addEventListener("abort", cancelPdf, { once: true });
   const pageTexts: string[] = [];
+  const pageTextItems: Array<Array<Record<string, unknown>>> = [];
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     assertImportActive(signal);
     const page = await pdf.getPage(pageNumber);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item) => "str" in item ? `${item.str}${item.hasEOL ? "\n" : " "}` : "")
-      .join("")
-      .replace(/[ \t]+\n/g, "\n")
-      .trim();
+    const [content, operatorList] = await Promise.all([page.getTextContent(), page.getOperatorList()]);
+    pageTextItems.push(content.items as Array<Record<string, unknown>>);
+    const pageText = pdfPageTextWithHighlightedAnswers(content.items, operatorList, pdfjs.OPS).trim();
     pageTexts.push(pageText);
     onUpdate({
       phase: "提取 PDF 文字",
@@ -158,13 +157,19 @@ async function extractPdf(file: File, onUpdate: (update: ImportUpdate) => void, 
   }
 
   const extracted = pageTexts.map((pageText, index) => `[[PAGE ${index + 1}]]\n${pageText}`).join("\n");
-  const pagesToOcr = pageTexts.map((pageText, index) => ({ pageText, index })).filter((item) => pdfPageNeedsOcr(item.pageText));
+  const hasGreenAnswerKeys = pageTexts.some((pageText) => /答案为绿色的选项|绿色.*选项/.test(pageText));
+  const pagesToOcr = pageTexts.map((pageText, index) => ({ pageText, index }))
+    .filter((item) => hasGreenAnswerKeys || pdfPageNeedsOcr(item.pageText));
   if (!pagesToOcr.length) {
     await closePdf();
     return { text: extracted, usedOcr: false };
   }
 
-  onUpdate({ phase: "启动 OCR", progress: 48, detail: `检测到 ${pagesToOcr.length} 个低质量或扫描页，将进行高清双语识别` });
+  onUpdate({
+    phase: hasGreenAnswerKeys ? "读取彩色答案" : "启动 OCR",
+    progress: 48,
+    detail: hasGreenAnswerKeys ? `检测到绿色答案版式，将逐页提取 A-D 正确项` : `检测到 ${pagesToOcr.length} 个低质量或扫描页，将进行高清双语识别`,
+  });
   const { createWorker } = await import("tesseract.js");
   assertImportActive(signal);
   let currentPage = 0;
@@ -213,10 +218,19 @@ async function extractPdf(file: File, onUpdate: (update: ImportUpdate) => void, 
       } finally {
         signal?.removeEventListener("abort", cancelRender);
       }
-      enhanceOcrCanvas(context, canvas.width, canvas.height);
-      const result = await worker.recognize(canvas, { rotateAuto: true });
+      const colorPixels = hasGreenAnswerKeys ? context.getImageData(0, 0, canvas.width, canvas.height).data : null;
+      if (!hasGreenAnswerKeys) enhanceOcrCanvas(context, canvas.width, canvas.height);
+      const result = await worker.recognize(canvas, { rotateAuto: !hasGreenAnswerKeys }, hasGreenAnswerKeys ? { text: true, tsv: true } : { text: true });
       const recognized = result.data.text.replace(/[ \t]+\n/g, "\n").replace(/\n{4,}/g, "\n\n").trim();
-      if (recognized.length > pagesToOcr[ocrIndex].pageText.length) mergedTexts[pageNumber - 1] = recognized;
+      if (hasGreenAnswerKeys && colorPixels && result.data.tsv) {
+        const answerTable = mergeAnswerTables(
+          greenAnswerTableFromPdfItems(pageTextItems[pageNumber - 1], colorPixels, canvas.width, canvas.height, viewport),
+          greenAnswerTableFromTsv(result.data.tsv, colorPixels, canvas.width, canvas.height),
+        );
+        mergedTexts[pageNumber - 1] = `${pagesToOcr[ocrIndex].pageText}${answerTable ? `\n参考答案（绿色选项）\n${answerTable}` : ""}`;
+      } else if (recognized.length > pagesToOcr[ocrIndex].pageText.length) {
+        mergedTexts[pageNumber - 1] = recognized;
+      }
       onUpdate({ phase: "OCR 文字识别", progress: 50 + Math.round(((ocrIndex + 1) / pagesToOcr.length) * 38), detail: `已识别 ${ocrIndex + 1} / ${pagesToOcr.length} 个扫描页（第 ${pageNumber} 页）` });
       canvas.width = 1;
       canvas.height = 1;

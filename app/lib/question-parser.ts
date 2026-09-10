@@ -200,11 +200,13 @@ function removeAnswerNotation(value: string) {
 
 function inlineAnswerFromBody(body: string) {
   const explicit = body.match(/(?:正确)?答案\s*[:：]\s*([A-GＡ-Ｇ、，,\s]+)/i);
+  const markedOptions = [...body.matchAll(/(?:^|\n)\s*([A-GＡ-Ｇ])\s*[.．、)）][^\n]*?(?:[（(【\[]\s*(?:正确(?:答案)?|答案)\s*[）)】\]]|[✓✔√])\s*$/gim)]
+    .map((match) => normalizeLabel(match[1]));
   const stemArea = body.slice(0, optionMarkers(body)[0]?.index ?? body.length);
   const trailing = stemArea.match(/(?:[:：]|[（(])\s*([A-GＡ-Ｇ]{1,7})\s*[）)]?\s*$/i);
   const underlined = stemArea.match(/(?:[_＿]{2,}\s*[。．.]?\s*([A-GＡ-Ｇ]{1,7})|[_＿]\s*([A-GＡ-Ｇ]{1,7})\s*[_＿]\s*[。．.]?)\s*$/i);
   const value = explicit?.[1] ?? trailing?.[1] ?? underlined?.[1] ?? underlined?.[2] ?? "";
-  return [...new Set((value.match(/[A-GＡ-Ｇ]/gi) ?? []).map(normalizeLabel))];
+  return [...new Set([...(value.match(/[A-GＡ-Ｇ]/gi) ?? []).map(normalizeLabel), ...markedOptions])];
 }
 
 function answerKey(chapter: string, kind: GeneralQuestionKind, number: string) {
@@ -381,7 +383,9 @@ function parseGeneralMedicalQuestions(text: string, category: string): QuizQuest
       const end = markers[optionIndex + 1]?.index ?? bodyWithoutAnswer.length;
       return {
         label: marker.label,
-        text: bodyWithoutAnswer.slice(marker.end, end).replace(/\n+/g, " ").replace(/\s+/g, " ").trim(),
+        text: bodyWithoutAnswer.slice(marker.end, end)
+          .replace(/(?:[（(【\[]\s*(?:正确(?:答案)?|答案)\s*[）)】\]]|[✓✔√])\s*$/i, " ")
+          .replace(/\n+/g, " ").replace(/\s+/g, " ").trim(),
       };
     }).filter((option) => option.text);
     const uniqueOptions = [...new Map(options.map((option) => [option.label, option])).values()];
@@ -504,6 +508,7 @@ function parseLooseObjectiveQuestions(text: string, category = "导入题库"): 
         label: marker.label,
         text: body.slice(marker.end, optionEnd)
           .replace(/(?:正确)?答案\s*[:：]\s*[A-GＡ-Ｇ、，,\s]+/gi, " ")
+          .replace(/(?:[（(【\[]\s*(?:正确(?:答案)?|答案)\s*[）)】\]]|[✓✔√])\s*$/i, " ")
           .replace(/\n+/g, " ")
           .replace(/\s+/g, " ")
           .trim(),

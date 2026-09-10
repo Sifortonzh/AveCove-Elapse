@@ -1,4 +1,4 @@
-import type { MedicalQuestionType as DetailedMedicalQuestionType, QuizOption, QuizQuestion, Western306Format } from "./question-parser";
+import { parseQuestionText, type MedicalQuestionType as DetailedMedicalQuestionType, type QuizOption, type QuizQuestion, type Western306Format } from "./question-parser";
 
 export type MedicalExamProfile = "general" | "western-medicine-306";
 export type MedicalQuestionType = "A" | "B" | "C" | "X";
@@ -107,7 +107,10 @@ export function detectWestern306Blueprint(fileName: string, text = ""): Western3
   const year = yearMatch ? Number.parseInt(yearMatch[0], 10) : undefined;
   const detectedSections = detectSectionRanges(sample);
   const hasLegacyC = detectedSections.some((section) => section.questionType === "C") || /C\s*型题/i.test(sample);
-  const modern = !hasLegacyC && ((year ?? 0) >= 2017 || /(?:136\s*[-—~～至]\s*165|共\s*165\s*题|满分\s*300)/i.test(sample));
+  // OCR noise from a footer or explanation page must not downgrade a modern
+  // paper merely because it contains a stray "C 型题" fragment.
+  const modern = (year ?? 0) >= 2017
+    || (!hasLegacyC && /(?:136\s*[-—~～至]\s*165|共\s*165\s*题|满分\s*300)/i.test(sample));
   if (modern) {
     return {
       year,
@@ -161,6 +164,85 @@ export function western306SubjectForQuestion(question: QuizQuestion): Western306
   return WESTERN_306_SUBJECTS.find((subject) => subject.ranges.some(([start, end]) => number >= start && number <= end))?.id;
 }
 
+function western306Category(sourceNumber: string) {
+  const number = Number.parseInt(sourceNumber, 10);
+  if (number >= 108 && number <= 115) return "医学人文";
+  return WESTERN_306_SUBJECTS.find((subject) => subject.ranges.some(([start, end]) => number >= start && number <= end))?.label ?? "西医综合";
+}
+
+function parseModernWestern306BQuestions(text: string, category: string): QuizQuestion[] {
+  const normalized = text.replace(/\r/g, "").replace(/^\[\[PAGE\s+\d+\]\]\s*$/gim, "");
+  const bStart = normalized.search(/(?:^|\n)\s*(?:二[、.．]\s*)?B\s*型题/i);
+  const xStart = normalized.search(/(?:^|\n)\s*(?:三[、.．]\s*)?X\s*型题/i);
+  if (bStart < 0 || xStart <= bStart) return [];
+  const section = normalized.slice(bStart, xStart);
+  const anchors = [...section.matchAll(/(?:^|\n)\s*(1(?:1[6-9]|2\d|3[0-5]))\s*[.．、]\s*/g)];
+  const anchorByNumber = new Map(anchors.map((anchor) => [Number(anchor[1]), anchor]));
+  const parsed: QuizQuestion[] = [];
+
+  const parsePool = (body: string) => {
+    const markers = [...body.matchAll(/(?:^|\n|\s)([A-DＡ-Ｄ])\s*[.．、]\s*/g)];
+    const accepted = markers.slice(-4);
+    if (accepted.length !== 4 || accepted.map((marker) => marker[1].toUpperCase()).join("") !== "ABCD") return [];
+    return accepted.map((marker, index) => {
+      const start = (marker.index ?? 0) + marker[0].length;
+      const end = accepted[index + 1]?.index ?? body.length;
+      return { label: marker[1].toUpperCase(), text: body.slice(start, end).replace(/\s+/g, " ").trim() };
+    }).filter((option) => option.text);
+  };
+
+  for (let number = 116; number <= 135; number += 2) {
+    const first = anchorByNumber.get(number);
+    const second = anchorByNumber.get(number + 1);
+    if (!first || !second) continue;
+    const firstIndex = first.index ?? 0;
+    const secondIndex = second.index ?? 0;
+    const previous = anchorByNumber.get(number - 1);
+    const poolSearchStart = previous ? (previous.index ?? 0) + previous[0].length : 0;
+    const options = parsePool(section.slice(poolSearchStart, firstIndex));
+    if (options.length !== 4) continue;
+    const nextPair = anchorByNumber.get(number + 2);
+    const firstStem = section.slice(firstIndex + first[0].length, secondIndex).replace(/\s+/g, " ").trim();
+    const secondSlice = section.slice(secondIndex + second[0].length, nextPair?.index ?? section.length);
+    const poolOffset = secondSlice.search(/(?:^|\n)\s*A\s*[.．、]/m);
+    const secondStem = (poolOffset >= 0 ? secondSlice.slice(0, poolOffset) : secondSlice).replace(/\s+/g, " ").trim();
+    [firstStem, secondStem].forEach((stem, index) => {
+      if (!stem) return;
+      const sourceNumber = String(number + index);
+      parsed.push({
+        id: `modern-306-b-${sourceNumber}`,
+        sourceNumber,
+        category: western306Category(sourceNumber) || category,
+        stem,
+        options: options.map((option) => ({ ...option })),
+        answer: [],
+        answerPending: true,
+        multiple: false,
+        questionType: "B",
+        medicalQuestionType: "B1",
+        sharedOptionGroup: `modern-306-b-${number}-${number + 1}`,
+      });
+    });
+  }
+  return parsed;
+}
+
+export function parseModernWestern306Questions(text: string, category = "西医综合 306") {
+  const generic = parseQuestionText(text.replace(/^\[\[PAGE\s+\d+\]\]\s*$/gim, ""), category);
+  const bQuestions = parseModernWestern306BQuestions(text, category);
+  const selected = new Map<string, QuizQuestion>();
+  [...generic, ...bQuestions].forEach((question) => {
+    const number = Number.parseInt(question.sourceNumber.match(/\d+/)?.[0] ?? "", 10);
+    if (!Number.isFinite(number) || number < 1 || number > 165) return;
+    const sourceNumber = String(number);
+    const current = selected.get(sourceNumber);
+    const quality = question.stem.length + question.options.reduce((sum, option) => sum + option.text.length, 0);
+    const currentQuality = current ? current.stem.length + current.options.reduce((sum, option) => sum + option.text.length, 0) : -1;
+    if (!current || quality > currentQuality || (number >= 116 && number <= 135 && question.questionType === "B")) selected.set(sourceNumber, question);
+  });
+  return [...selected.values()].sort((left, right) => Number(left.sourceNumber) - Number(right.sourceNumber));
+}
+
 export function standardizeParsedWestern306Questions(
   fileName: string,
   text: string,
@@ -176,7 +258,13 @@ export function standardizeParsedWestern306Questions(
     const numericSourceNumber = Number(sourceNumber);
     if (numericSourceNumber < 1 || (blueprint.expectedQuestionCount && numericSourceNumber > blueprint.expectedQuestionCount)) continue;
     const metadata = western306Metadata(sourceNumber, blueprint);
-    const optionLabels = new Set(question.options.map((option) => option.label));
+    if (blueprint.format === "modern-165" && metadata.questionType !== "A" && metadata.questionType !== "B" && metadata.questionType !== "X") continue;
+    const normalizedOptions = [...new Map(question.options
+      .map((option) => ({ ...option, label: option.label.toUpperCase() }))
+      .filter((option) => /^[A-D]$/.test(option.label) && option.text.trim())
+      .map((option) => [option.label, option])).values()];
+    if (blueprint.format === "modern-165" && (normalizedOptions.length !== 4 || normalizedOptions.map((option) => option.label).join("") !== "ABCD")) continue;
+    const optionLabels = new Set(normalizedOptions.map((option) => option.label));
     const answer = [...new Set(question.answer)].filter((label) => optionLabels.has(label));
     const normalized: QuizQuestion = {
       ...question,
@@ -187,6 +275,8 @@ export function standardizeParsedWestern306Questions(
       questionType: metadata.questionType,
       points: metadata.points,
       multiple: metadata.questionType === "X",
+      category: western306Category(sourceNumber),
+      options: normalizedOptions,
       answer,
       answerPending: answer.length === 0,
       answerSource: question.answerSource || (answer.length ? "原卷题后参考答案" : undefined),
@@ -207,8 +297,13 @@ export function standardizeParsedWestern306Questions(
   const missingSourceNumbers = blueprint.expectedQuestionCount
     ? Array.from({ length: blueprint.expectedQuestionCount }, (_, index) => String(index + 1)).filter((number) => !knownNumbers.has(number))
     : [];
-  const structurallyComplete = questions.every((question) => {
-    if (!question.stem.trim() || question.options.length < 2 || !question.answer.length) return false;
+  const questionStructureComplete = questions.every((question) => {
+    if (!question.stem.trim() || question.options.length !== 4) return false;
+    if (question.options.map((option) => option.label).join("") !== "ABCD") return false;
+    return question.questionType === "A" || question.questionType === "B" || question.questionType === "X";
+  });
+  const answerStructureComplete = questions.every((question) => {
+    if (!question.answer.length) return false;
     if (question.questionType !== "X" && question.answer.length !== 1) return false;
     const labels = new Set(question.options.map((option) => option.label));
     return question.answer.every((label) => labels.has(label));
@@ -216,13 +311,13 @@ export function standardizeParsedWestern306Questions(
   const minimumFastPathCount = blueprint.expectedQuestionCount
     ? Math.max(40, blueprint.expectedQuestionCount - 20)
     : 80;
-  const typeCounts = Object.fromEntries(["A", "B", "C", "X"].map((type) => [
+  const typeCounts = Object.fromEntries(["A", "B", "X"].map((type) => [
     type,
     questions.filter((question) => question.questionType === type).length,
   ]));
 
   return {
-    usable: questions.length >= minimumFastPathCount && structurallyComplete,
+    usable: blueprint.format === "modern-165" && questions.length >= minimumFastPathCount && questionStructureComplete,
     questions,
     report: {
       profile: "western-medicine-306",
@@ -237,7 +332,7 @@ export function standardizeParsedWestern306Questions(
       missingSourceNumbers,
       duplicateSourceNumbers: [...duplicateSourceNumbers],
       reconciledAnswerCount: 0,
-      oneToOneVerified: missingSourceNumbers.length < 10 && structurallyComplete,
+      oneToOneVerified: missingSourceNumbers.length < 10 && questionStructureComplete && answerStructureComplete,
       suggestedGroupName: "考研西综306",
       warnings: [],
     },
@@ -685,10 +780,10 @@ export function buildMedicalImportPrompt(input: {
   const profileRules = input.profile === "western-medicine-306" ? [
     `这是考研西医综合 306，年份：${blueprint.year ?? "未确定"}，版式：${blueprint.format}。${sectionSummary || "必须依据原文标题识别 A/B/C/X 分区，不可套用错误年份的题号范围。"}。`,
     blueprint.format === "modern-165"
-      ? "现代卷共 165 题、满分 300 分：A 型 1-115，B 型 116-135，X 型 136-165。"
+      ? "现代卷共 165 题、满分 300 分：A 型 1-115，B 型 116-135，X 型 136-165；没有 C 型题。每题必须且只能有 A、B、C、D 四个选项，禁止输出 E 或更多选项。"
       : "旧卷可能含 C 型题。C 型题的 A/B 是两条来源陈述，答案编码为：A=仅 A 正确，B=仅 B 正确，C=两者均正确，D=两者均不正确；C 型不是多选题。",
-    "B 型题必须把共用的 A-D 备选项复制到每道关联题，并为同组题填写相同 sharedOptionGroup。",
-    "C 型题必须保留两条来源陈述和 A/B/C/D 判定选项，并为同组题填写相同 sharedOptionGroup。",
+    "B 型题必须把共用的 A-D 四个备选项复制到每道关联题，并为同组题填写相同 sharedOptionGroup。",
+    ...(blueprint.format === "modern-165" ? [] : ["C 型题必须保留两条来源陈述和 A/B/C/D 判定选项，并为同组题填写相同 sharedOptionGroup。"]),
     "X 型题仅记录文件明确给出的全部正确选项，不得按医学知识猜测。",
   ] : [
     "医学客观题型包括 A1、A2、A3、A4、B1、C、X。只整理这些客观题；跳过填空题、名词解释、简答题、问答题及病例论述题。",
