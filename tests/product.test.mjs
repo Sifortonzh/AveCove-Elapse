@@ -46,6 +46,12 @@ async function loadQuestionParser() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadQuestionEdit() {
+  const source = (await text("app/lib/question-edit.ts")).replace(/^import type .*?;\n/, "");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 async function loadMineruImport() {
   const source = (await text("app/lib/mineru-import.ts")).replace(/^import .*?;\n/, "");
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -649,7 +655,15 @@ test("persists in-practice question corrections into sync and shared banks", asy
   assert.match(page, /修订题目与标准答案/);
   assert.match(page, /标准答案已模糊保护/);
   assert.match(page, /显示并修订答案/);
-  assert.match(page, /const \[answerVisible, setAnswerVisible\] = useState\(false\)/);
+  assert.match(page, /setAnswerVisible\] = useState\(creating \|\| question\.answer\.length === 0\)/);
+  assert.match(page, /本题暂无答案，请在这里手动补录/);
+  assert.match(page, /可手动纠正 A1、A2、A3、A4、B1、C、X 型/);
+  assert.match(page, /＋ 添加选项/);
+  assert.match(page, /function insertQuestionAfterCurrent/);
+  assert.match(page, /在当前题后新增一道题/);
+  assert.match(page, /后续连续原题号会自动顺延/);
+  assert.match(page, /原题解析 <small>可选<\/small>/);
+  assert.match(page, /questions: result\.questions/);
   assert.match(page, /原文件答案可能受教材版本、指南更新或识别误差影响/);
   assert.match(page, /当前题库、多端同步与后续分享都会使用这个版本/);
   assert.match(page, /questions: replaceQuestion\(bank\.questions\)/);
@@ -659,6 +673,40 @@ test("persists in-practice question corrections into sync and shared banks", asy
   assert.match(styles, /\.answer-edit-mask/);
   assert.match(styles, /filter:blur\(7px\)/);
   assert.match(styles, /\.answer-revision-warning/);
+  assert.match(styles, /\.question-type-edit-section/);
+  assert.match(styles, /\.add-option-button/);
+});
+
+test("inserts a complete manual question and shifts the following continuous source numbers", async () => {
+  const { insertQuestionAfter } = await loadQuestionEdit();
+  const makeQuestion = (id, sourceNumber) => ({
+    id, sourceNumber, category: "第一章", stem: id,
+    options: [{ label: "A", text: "甲" }, { label: "B", text: "乙" }],
+    answer: ["A"], multiple: false,
+  });
+  const draft = {
+    ...makeQuestion("draft", "待自动编号"),
+    stem: " 新增题干 ",
+    options: [{ label: "A", text: " 选项甲 " }, { label: "B", text: "选项乙" }],
+    answer: ["B"],
+    explanation: " 可选解析 ",
+    medicalQuestionType: "A2",
+    questionType: "A",
+  };
+  const result = insertQuestionAfter(
+    [makeQuestion("q11", "11"), makeQuestion("q12", "12"), makeQuestion("q13", "13")],
+    "q11",
+    draft,
+    () => "manual-new",
+  );
+
+  assert.deepEqual(result.questions.map((question) => question.sourceNumber), ["11", "12", "13", "14"]);
+  assert.equal(result.questions[1].id, "manual-new");
+  assert.equal(result.questions[1].stem, "新增题干");
+  assert.equal(result.questions[1].options[0].text, "选项甲");
+  assert.deepEqual(result.questions[1].answer, ["B"]);
+  assert.equal(result.questions[1].explanation, "可选解析");
+  assert.equal(result.questions[1].answerSource, "manual");
 });
 
 test("ships an isolated, responsive English learning demo", async () => {
@@ -1021,7 +1069,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.4\.9"/);
+  assert.match(packageJson, /"version": "1\.4\.10"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);

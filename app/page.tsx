@@ -5,12 +5,12 @@ import Image from "next/image";
 import {
   AlertCircle, ArrowDown, ArrowRight, ArrowUp, BookOpen, Bot, BrainCircuit, Check, CheckCircle2,
   ChevronLeft, ChevronRight, CircleHelp, Clock3, Cloud, Download, FileText, Home, Import,
-  Copy, Database, ExternalLink, Eye, EyeOff, GripVertical, Languages, Library, Lightbulb, Link2, ListChecks, MessageCircle, Moon, NotebookPen, Pencil, Play,
+  Copy, Database, ExternalLink, Eye, EyeOff, GripVertical, Languages, Library, Lightbulb, Link2, ListChecks, MessageCircle, Moon, NotebookPen, Pencil, Play, Plus,
   RefreshCw, RotateCcw, ScanText, Search, Send, Settings2, Share2, ShieldCheck, Shuffle, Sparkles,
   Scissors, Star, Sun, Target, Trash2, Upload, X, Zap,
 } from "lucide-react";
 import questionBank from "./questions.json";
-import { AnnotatedOption, AiDialogue, InkNote, NoteImages, ChapterDirectory } from "./components/PracticeExtras";
+import { AnnotatedOption, AiDialogue, ChapterDirectory } from "./components/PracticeExtras";
 import EnglishLearningView from "./components/EnglishLearningView";
 import { extractQuestionFileText, importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
 import {
@@ -26,7 +26,7 @@ import {
   learningRecordsEqual, mergeLearningRecords, normalizeLearningRecords, stampLearningRecord,
   type RecordLedger,
 } from "./lib/record-sync";
-import { parseQuestionText, type QuizQuestion } from "./lib/question-parser";
+import { parseQuestionText, type MedicalQuestionType, type QuizQuestion } from "./lib/question-parser";
 import { isMineruHybridJson, parseMineruHybridQuestionBank } from "./lib/mineru-import";
 import {
   standardizeParsedWestern306Questions, WESTERN_306_SUBJECTS, western306Score,
@@ -35,6 +35,7 @@ import {
 import { suggestQuestionBankGroup } from "./lib/bank-grouping";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
+import { insertQuestionAfter } from "./lib/question-edit";
 
 type Progress = Record<string, "correct" | "wrong">;
 type Scope = "all" | "unanswered" | "wrong" | "favorite";
@@ -1364,6 +1365,43 @@ export default function HomePage() {
     setToast("题目修订已保存 ✏️✨ 当前题库、多端同步与后续分享都会使用这个版本。");
   }
 
+  async function insertQuestionAfterCurrent(afterQuestionId: string, draft: QuizQuestion) {
+    const baseQuestions = activeBankId
+      ? questionBanks.find((candidate) => candidate.id === activeBankId)?.questions
+      : questions;
+    if (!baseQuestions) throw new Error("当前题库暂时无法写入，请返回“我的题库”后重试");
+    const result = insertQuestionAfter(baseQuestions, afterQuestionId, draft);
+    let saved: SavedQuestionBank;
+    if (activeBankId) {
+      const bank = questionBanks.find((candidate) => candidate.id === activeBankId);
+      if (!bank) throw new Error("当前题库暂时无法写入，请返回“我的题库”后重试");
+      saved = await saveQuestionBank({ ...bank, questions: result.questions, updatedAt: new Date().toISOString() }, true);
+      setQuestionBanks((banks) => banks.map((candidate) => candidate.id === saved.id ? saved : candidate));
+    } else {
+      saved = await saveQuestionBank({
+        id: `expanded-demo-${Date.now()}`,
+        name: `${bankName}（已补题）`,
+        description: "由演示题库在刷题过程中手动补充题目并保存。",
+        questions: result.questions,
+        importedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, true);
+      setActiveBankId(saved.id);
+      setBankName(saved.name);
+      setQuestionBanks((banks) => [saved, ...banks.filter((candidate) => candidate.id !== saved.id)]);
+    }
+    const savedById = new Map(saved.questions.map((question) => [question.id, question]));
+    setQuestions(saved.questions);
+    setSessionQuestions((session) => {
+      const updated = session.map((question) => savedById.get(question.id) ?? question);
+      const currentSessionIndex = updated.findIndex((question) => question.id === afterQuestionId);
+      if (currentSessionIndex < 0) return updated;
+      updated.splice(currentSessionIndex + 1, 0, result.inserted);
+      return updated;
+    });
+    setToast(`新题已插入为原题号 ${result.inserted.sourceNumber}，后续连续题号已自动顺延 ➕📚`);
+  }
+
   async function removeSavedBank(id: string) {
     await deleteQuestionBank(id);
     setQuestionBanks((banks) => banks.filter((bank) => bank.id !== id));
@@ -1510,6 +1548,7 @@ export default function HomePage() {
           onAi={askAi}
           onMobilePanel={() => setShowMobilePanel((value) => !value)}
           onEditQuestion={reviseCurrentQuestion}
+          onAddQuestion={insertQuestionAfterCurrent}
           knownNoteTags={knownNoteTags}
         />
       ) : (
@@ -2089,9 +2128,11 @@ function QuizView(props: {
   onOpenRelated: (questionId: string) => void;
   onUpdateKilled: (questionIds: string[], killed: boolean) => void;
   onEditQuestion: (question: QuizQuestion) => Promise<void>;
+  onAddQuestion: (afterQuestionId: string, question: QuizQuestion) => Promise<void>;
   knownNoteTags: string[];
 }) {
   const [editingQuestion, setEditingQuestion] = useState(false);
+  const [addingQuestion, setAddingQuestion] = useState<QuizQuestion | null>(null);
   const [showKillQuestions, setShowKillQuestions] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
   const { current, currentIndex, total, selected, excluded, submitted, studyMode, result, favorite, note, aiMode, aiTexts, aiLoading, examScore } = props;
@@ -2106,12 +2147,24 @@ function QuizView(props: {
     : blind
       ? answerAvailable ? "选择后不会立即判题；可继续下一题，想核对时再点“对答案”" : "答案尚未导入：选择会先保留，之后可导入答案统一核对"
       : answerAvailable ? current.multiple ? "本题有多个正确答案，请选择所有符合项" : "请选择一个最符合题意的答案" : "答案尚未导入：先按测试模式作答，之后可在“我的题库”导入答案并一键核对";
+  const beginAddingQuestion = () => setAddingQuestion({
+    id: "manual-draft",
+    sourceNumber: "待自动编号",
+    category: current.category,
+    stem: "",
+    options: "ABCDE".split("").map((label) => ({ label, text: "" })),
+    answer: [],
+    answerPending: true,
+    multiple: false,
+    questionType: "A",
+    medicalQuestionType: "A1",
+  });
   return <div className="quiz-shell">
     <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b>正确率 {props.accuracy.toFixed(2)}% · {currentIndex + 1} / {total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
         <button className="question-previous-top subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>
-        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题"><Scissors size={16} />{props.killed ? "已斩" : "斩"}</button><button className="question-search-trigger" onClick={props.onSearch}><Search size={16} />搜题</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)}><Pencil size={16} />纠错编辑</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已精选" : "精选"}</button></div></div>
+        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题"><Scissors size={16} />{props.killed ? "已斩" : "斩"}</button><button className="question-search-trigger" onClick={props.onSearch}><Search size={16} />搜题</button><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题"><Plus size={16} />新增题目</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)}><Pencil size={16} />纠错编辑</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已精选" : "精选"}</button></div></div>
         {props.killed && <div className="killed-question-banner"><Scissors size={18} /><div><strong>本题已斩</strong><span>会被后续练习跳过，不计入正确率；可随时恢复。</span></div><button onClick={() => props.onUpdateKilled([current.id], false)}>恢复本题</button></div>}
         {current.sharedStem && <section className="shared-medical-stem"><span>{current.medicalQuestionType === "A4" ? "递进病例" : "共用题干"}</span><p>{current.sharedStem}</p></section>}
         {props.relatedQuestions.length > 1 && <section className="linked-question-group"><header><div><strong>同组题目</strong><span>{props.relatedQuestions.length} 题共用{current.medicalQuestionType === "B1" ? "备选答案" : "题干"}，可直接切换</span></div></header><div>{props.relatedQuestions.map((question) => <button key={question.id} className={`${question.id === current.id ? "active" : ""} ${props.relatedProgress[question.id] ?? ""}`} onClick={() => props.onOpenRelated(question.id)}><b>{question.sourceNumber}</b><span>{question.stem}</span>{props.relatedProgress[question.id] === "correct" ? <Check size={14} /> : props.relatedProgress[question.id] === "wrong" ? <X size={14} /> : null}</button>)}</div></section>}
@@ -2136,6 +2189,7 @@ function QuizView(props: {
       {props.mobilePanel && <div className="mobile-learning"><button className="drawer-close" aria-label="关闭学习区" onClick={props.onMobilePanel}><X /></button><LearningPanel onSearchNotes={props.onSearchNotes} current={current} submitted={submitted && answerAvailable} note={note} knownNoteTags={props.knownNoteTags} aiMode={aiMode} aiTexts={aiTexts} aiLoading={aiLoading} account={props.account} onNote={props.onNote} onAi={props.onAi} /></div>}
       {showChapters && <ChapterDirectory questions={props.bankQuestions} onOpen={props.onOpenQuestion} onClose={() => setShowChapters(false)} />}
       {editingQuestion && <QuestionCorrectionModal question={current} onSave={props.onEditQuestion} onClose={() => setEditingQuestion(false)} />}
+      {addingQuestion && <QuestionCorrectionModal creating question={addingQuestion} onSave={(question) => props.onAddQuestion(current.id, question)} onClose={() => setAddingQuestion(null)} />}
       {showKillQuestions && <KillQuestionsModal current={current} questions={props.bankQuestions} killed={props.killed} onApply={(ids, killed) => { props.onUpdateKilled(ids, killed); setShowKillQuestions(false); }} onClose={() => setShowKillQuestions(false)} />}
   </div>;
 }
@@ -2168,27 +2222,40 @@ function KillQuestionsModal({ current, questions, killed, onApply, onClose }: {
   return <div className="modal-layer" onMouseDown={onClose}><section className="kill-question-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>SKIP WITHOUT SCORING</span><h2>斩题</h2><p>斩掉的题会直接跳过，答题卡以斜杠标记，不计入做题数、正确率或 306 得分。</p></div><button onClick={onClose} aria-label="关闭"><X /></button></header><button className={killed ? "restore-current" : "kill-current"} onClick={() => onApply([current.id], !killed)}>{killed ? <RotateCcw /> : <Scissors />}<span><strong>{killed ? "恢复当前题" : "斩掉当前题"}</strong><small>原题号 {current.sourceNumber} · {current.category}</small></span></button><div className="batch-kill-section"><label htmlFor="kill-question-range">批量斩题 · 当前章节原题号</label><input id="kill-question-range" value={range} onChange={(event) => setRange(event.target.value)} placeholder="例如：1-31，35，40-42" /><p>将在“{current.category}”中匹配 {matched.length} 题；不会波及其他章节的同号题。</p><button disabled={!matched.length} onClick={() => onApply(matched.map((question) => question.id), true)}><Scissors size={17} />确认批量斩题</button></div></section></div>;
 }
 
-function QuestionCorrectionModal({ question, onSave, onClose }: {
+function QuestionCorrectionModal({ question, creating = false, onSave, onClose }: {
   question: QuizQuestion;
+  creating?: boolean;
   onSave: (question: QuizQuestion) => Promise<void>;
   onClose: () => void;
 }) {
   const [stem, setStem] = useState(question.stem);
   const [options, setOptions] = useState(question.options.map((option) => ({ ...option })));
   const [answer, setAnswer] = useState([...question.answer]);
-  const [allowMultiple, setAllowMultiple] = useState(question.questionType === "X" || question.multiple);
-  const [answerVisible, setAnswerVisible] = useState(false);
+  const [medicalType, setMedicalType] = useState<MedicalQuestionType>(question.medicalQuestionType
+    ?? (question.questionType === "B" ? "B1" : question.questionType === "C" ? "C" : question.questionType === "X" ? "X" : "A1"));
+  const [explanation, setExplanation] = useState(question.explanation ?? "");
+  const [answerVisible, setAnswerVisible] = useState(creating || question.answer.length === 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const fixedExamType = Boolean(question.questionType);
+  const allowMultiple = medicalType === "X";
+  const medicalTypes: Array<{ id: MedicalQuestionType; name: string; detail: string }> = [
+    { id: "A1", name: "A1", detail: "单句单选" },
+    { id: "A2", name: "A2", detail: "病例单选" },
+    { id: "A3", name: "A3", detail: "共用病例" },
+    { id: "A4", name: "A4", detail: "递进病例" },
+    { id: "B1", name: "B1", detail: "共用备选" },
+    { id: "C", name: "C", detail: "配伍判断" },
+    { id: "X", name: "X", detail: "多选题" },
+  ];
   const normalizedOriginalAnswer = [...question.answer].sort().join("");
   const answerChanged = [...answer].sort().join("") !== normalizedOriginalAnswer
-    || allowMultiple !== (question.questionType === "X" || question.multiple);
+    || medicalType !== (question.medicalQuestionType
+      ?? (question.questionType === "B" ? "B1" : question.questionType === "C" ? "C" : question.questionType === "X" ? "X" : "A1"));
   const valid = Boolean(
     stem.trim()
     && options.length >= 2
     && options.every((option) => option.text.trim())
-    && (answer.length || (!question.answer.length && !answerVisible))
+    && (!creating || answer.length > 0)
     && answer.every((label) => options.some((option) => option.label === label)),
   );
 
@@ -2200,10 +2267,28 @@ function QuestionCorrectionModal({ question, onSave, onClose }: {
     }
   };
 
-  const changeAnswerMode = (multiple: boolean) => {
-    if (fixedExamType) return;
-    setAllowMultiple(multiple);
-    if (!multiple) setAnswer((current) => current.slice(0, 1));
+  const changeMedicalType = (nextType: MedicalQuestionType) => {
+    setMedicalType(nextType);
+    if (nextType !== "X") setAnswer((current) => current.slice(0, 1));
+  };
+
+  const addOption = () => {
+    const label = "ABCDEFG"[options.length];
+    if (!label) return;
+    setOptions((current) => [...current, { label, text: "" }]);
+  };
+
+  const removeOption = (index: number) => {
+    if (options.length <= 2) return;
+    const removedLabel = options[index]?.label;
+    const labelMap = new Map<string, string>();
+    const nextOptions = options.filter((_, optionIndex) => optionIndex !== index).map((option, optionIndex) => {
+      const nextLabel = "ABCDEFG"[optionIndex];
+      labelMap.set(option.label, nextLabel);
+      return { ...option, label: nextLabel };
+    });
+    setOptions(nextOptions);
+    setAnswer((current) => current.filter((label) => label !== removedLabel).map((label) => labelMap.get(label) ?? label));
   };
 
   const save = async () => {
@@ -2217,7 +2302,10 @@ function QuestionCorrectionModal({ question, onSave, onClose }: {
         options: options.map((option) => ({ ...option, text: option.text.trim() })),
         answer: [...answer].sort(),
         answerPending: answer.length === 0,
-        multiple: allowMultiple || answer.length > 1,
+        multiple: medicalType === "X",
+        questionType: medicalType === "B1" ? "B" : medicalType === "C" ? "C" : medicalType === "X" ? "X" : "A",
+        medicalQuestionType: medicalType,
+        explanation: explanation.trim() || undefined,
       });
       onClose();
     } catch (caught) {
@@ -2228,16 +2316,18 @@ function QuestionCorrectionModal({ question, onSave, onClose }: {
 
   return <div className="modal-layer question-edit-layer" onMouseDown={() => !busy && onClose()}>
     <section className="question-edit-modal" role="dialog" aria-modal="true" aria-labelledby="question-edit-title" onMouseDown={(event) => event.stopPropagation()}>
-      <header><div><span>QUESTION CORRECTION</span><h2 id="question-edit-title">修订题目与标准答案</h2><p>发现识别错字时可直接修正；保存后，题库同步与分享文件都会采用新版本。</p></div><button onClick={onClose} disabled={busy} aria-label="关闭纠错编辑"><X /></button></header>
+      <header><div><span>{creating ? "INSERT QUESTION" : "QUESTION CORRECTION"}</span><h2 id="question-edit-title">{creating ? "在当前题后新增一道题" : "修订题目与标准答案"}</h2><p>{creating ? "填写题型、题目、选项与答案；解析可选。保存后，后续连续原题号会自动顺延。" : "发现识别错字时可直接修正；保存后，题库同步与分享文件都会采用新版本。"}</p></div><button onClick={onClose} disabled={busy} aria-label={creating ? "关闭新增题目" : "关闭纠错编辑"}><X /></button></header>
       <div className="question-edit-scroll">
         <label className="question-edit-field"><span>题干</span><textarea value={stem} rows={4} onChange={(event) => setStem(event.target.value)} /></label>
-        <section className="option-edit-section"><div><strong>选项文字</strong><span>选项编号保持不变，避免影响已有作答记录</span></div>{options.map((option, index) => <label key={option.label}><b>{option.label}</b><textarea rows={2} value={option.text} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} /></label>)}</section>
-        <section className={`answer-edit-section ${answerVisible ? "revealed" : "concealed"}`}><header><div><strong>标准答案</strong><span>{answerVisible ? allowMultiple ? "可选择多个正确选项" : "仅选择一个正确选项" : "默认隐藏，避免只改文字时提前看到答案"}</span></div>{answerVisible && !fixedExamType && <div className="answer-type-switch"><button className={!allowMultiple ? "active" : ""} onClick={() => changeAnswerMode(false)}>单选</button><button className={allowMultiple ? "active" : ""} onClick={() => changeAnswerMode(true)}>多选</button></div>}</header>{answerVisible ? <div className="answer-edit-choices">{options.map((option) => <button key={option.label} className={answer.includes(option.label) ? "active" : ""} onClick={() => toggleAnswer(option.label)} aria-pressed={answer.includes(option.label)}><i>{answer.includes(option.label) && <Check size={15} />}</i><b>{option.label}</b><span>{option.text}</span></button>)}</div> : <div className="answer-edit-mask"><div className="answer-blur-preview" aria-hidden="true">{options.slice(0, 4).map((option) => <span key={option.label}><i /><b>{option.label}</b><em>{option.text}</em></span>)}</div><div className="answer-reveal-panel"><EyeOff /><div><strong>标准答案已模糊保护</strong><p>只修题干或选项时无需查看答案；确认需要纠正答案后再主动展开。</p></div><button onClick={() => setAnswerVisible(true)}><Eye size={17} />显示并修订答案</button></div></div>}</section>
-        {answerChanged && <div className="answer-revision-warning"><AlertCircle /><div><strong>改标准答案前，请再核对一次 ⚠️🩺</strong><p>原文件答案可能受教材版本、指南更新或识别误差影响；但手动修订也可能出错。请对照教材、官方答案或可靠解析再次核验后再保存哦 🔎✅</p></div></div>}
-        <div className="question-edit-impact"><ShieldCheck /><p>保存后，当前题库、多端同步和后续分享均使用修订版；已有首次评分记录会保留，当前掌握状态会按新答案重新核对。</p></div>
+        <section className="question-type-edit-section"><header><strong>医学题型</strong><span>可手动纠正 A1、A2、A3、A4、B1、C、X 型</span></header><div>{medicalTypes.map((type) => <button key={type.id} className={medicalType === type.id ? "active" : ""} onClick={() => changeMedicalType(type.id)}><b>{type.name}</b><span>{type.detail}</span></button>)}</div></section>
+        <section className="option-edit-section"><div><span><strong>题目选项</strong><small>缺字或漏项时可直接修改、删除或补充</small></span><button className="add-option-button" onClick={addOption} disabled={options.length >= 7}>＋ 添加选项</button></div>{options.map((option, index) => <label key={`${option.label}-${index}`}><b>{option.label}</b><textarea rows={2} value={option.text} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} /><button className="remove-option-button" onClick={() => removeOption(index)} disabled={options.length <= 2} aria-label={`删除 ${option.label} 选项`}><Trash2 size={16} /></button></label>)}</section>
+        <section className={`answer-edit-section ${answerVisible ? "revealed" : "concealed"}`}><header><div><strong>标准答案</strong><span>{answerVisible ? question.answer.length ? allowMultiple ? "X 型题可选择多个正确选项" : "请选择一个正确选项" : "本题暂无答案，请在这里手动补录" : "默认隐藏，避免只改文字时提前看到答案"}</span></div></header>{answerVisible ? <div className="answer-edit-choices">{options.map((option) => <button key={option.label} className={answer.includes(option.label) ? "active" : ""} onClick={() => toggleAnswer(option.label)} aria-pressed={answer.includes(option.label)}><i>{answer.includes(option.label) && <Check size={15} />}</i><b>{option.label}</b><span>{option.text || "待补充选项文字"}</span></button>)}</div> : <div className="answer-edit-mask"><div className="answer-blur-preview" aria-hidden="true">{options.slice(0, 4).map((option) => <span key={option.label}><i /><b>{option.label}</b><em>{option.text}</em></span>)}</div><div className="answer-reveal-panel"><EyeOff /><div><strong>标准答案已模糊保护</strong><p>只修题干或选项时无需查看答案；确认需要纠正答案后再主动展开。</p></div><button onClick={() => setAnswerVisible(true)}><Eye size={17} />显示并修订答案</button></div></div>}</section>
+        <label className="question-edit-field explanation-edit-field"><span>原题解析 <small>可选</small></span><textarea value={explanation} rows={4} onChange={(event) => setExplanation(event.target.value)} placeholder="可粘贴原资料解析、答案依据或版本说明；没有可留空" /></label>
+        {!creating && answerChanged && <div className="answer-revision-warning"><AlertCircle /><div><strong>改标准答案前，请再核对一次 ⚠️🩺</strong><p>原文件答案可能受教材版本、指南更新或识别误差影响；但手动修订也可能出错。请对照教材、官方答案或可靠解析再次核验后再保存哦 🔎✅</p></div></div>}
+        <div className="question-edit-impact"><ShieldCheck /><p>{creating ? "新题会插入当前题之后并写回题库；多端同步和后续分享都会采用含新增题目的版本。" : "保存后，当前题库、多端同步和后续分享均使用修订版；已有首次评分记录会保留，当前掌握状态会按新答案重新核对。"}</p></div>
         {error && <p className="question-edit-error"><AlertCircle size={17} />{error}</p>}
       </div>
-      <footer><button className="ghost-action" onClick={onClose} disabled={busy}>取消</button><button className="primary-action" onClick={() => void save()} disabled={!valid || busy}><CheckCircle2 />{busy ? "正在保存…" : "保存修订"}</button></footer>
+      <footer><button className="ghost-action" onClick={onClose} disabled={busy}>取消</button><button className="primary-action" onClick={() => void save()} disabled={!valid || busy}><CheckCircle2 />{busy ? "正在保存…" : creating ? "插入这道题" : "保存修订"}</button></footer>
     </section>
   </div>;
 }
@@ -2280,8 +2370,6 @@ function LearningPanel({ current, submitted, note, onSearchNotes, knownNoteTags,
   return <aside className="learning-panel"><div className="learning-heading"><h2>解析与考点</h2><button className="note-search-trigger" onClick={onSearchNotes}><Search size={16} />搜索笔记</button></div><div className="learning-tabs">{modes.map((mode) => <button key={mode.id} className={aiMode === mode.id ? "active" : ""} onClick={() => onAi(mode.id)}>{mode.icon}{mode.label}</button>)}</div>
     <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className="original-explanation-panel"><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析"}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“大神总结”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入我的笔记</button>}</> : <>{generatedText && <p className="ai-copy">{generatedText}</p>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入我的笔记</button>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
     {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={current.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
-    <NoteImages key={`images-${current.id}`} note={note} onNote={onNote} />
-    <InkNote key={`ink-${current.id}`} note={note} onNote={onNote} />
     <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(event.target.value + "\n" + [...note.matchAll(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g)].map((match) => match[0]).join("\n") + (note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? "\n" + note.match(/```elapse-ink\n[^`]+\n```/)![0] : ""))} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
   </aside>;
 }

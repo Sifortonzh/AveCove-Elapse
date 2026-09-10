@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 1.4.9" src="https://img.shields.io/badge/version-1.4.9-b43d35" />
+    <img alt="版本 1.4.10" src="https://img.shields.io/badge/version-1.4.10-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v1.4.9。** 医学刷题、题库管理、可选多端同步和西医综合 306 已构成稳定主线；受支持的医学教材版式现在可直接导入官方 MinerU Hybrid JSON。English Lab 仍是预览功能，OCR 与 AI 自动整理仍须对照原文件抽查。
+> **当前版本：v1.4.10。** 医学刷题、题库管理、可选多端同步和西医综合 306 已构成稳定主线；刷题纠错现已支持无答案题补录、医学题型修订、选项增删，以及在现有题目之间插入完整新题并自动顺延题号。English Lab 仍是预览功能，OCR 与 AI 自动整理仍须对照原文件抽查。
 
 ## 产品地图
 
@@ -217,6 +217,7 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 <details>
 <summary><strong>版本记录</strong></summary>
 
+- **v1.4.10** — 支持无答案题手动补录、医学题型纠正、选项增删、完整新题插入与连续题号顺延，并精简刷题学习区。
 - **v1.4.9** — 支持直接导入耳鼻喉军医与皮肤病人卫版式的 MinerU Hybrid JSON，并让 Word 无答案客观题先完整入库、后续纠错。
 - **v1.4.8** — 精简题库页面，补充来源与版权信息，并加入仅存本机的“藏经阁”Demo。
 - **v1.4.7** — 为服务器繁忙或刚重启的场景增加自动部署等待与重试。
