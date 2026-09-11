@@ -43,3 +43,26 @@ export function insertQuestionAfter(
   nextItems.splice(afterIndex + 1, 0, inserted);
   return { questions: nextItems, inserted };
 }
+
+export function deleteQuestionAndRenumber(items: QuizQuestion[], questionId: string) {
+  if (items.length <= 1) throw new Error("题库至少需要保留一道题，无法删除最后一题");
+  const deleteIndex = items.findIndex((question) => question.id === questionId);
+  if (deleteIndex < 0) throw new Error("没有找到要删除的题目，请返回题库后重试");
+
+  const deleted = items[deleteIndex];
+  const deletedSourceNumber = deleted.sourceNumber.trim();
+  const deletedNumber = Number.parseInt(deletedSourceNumber, 10);
+  const nextItems = items.filter((question) => question.id !== questionId).map((question) => ({ ...question }));
+
+  if (/^\d+$/.test(deletedSourceNumber)) {
+    let expectedOriginalNumber = deletedNumber + 1;
+    for (let index = deleteIndex; index < nextItems.length; index += 1) {
+      const original = nextItems[index].sourceNumber.trim();
+      if (!/^\d+$/.test(original) || Number(original) !== expectedOriginalNumber) break;
+      nextItems[index] = { ...nextItems[index], sourceNumber: String(expectedOriginalNumber - 1) };
+      expectedOriginalNumber += 1;
+    }
+  }
+
+  return { questions: nextItems, deleted };
+}

@@ -528,7 +528,11 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /编辑题库名称与简介/);
   assert.match(page, /题库简介/);
   assert.match(page, /展开全文/);
-  assert.match(page, /全局搜索：题库名、疾病、症状或知识点/);
+  assert.match(page, /搜索题库名称、分组、简介或来源/);
+  assert.match(page, /这里只搜索题库名称、分组、简介和来源/);
+  assert.match(page, /featured-bank-title-link/);
+  assert.match(page, /locateOriginalBank/);
+  assert.match(page, /进度 \{progressLabel\}% · 正确率/);
   assert.match(page, /分享之前，请先确认版权与隐私边界/);
   assert.match(page, /仅做单选/);
   assert.match(page, /单选＋多选/);
@@ -673,7 +677,8 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(page, /reconcileQuestionBankOrder/);
   assert.match(page, /function toggleSavedBankFeatured/);
   assert.match(page, /精选试卷/);
-  assert.match(page, /全部题库 <em>\{banks\.length\}<\/em>/);
+  assert.match(page, /keyword \? "题库搜索结果" : "全部题库"/);
+  assert.match(page, /filteredBanks\.length/);
   assert.match(page, /藏经阁 · Demo/);
   assert.match(page, /const BANK_REQUESTS_KEY = "hongdou-bank-requests-v1"/);
   assert.match(page, /暂不接入公开社区，也不会上传题库文件/);
@@ -726,6 +731,9 @@ test("persists in-practice question corrections into sync and shared banks", asy
   assert.match(page, /可手动纠正 A1、A2、A3、A4、B1、C、X 型/);
   assert.match(page, /＋ 添加选项/);
   assert.match(page, /function insertQuestionAfterCurrent/);
+  assert.match(page, /function deleteCurrentQuestion/);
+  assert.match(page, /删除原题号/);
+  assert.match(page, /本题的作答、精选、笔记和斩题记录也会一并清理/);
   assert.match(page, /在当前题后新增一道题/);
   assert.match(page, /后续连续原题号会自动顺延/);
   assert.match(page, /原题解析 <small>可选<\/small>/);
@@ -773,6 +781,23 @@ test("inserts a complete manual question and shifts the following continuous sou
   assert.deepEqual(result.questions[1].answer, ["B"]);
   assert.equal(result.questions[1].explanation, "可选解析");
   assert.equal(result.questions[1].answerSource, "manual");
+});
+
+test("deletes a question and closes the continuous source-number gap", async () => {
+  const { deleteQuestionAndRenumber } = await loadQuestionEdit();
+  const makeQuestion = (id, sourceNumber) => ({
+    id, sourceNumber, category: "第一章", stem: id,
+    options: [{ label: "A", text: "甲" }, { label: "B", text: "乙" }],
+    answer: ["A"], multiple: false,
+  });
+  const result = deleteQuestionAndRenumber(
+    [makeQuestion("q11", "11"), makeQuestion("q12", "12"), makeQuestion("q13", "13"), makeQuestion("appendix", "附1")],
+    "q12",
+  );
+
+  assert.equal(result.deleted.id, "q12");
+  assert.deepEqual(result.questions.map((question) => question.sourceNumber), ["11", "12", "附1"]);
+  assert.throws(() => deleteQuestionAndRenumber([makeQuestion("only", "1")], "only"), /至少需要保留一道题/);
 });
 
 test("ships an isolated, responsive English learning demo", async () => {

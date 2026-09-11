@@ -36,7 +36,7 @@ import {
 import { suggestQuestionBankGroup } from "./lib/bank-grouping";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
-import { insertQuestionAfter } from "./lib/question-edit";
+import { deleteQuestionAndRenumber, insertQuestionAfter } from "./lib/question-edit";
 
 type Progress = Record<string, "correct" | "wrong">;
 type Scope = "all" | "unanswered" | "wrong" | "favorite";
@@ -1403,6 +1403,67 @@ export default function HomePage() {
     setToast(`新题已插入为原题号 ${result.inserted.sourceNumber}，后续连续题号已自动顺延 ➕📚`);
   }
 
+  async function deleteCurrentQuestion(questionId: string) {
+    const baseQuestions = activeBankId
+      ? questionBanks.find((candidate) => candidate.id === activeBankId)?.questions
+      : questions;
+    if (!baseQuestions) throw new Error("当前题库暂时无法写入，请返回“我的题库”后重试");
+    const result = deleteQuestionAndRenumber(baseQuestions, questionId);
+    let saved: SavedQuestionBank;
+    if (activeBankId) {
+      const bank = questionBanks.find((candidate) => candidate.id === activeBankId);
+      if (!bank) throw new Error("当前题库暂时无法写入，请返回“我的题库”后重试");
+      saved = await saveQuestionBank({ ...bank, questions: result.questions, updatedAt: new Date().toISOString() }, true);
+      setQuestionBanks((banks) => banks.map((candidate) => candidate.id === saved.id ? saved : candidate));
+    } else {
+      saved = await saveQuestionBank({
+        id: `trimmed-demo-${Date.now()}`,
+        name: `${bankName}（已删题）`,
+        description: "由演示题库在刷题过程中删除题目并保存。",
+        questions: result.questions,
+        importedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, true);
+      setActiveBankId(saved.id);
+      setBankName(saved.name);
+      setQuestionBanks((banks) => [saved, ...banks.filter((candidate) => candidate.id !== saved.id)]);
+    }
+
+    const savedById = new Map(saved.questions.map((question) => [question.id, question]));
+    const nextSession = sessionQuestions
+      .filter((question) => question.id !== questionId)
+      .map((question) => savedById.get(question.id) ?? question);
+    const nextIndex = Math.min(currentIndex, Math.max(0, nextSession.length - 1));
+    const nextCurrent = nextSession[nextIndex];
+    setQuestions(saved.questions);
+    setSessionQuestions(nextSession);
+    setCurrentIndex(nextIndex);
+    setSelected(nextCurrent ? [...(answerSelections[nextCurrent.id] ?? nextCurrent.draftAnswer ?? [])] : []);
+    setSubmitted(Boolean(nextCurrent && settings.showAnswerOnReturn && progress[nextCurrent.id]));
+    setAiTexts({});
+    setRevealedAnswers((ids) => ids.filter((id) => id !== questionId));
+    setExcludedOptions((items) => Object.fromEntries(Object.entries(items).filter(([id]) => id !== questionId)));
+    setAnswerSelections((items) => Object.fromEntries(Object.entries(items).filter(([id]) => id !== questionId)));
+
+    const nextProgress = { ...progress };
+    const nextFirstProgress = { ...firstProgress };
+    const nextNotes = { ...notes };
+    const nextLedger = { ...recordLedger };
+    delete nextProgress[questionId];
+    delete nextFirstProgress[questionId];
+    delete nextNotes[questionId];
+    delete nextLedger[questionId];
+    persistLearningRecords({
+      progress: nextProgress,
+      firstProgress: nextFirstProgress,
+      favorites: favorites.filter((id) => id !== questionId),
+      notes: nextNotes,
+      killed: killedQuestions.filter((id) => id !== questionId),
+      ledger: nextLedger,
+    });
+    setToast(`原题号 ${result.deleted.sourceNumber} 已删除，连续题号与学习记录已同步整理 🗑️📚`);
+  }
+
   async function removeSavedBank(id: string) {
     await deleteQuestionBank(id);
     setQuestionBanks((banks) => banks.filter((bank) => bank.id !== id));
@@ -1495,7 +1556,6 @@ export default function HomePage() {
           onToggleFeatured={toggleSavedBankFeatured}
           onDelete={removeSavedBank}
           onReset={resetSavedBankProgress}
-          onOpenQuestion={openSavedQuestion}
           progress={progress}
           favorites={favorites}
           notes={notes}
@@ -1550,6 +1610,7 @@ export default function HomePage() {
           onMobilePanel={() => setShowMobilePanel((value) => !value)}
           onEditQuestion={reviseCurrentQuestion}
           onAddQuestion={insertQuestionAfterCurrent}
+          onDeleteQuestion={deleteCurrentQuestion}
           knownNoteTags={knownNoteTags}
         />
       ) : (
@@ -1661,7 +1722,7 @@ function reconcileQuestionBankOrder(order: string[], ids: string[]) {
   return [...order.filter((id, index) => available.has(id) && order.indexOf(id) === index), ...ids.filter((id) => !order.includes(id))];
 }
 
-function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onHome, onImport, onRequests, onImportAnswers, onSelect, onUpdate, onToggleFeatured, onDelete, onReset, onOpenQuestion }: {
+function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onHome, onImport, onRequests, onImportAnswers, onSelect, onUpdate, onToggleFeatured, onDelete, onReset }: {
   banks: SavedQuestionBank[];
   activeBankId: string | null;
   progress: Progress;
@@ -1676,7 +1737,6 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   onToggleFeatured: (id: string, featured: boolean) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReset: (bank: SavedQuestionBank) => Promise<void>;
-  onOpenQuestion: (bank: SavedQuestionBank, questionId: string) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1697,8 +1757,18 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [groupVisibleLimit, setGroupVisibleLimit] = useState(6);
   const [draggedGroup, setDraggedGroup] = useState<string | null>(null);
+  const [locatedBankId, setLocatedBankId] = useState<string | null>(null);
   const keyword = query.trim();
-  const searchResults = useMemo(() => searchQuestionBanks(banks, query, 100), [banks, query]);
+  const filteredBanks = useMemo(() => {
+    const terms = getSearchTerms(query);
+    if (!terms.length) return banks;
+    return banks.filter((bank) => {
+      const searchable = [bank.name, bank.groupName, bank.description, bank.sourceTitle, bank.edition, bank.author]
+        .join(" ")
+        .toLocaleLowerCase("zh-CN");
+      return terms.every((term) => searchable.includes(term.toLocaleLowerCase("zh-CN")));
+    });
+  }, [banks, query]);
   const availableGroupNames = useMemo(
     () => [...new Set(banks.map((bank) => bank.groupName || UNGROUPED_BANKS))],
     [banks],
@@ -1729,7 +1799,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
 
   const groupedBanks = useMemo(() => {
     const groups = new Map<string, SavedQuestionBank[]>();
-    for (const bank of banks) {
+    for (const bank of filteredBanks) {
       const key = bank.groupName || UNGROUPED_BANKS;
       groups.set(key, [...(groups.get(key) ?? []), bank]);
     }
@@ -1749,17 +1819,27 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
         return left === UNGROUPED_BANKS ? 1 : right === UNGROUPED_BANKS ? -1 : left.localeCompare(right, "zh-CN");
       })
       .map(([name, entries]) => ({ name, banks: sortEntries(entries) }));
-  }, [bankOrder, banks, groupOrder, sortMode]);
+  }, [bankOrder, filteredBanks, groupOrder, sortMode]);
   const featuredBanks = useMemo(
     () => {
       const rank = new Map(bankOrder.map((id, index) => [id, index]));
-      return banks.filter((bank) => bank.featured).sort((left, right) => sortMode === "custom"
+      return filteredBanks.filter((bank) => bank.featured).sort((left, right) => sortMode === "custom"
         ? (rank.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(right.id) ?? Number.MAX_SAFE_INTEGER)
         : sortMode === "imported-asc" ? left.importedAt.localeCompare(right.importedAt)
           : sortMode === "name-asc" ? left.name.localeCompare(right.name, "zh-CN") : right.importedAt.localeCompare(left.importedAt));
     },
-    [bankOrder, banks, sortMode],
+    [bankOrder, filteredBanks, sortMode],
   );
+
+  function locateOriginalBank(bank: SavedQuestionBank) {
+    const groupName = bank.groupName || UNGROUPED_BANKS;
+    setExpandedGroups((names) => names.includes(groupName) ? names : [...names, groupName]);
+    setLocatedBankId(bank.id);
+    window.setTimeout(() => {
+      document.querySelector<HTMLElement>(`[data-bank-id="${CSS.escape(bank.id)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+    window.setTimeout(() => setLocatedBankId((id) => id === bank.id ? null : id), 2_200);
+  }
 
   function persistGroupOrder(next: string[]) {
     setGroupOrder(next);
@@ -1851,12 +1931,13 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   return <div className="bank-page">
     <header className="bank-page-header"><button className="icon-button" onClick={onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><button className="request-bank-action" onClick={onRequests}><Library size={17} />藏经阁</button><button className="primary-action" onClick={onImport}><Import size={17} />导入题库</button></header>
     <main>
-      <label className="bank-global-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="全局搜索：题库名、疾病、症状或知识点" /><span>{keyword ? `${searchResults.length} 条结果` : "搜索全部题库"}</span></label>
-      {keyword ? <section className="bank-search-section"><div className="bank-section-title"><div><span>GLOBAL SEARCH · 按相关度排序</span><h2>全局搜索结果</h2></div><button onClick={() => setQuery("")}><X size={16} />清除搜索</button></div>{searchResults.length ? <div className="bank-question-results">{searchResults.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => onOpenQuestion(bank, question.id)}><span className={question.multiple ? "multi" : ""}>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b><i>·</i>分组：<b>{bank.groupName || "未分组"}</b><i>·</i>分类：<b><HighlightMatches text={question.category} query={query} /></b><i>·</i>原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight /></button>)}</div> : <div className="bank-empty"><CircleHelp /><h2>还没有找到这条知识线索</h2><p>可输入多个关键词并用空格分隔，例如“肺炎 发热”；系统会要求每个关键词都有命中。</p></div>}</section> : <section className="bank-library-section"><div className="bank-section-title compact"><div><span>LOCAL COLLECTION</span><h2>全部题库 <em>{banks.length}</em></h2></div><div className="bank-sort-control"><label htmlFor="bank-sort-mode">题库排序</label><select id="bank-sort-mode" value={sortMode} onChange={(event) => changeSortMode(event.target.value as QuestionBankSortMode)}><option value="imported-desc">最近导入</option><option value="imported-asc">最早导入</option><option value="name-asc">名称排序</option><option value="custom">自定义排序</option></select></div></div>{banks.length ? <div className="bank-library-content"><section className="featured-bank-section" aria-labelledby="featured-bank-title"><header><div><span className="featured-bank-mark"><Sparkles /></span><span><small>CURATED PAPERS</small><h2 id="featured-bank-title">精选试卷</h2><p>把近期重点、经典真题或高频复习卷固定在这里，可直接切换使用。</p></span></div><em>{featuredBanks.length} 份精选</em></header>{featuredBanks.length ? <div className="featured-bank-grid">{featuredBanks.map((bank) => {
+      <label className="bank-global-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库名称、分组、简介或来源" /><span>{keyword ? `${filteredBanks.length} 份题库` : "搜索全部题库"}</span></label>
+      <section className="bank-library-section"><div className="bank-section-title compact"><div><span>LOCAL COLLECTION</span><h2>{keyword ? "题库搜索结果" : "全部题库"} <em>{keyword ? `${filteredBanks.length}/${banks.length}` : banks.length}</em></h2></div><div className="bank-section-controls">{keyword && <button className="bank-search-clear" onClick={() => setQuery("")}><X size={16} />清除搜索</button>}<div className="bank-sort-control"><label htmlFor="bank-sort-mode">题库排序</label><select id="bank-sort-mode" value={sortMode} onChange={(event) => changeSortMode(event.target.value as QuestionBankSortMode)}><option value="imported-desc">最近导入</option><option value="imported-asc">最早导入</option><option value="name-asc">名称排序</option><option value="custom">自定义排序</option></select></div></div></div>{filteredBanks.length ? <div className="bank-library-content"><section className="featured-bank-section" aria-labelledby="featured-bank-title"><header><div><span className="featured-bank-mark"><Sparkles /></span><span><small>CURATED PAPERS</small><h2 id="featured-bank-title">精选试卷</h2><p>把近期重点、经典真题或高频复习卷固定在这里，可直接切换使用。</p></span></div><em>{featuredBanks.length} 份精选</em></header>{featuredBanks.length ? <div className="featured-bank-grid">{featuredBanks.map((bank) => {
         const completed = bank.questions.filter((question) => Boolean(progress[question.id])).length;
-        const completion = bank.questions.length ? Math.round((completed / bank.questions.length) * 100) : 0;
+        const completion = bank.questions.length ? (completed / bank.questions.length) * 100 : 0;
+        const completionLabel = completion.toFixed(2);
         const isActive = bank.id === activeBankId;
-        return <article className={`featured-bank-card ${isActive ? "active" : ""}`} key={`featured-${bank.id}`}><div className="featured-bank-card-head"><span><Star fill="currentColor" />精选</span><small>{bank.groupName || "未分组"}</small></div><h3>{bank.name}</h3><p>{bank.questions.length} 道题 · 已完成 {completed} 道</p><div className="featured-bank-progress" aria-label={`精选试卷学习进度 ${completion}%`}><i><b style={{ width: `${completion}%` }} /></i><strong>{completion}%</strong></div><footer><button className="featured-bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "使用这份试卷"}</button><button className="featured-bank-remove" aria-label={`取消精选 ${bank.name}`} title="取消精选" onClick={() => void onToggleFeatured(bank.id, false)}><Star fill="currentColor" /></button></footer></article>;
+        return <article className={`featured-bank-card ${isActive ? "active" : ""}`} key={`featured-${bank.id}`}><div className="featured-bank-card-head"><span><Star fill="currentColor" />精选</span><small>{bank.groupName || "未分组"}</small></div><h3><button className="featured-bank-title-link" onClick={() => locateOriginalBank(bank)} title={`定位到“${bank.groupName || UNGROUPED_BANKS}”中的原题库`}>{bank.name}<ChevronRight /></button></h3><p>{bank.questions.length} 道题 · 已完成 {completed} 道</p><div className="featured-bank-progress" aria-label={`精选试卷学习进度 ${completionLabel}%`}><i><b style={{ width: `${completion}%` }} /></i><strong>{completionLabel}%</strong></div><footer><button className="featured-bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "使用这份试卷"}</button><button className="featured-bank-remove" aria-label={`取消精选 ${bank.name}`} title="取消精选" onClick={() => void onToggleFeatured(bank.id, false)}><Star fill="currentColor" /></button></footer></article>;
       })}</div> : <div className="featured-bank-empty"><Star /><div><strong>还没有精选试卷</strong><p>点击题库卡片右上角的星标，把重点试卷加入这里。</p></div></div>}</section><div className="bank-group-list">{groupedBanks.map((group, groupIndex) => {
         const groupExpanded = expandedGroups.includes(group.name);
         const visibleBanks = groupExpanded ? group.banks : group.banks.slice(0, groupVisibleLimit);
@@ -1871,8 +1952,9 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
         const descriptionIsLong = bank.description.length > 120 || bank.description.includes("\n");
         const pendingAnswerCount = bank.questions.filter((question) => !question.answer.length).length;
         const completedCount = bank.questions.filter((question) => Boolean(progress[question.id])).length;
-        const completion = bank.questions.length ? Math.round((completedCount / bank.questions.length) * 100) : 0;
-        return <article className={`bank-card ${isActive ? "active" : ""}`} key={bank.id}>
+        const completion = bank.questions.length ? (completedCount / bank.questions.length) * 100 : 0;
+        const completionLabel = completion.toFixed(2);
+        return <article className={`bank-card ${isActive ? "active" : ""} ${locatedBankId === bank.id ? "located" : ""}`} data-bank-id={bank.id} key={bank.id}>
           <header><span className="bank-card-icon"><Database /></span><div className="bank-card-head-actions">{isActive && <em><Check size={13} />当前题库</em>}{sortMode === "custom" && <span className="bank-item-order"><button type="button" aria-label={`上移题库 ${bank.name}`} title="上移题库" disabled={bankIndex === 0} onClick={() => moveBank(group.name, bank.id, -1)}><ArrowUp /></button><button type="button" aria-label={`下移题库 ${bank.name}`} title="下移题库" disabled={bankIndex === group.banks.length - 1} onClick={() => moveBank(group.name, bank.id, 1)}><ArrowDown /></button></span>}<button type="button" className={`bank-feature-toggle ${bank.featured ? "active" : ""}`} aria-label={`${bank.featured ? "取消精选" : "设为精选"} ${bank.name}`} aria-pressed={bank.featured} title={bank.featured ? "移出精选试卷" : "加入精选试卷"} onClick={() => void onToggleFeatured(bank.id, !bank.featured)}><Star fill={bank.featured ? "currentColor" : "none"} /></button></div></header>
           {isEditing ? <form className="bank-edit" onSubmit={(event) => { event.preventDefault(); void submitEdit(bank); }}>
             <label><span>题库名称</span><input autoFocus value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={60} /></label>
@@ -1886,14 +1968,14 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
           </form> : <><span className="bank-group-chip">{bank.groupName || "未分组"}</span><h3>{bank.name}</h3><p>{bank.questions.length} 道题 · 单选 {singleCount} · 多选 {multipleCount}</p>
             {(bank.sourceTitle || bank.edition || bank.author || bank.copyrightNotice) && <section className="bank-source-summary"><div><ShieldCheck size={14} /><strong>{[bank.sourceTitle, bank.edition].filter(Boolean).join(" · ") || "来源信息待补充"}</strong></div>{bank.author && <p>作者 / 编者：{bank.author}</p>}{bank.copyrightNotice && <p>版权说明：{bank.copyrightNotice}</p>}</section>}
             {bank.description && <section className={`bank-description ${descriptionExpanded ? "expanded" : ""}`}><div><span><FileText size={14} />题库简介</span>{descriptionIsLong && <button type="button" aria-expanded={descriptionExpanded} onClick={() => toggleDescription(bank.id)}>{descriptionExpanded ? "收起" : "展开全文"}<ChevronRight size={14} /></button>}</div><p>{bank.description}</p></section>}
-            <div className="bank-card-progress" aria-label={`已完成 ${completedCount} 道，共 ${bank.questions.length} 道`}><div><span>学习进度 · {completedCount}/{bank.questions.length}</span><b>{completion}%</b></div><i><b style={{ width: `${completion}%` }} /></i></div>
+            <div className="bank-card-progress" aria-label={`已完成 ${completedCount} 道，共 ${bank.questions.length} 道，进度 ${completionLabel}%`}><div><span>学习进度 · {completedCount}/{bank.questions.length}</span><b>{completionLabel}%</b></div><i><b style={{ width: `${completion}%` }} /></i></div>
           </>}
           <div className="bank-card-meta"><span>导入于 {new Date(bank.importedAt).toLocaleDateString("zh-CN")}</span><span>仅存本机</span></div>
           {pendingAnswerCount > 0 && <div className="bank-answer-pending"><CircleHelp /><div><strong>测试模式 · {pendingAnswerCount} 题待答案</strong><span>可以先作答，之后导入答案文件一键核对。</span></div><button onClick={() => onImportAnswers(bank)}><Upload />导入答案</button></div>}
           {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
         </article>;
       })}</div>{group.banks.length > groupVisibleLimit && <button type="button" className={`bank-group-toggle ${groupExpanded ? "expanded" : ""}`} aria-expanded={groupExpanded} onClick={() => toggleGroup(group.name)}>{groupExpanded ? "收起题库" : `展开其余 ${hiddenCount} 份题库`}<ChevronRight /></button>}</section>;
-      })}</div></div> : <div className="bank-empty"><Database /><h2>题库书架还是空的</h2><p>导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。</p><button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button></div>}</section>}
+      })}</div></div> : <div className="bank-empty">{keyword ? <CircleHelp /> : <Database />}<h2>{keyword ? "没有找到匹配的题库" : "题库书架还是空的"}</h2><p>{keyword ? "这里只搜索题库名称、分组、简介和来源；刷题时仍可使用“搜题”检索题目内容。" : "导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。"}</p>{keyword ? <button className="ghost-action" onClick={() => setQuery("")}><X size={17} />清除搜索</button> : <button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button>}</div>}</section>
     </main>
     {sharingBank && <ShareBankModal bank={sharingBank} onClose={() => setSharingBank(null)} />}
     {resettingBank && <ResetBankProgressModal bank={resettingBank} progress={progress} favorites={favorites} notes={notes} onReset={onReset} onClose={() => setResettingBank(null)} />}
@@ -2130,14 +2212,19 @@ function QuizView(props: {
   onUpdateKilled: (questionIds: string[], killed: boolean) => void;
   onEditQuestion: (question: QuizQuestion) => Promise<void>;
   onAddQuestion: (afterQuestionId: string, question: QuizQuestion) => Promise<void>;
+  onDeleteQuestion: (questionId: string) => Promise<void>;
   knownNoteTags: string[];
 }) {
   const [editingQuestion, setEditingQuestion] = useState(false);
   const [addingQuestion, setAddingQuestion] = useState<QuizQuestion | null>(null);
   const [showKillQuestions, setShowKillQuestions] = useState(false);
+  const [deletingQuestion, setDeletingQuestion] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [showChapters, setShowChapters] = useState(false);
   const { current, currentIndex, total, selected, excluded, submitted, studyMode, result, favorite, note, aiMode, aiTexts, aiLoading, examScore } = props;
-  const progress = Math.round(((currentIndex + 1) / total) * 100);
+  const progress = ((currentIndex + 1) / total) * 100;
+  const progressLabel = progress.toFixed(2);
   const answerAvailable = current.answer.length > 0;
   const memorizing = studyMode === "memorize";
   const blind = studyMode === "blind";
@@ -2161,11 +2248,11 @@ function QuizView(props: {
     medicalQuestionType: "A1",
   });
   return <div className="quiz-shell">
-    <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b>正确率 {props.accuracy.toFixed(2)}% · {currentIndex + 1} / {total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
+    <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b title={`学习进度 ${progressLabel}% · 正确率 ${props.accuracy.toFixed(2)}%`}>进度 {progressLabel}% · 正确率 {props.accuracy.toFixed(2)}% · {currentIndex + 1}/{total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
         <button className="question-previous-top subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>
-        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题"><Scissors size={16} />{props.killed ? "已斩" : "斩"}</button><button className="question-search-trigger" onClick={props.onSearch}><Search size={16} />搜题</button><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题"><Plus size={16} />新增题目</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)}><Pencil size={16} />纠错编辑</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已精选" : "精选"}</button></div></div>
+        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题"><Scissors size={16} />{props.killed ? "已斩" : "斩"}</button><button className="question-search-trigger" onClick={props.onSearch}><Search size={16} />搜题</button><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题"><Plus size={16} />新增题目</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)}><Pencil size={16} />纠错编辑</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题"><Trash2 size={16} />删除题目</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已精选" : "精选"}</button></div></div>
         {props.killed && <div className="killed-question-banner"><Scissors size={18} /><div><strong>本题已斩</strong><span>会被后续练习跳过，不计入正确率；可随时恢复。</span></div><button onClick={() => props.onUpdateKilled([current.id], false)}>恢复本题</button></div>}
         {current.sharedStem && <section className="shared-medical-stem"><span>{current.medicalQuestionType === "A4" ? "递进病例" : "共用题干"}</span><p>{current.sharedStem}</p></section>}
         {props.relatedQuestions.length > 1 && <section className="linked-question-group"><header><div><strong>同组题目</strong><span>{props.relatedQuestions.length} 题共用{current.medicalQuestionType === "B1" ? "备选答案" : "题干"}，可直接切换</span></div></header><div>{props.relatedQuestions.map((question) => <button key={question.id} className={`${question.id === current.id ? "active" : ""} ${props.relatedProgress[question.id] ?? ""}`} onClick={() => props.onOpenRelated(question.id)}><b>{question.sourceNumber}</b><span>{question.stem}</span>{props.relatedProgress[question.id] === "correct" ? <Check size={14} /> : props.relatedProgress[question.id] === "wrong" ? <X size={14} /> : null}</button>)}</div></section>}
@@ -2192,6 +2279,7 @@ function QuizView(props: {
       {editingQuestion && <QuestionCorrectionModal question={current} onSave={props.onEditQuestion} onClose={() => setEditingQuestion(false)} />}
       {addingQuestion && <QuestionCorrectionModal creating question={addingQuestion} onSave={(question) => props.onAddQuestion(current.id, question)} onClose={() => setAddingQuestion(null)} />}
       {showKillQuestions && <KillQuestionsModal current={current} questions={props.bankQuestions} killed={props.killed} onApply={(ids, killed) => { props.onUpdateKilled(ids, killed); setShowKillQuestions(false); }} onClose={() => setShowKillQuestions(false)} />}
+      {deletingQuestion && <div className="modal-layer question-delete-layer" onMouseDown={() => !deleteBusy && setDeletingQuestion(false)}><section className="question-delete-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="question-delete-title"><span><Trash2 /></span><div><small>DELETE QUESTION</small><h2 id="question-delete-title">删除原题号 {current.sourceNumber}？</h2><p>删除后，连续原题号会自动顺延；本题的作答、精选、笔记和斩题记录也会一并清理。分享与多端同步将采用删除后的版本。</p>{deleteError && <em>{deleteError}</em>}</div><footer><button className="ghost-action" disabled={deleteBusy} onClick={() => setDeletingQuestion(false)}>取消</button><button className="danger-action" disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); setDeleteError(""); try { await props.onDeleteQuestion(current.id); setDeletingQuestion(false); } catch (error) { setDeleteError(error instanceof Error ? error.message : "删除失败，请稍后重试"); } finally { setDeleteBusy(false); } }}><Trash2 />{deleteBusy ? "正在删除…" : "确认删除"}</button></footer></section></div>}
   </div>;
 }
 
