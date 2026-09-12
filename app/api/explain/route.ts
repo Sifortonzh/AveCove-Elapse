@@ -55,8 +55,12 @@ export async function POST(request: Request) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45_000);
   try {
-    const explanation = await generateAiText(aiConfig, prompt, { signal: controller.signal });
-    return Response.json({ explanation: explanation || "AI 未返回可显示的解析。" });
+    let explanation = await generateAiText(aiConfig, prompt, { maxTokens: 2_400, signal: controller.signal });
+    if (!explanation) {
+      explanation = await generateAiText(aiConfig, `${prompt}\n请跳过内部推理过程，只输出可直接展示给学习者的最终解析正文。`, { maxTokens: 3_200, temperature: 0.1, signal: controller.signal });
+    }
+    if (!explanation) throw new Error("AI 厂商本次未返回正文，请重新生成");
+    return Response.json({ explanation });
   } catch (error) {
     return Response.json({ error: `AI 解析失败：${publicAiErrorMessage(error, aiConfig.apiKey)}` }, { status: 502 });
   } finally {

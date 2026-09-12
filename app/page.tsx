@@ -988,9 +988,11 @@ export default function HomePage() {
         body: JSON.stringify({ question: current, mode, personalAi: readPersonalAiConfig() ?? undefined }),
       });
       const result = await response.json() as { explanation?: string; error?: string };
-      setAiTexts((value) => ({ ...value, [mode]: result.explanation ?? result.error ?? "暂时没有生成内容。" }));
-    } catch {
-      setAiTexts((value) => ({ ...value, [mode]: "AI 服务暂时不可用，部署时配置密钥即可启用。" }));
+      if (!response.ok || !result.explanation?.trim()) throw new Error(result.error || "AI 本次没有返回正文，请重试");
+      setAiTexts((value) => ({ ...value, [mode]: result.explanation }));
+    } catch (error) {
+      setAiTexts((value) => { const next = { ...value }; delete next[mode]; return next; });
+      setToast(error instanceof Error ? `${error.message} · 可点击重新生成` : "AI 请求失败，可点击重新生成");
     } finally {
       setAiLoading(false);
     }
@@ -1719,7 +1721,7 @@ export default function HomePage() {
         <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} western306SubjectCounts={western306SubjectCounts} showWestern306Subjects={hasModernWestern306} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
-        <AnswerSheet questions={sessionQuestions} progress={progress} favorites={favorites} killed={killedQuestions} answerSelections={answerSelections} currentIndex={currentIndex} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
+        <AnswerSheet questions={sessionQuestions} progress={progress} favorites={favorites} notes={notes} killed={killedQuestions} answerSelections={answerSelections} currentIndex={currentIndex} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
       )}
       {showImport && (
         <ImportModal
@@ -2621,10 +2623,10 @@ function SwitchRow({ label, detail, value, onChange }: { label: string; detail: 
   return <button className="switch-row" onClick={() => onChange(!value)}><div><strong>{label}</strong><span>{detail}</span></div><i className={value ? "on" : ""}><b /></i></button>;
 }
 
-function AnswerSheet({ questions, progress, favorites, killed, answerSelections, currentIndex, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; favorites: string[]; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onJump: (index: number) => void; onClose: () => void }) {
+function AnswerSheet({ questions, progress, favorites, notes, killed, answerSelections, currentIndex, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; favorites: string[]; notes: Record<string, string>; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onJump: (index: number) => void; onClose: () => void }) {
   const favoriteIds = new Set(favorites);
   const killedIds = new Set(killed);
-  return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose} aria-label="关闭答题卡"><X /></button></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>★ 精选</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; return <button key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? "，精选" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★</span>}</button>; })}</div></section></div>;
+  return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose} aria-label="关闭答题卡"><X /></button></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = /^> 选项 [A-G] 批注：\s*\S/m.test(notes[question.id] ?? ""); return <button key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? "，精选" : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★</span>}</button>; })}</div></section></div>;
 }
 
 function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; on306: () => void }) {

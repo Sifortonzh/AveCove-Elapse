@@ -1023,6 +1023,9 @@ test("keeps imported explanations separate and upgrades AI-assisted notes to sea
   assert.match(explainRoute, /人民卫生出版社第十版医学教材/);
   assert.match(explainRoute, /不得伪造教材引文、页码、章节/);
   assert.match(explainRoute, /原资料解析/);
+  assert.match(explainRoute, /maxTokens: 2_400/);
+  assert.match(explainRoute, /只输出可直接展示给学习者的最终解析正文/);
+  assert.match(page, /可点击重新生成/);
   assert.match(medicalImport, /必须忠实提取并整理该题对应的原文解析/);
   assert.match(styles, /\.source-explanation/);
   assert.match(styles, /\.markdown-note-preview/);
@@ -1165,7 +1168,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.4\.13"/);
+  assert.match(packageJson, /"version": "1\.4\.14"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1374,6 +1377,8 @@ test("keeps touch practice controls, in-quiz search, and reusable note tags disc
   assert.match(page, /className="bank-answer-badge"/);
   assert.doesNotMatch(page, /className="bank-answer-pending"/);
   assert.match(page, /className="sheet-answer-missing"/);
+  assert.match(page, /className="sheet-annotation"/);
+  assert.match(page, /选项 \[A-G\] 批注/);
   assert.match(page, /commentThreadId\(activeBankId, current\.id\)/);
   assert.match(page, /当前题库独立讨论/);
   assert.match(page, /同学讨论/);
