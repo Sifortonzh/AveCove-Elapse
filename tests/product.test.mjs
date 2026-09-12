@@ -439,6 +439,22 @@ D. 方案丁`, "Word 待核对题库");
   assert.deepEqual(questions.map((question) => question.options.length), [4, 4]);
 });
 
+test("does not let MinerU cross-page option text pollute chapter names", async () => {
+  const { parseQuestionText } = await loadQuestionParser();
+  const questions = parseQuestionText(`第八章 妊娠合并内外科疾病C.重度子痫或子痫 D.估计胎儿体重 $>4500\\mathrm{g}$ E.胎儿窘迫
+一、单项选择题
+64. 不属于该病终止妊娠指征的是
+A. 尿糖持续阳性
+B. 酮症酸中毒
+C. 低血糖
+D. 感染
+答案：B`, "妇产科学");
+
+  const sourceQuestion = questions.find((question) => question.sourceNumber === "64");
+  assert.ok(sourceQuestion);
+  assert.equal(sourceQuestion.category, "妊娠合并内外科疾病");
+});
+
 test("recognizes official MinerU Hybrid JSON and keeps page reading order", async () => {
   const { extractMineruHybridText, isMineruHybridJson } = await loadMineruImport();
   const payload = {
@@ -451,6 +467,50 @@ test("recognizes official MinerU Hybrid JSON and keeps page reading order", asyn
   assert.match(source, /parseEnt\(pages\)/);
   assert.match(source, /parseDermatology\(pages\.join\("\\n"\)\)/);
   assert.match(source, /原文此选项 OCR 缺失，可在纠错中补录/);
+});
+
+test("merges split MinerU results, removes duplicate pages and preserves formulas", async () => {
+  const { extractMineruHybridText, mergeMineruHybridDocuments } = await loadMineruImport();
+  const formulaPage = {
+    page_idx: 0,
+    para_blocks: [{ type: "text", lines: [{ bbox: [0, 0], spans: [
+      { bbox: [0, 0], type: "text", content: "C. " },
+      { bbox: [20, 0], type: "inline_equation", content: "10 \\\\sim 13^{+6}" },
+      { bbox: [80, 0], type: "text", content: " 周" },
+    ] }] }],
+  };
+  const secondPage = {
+    page_idx: 0,
+    para_blocks: [{ type: "text", lines: [{ bbox: [0, 0], spans: [{ bbox: [0, 0], type: "text", content: "2. 下一页" }] }] }],
+  };
+  const merged = mergeMineruHybridDocuments([
+    { pdf_info: [formulaPage] },
+    { pdf_info: [formulaPage, secondPage] },
+  ]);
+
+  assert.equal(merged.pdf_info.length, 2);
+  assert.equal(merged._elapse_merge.inputPageCount, 3);
+  assert.equal(merged._elapse_merge.duplicatePageCount, 1);
+  assert.deepEqual(merged.pdf_info.map((page) => page.page_idx), [0, 1]);
+  assert.match(extractMineruHybridText(merged), /\$10 \\\\sim 13\^\{\+6\}\$/);
+});
+
+test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
+  const [page, workbench, math, layout, manifest] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/components/MinerUWorkbench.tsx"),
+    text("app/components/MathText.tsx"),
+    text("app/layout.tsx"),
+    text("package.json"),
+  ]);
+  assert.match(page, /MinerU 题库工作台/);
+  assert.match(page, /showMineruWorkbench/);
+  assert.match(workbench, /mergeMineruHybridDocuments/);
+  assert.match(workbench, /一键保存并开始刷题/);
+  assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
+  assert.match(math, /katex\.renderToString/);
+  assert.match(layout, /katex\/dist\/katex\.min\.css/);
+  assert.equal(JSON.parse(manifest).version, "2.1.0");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1168,7 +1228,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.4\.15"/);
+  assert.match(packageJson, /"version": "2\.1\.0"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);

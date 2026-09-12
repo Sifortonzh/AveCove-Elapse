@@ -135,7 +135,16 @@ function normalizeGeneralImportLines(text: string) {
 
 function canonicalChapter(line: string) {
   const chapter = line.match(/^第[一二三四五六七八九十百0-9]+章\s*[：:]?\s*(.+?)(?:\s+答案)?$/);
-  if (chapter) return chapter[1].replace(/\s+答案$/, "").trim();
+  if (chapter) {
+    // MinerU occasionally glues a repeated running chapter header to the
+    // previous/next page's first option.  Keep the real chapter title only.
+    const title = chapter[1]
+      .split(/(?=[A-GＡ-Ｇ]\s*[.．、])/)[0]
+      .replace(/(?:…{2,}|\.{3,})\s*\d+\s*$/, "")
+      .replace(/\s+答案$/, "")
+      .trim();
+    return title.length <= 60 ? title : "";
+  }
   const answerHeading = line.match(/^(.{1,40}?)\s+答案$/);
   return answerHeading?.[1].trim() ?? "";
 }

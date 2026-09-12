@@ -1,9 +1,9 @@
 import { parseQuestionText, type QuizQuestion } from "./question-parser";
 
-type MinerUSpan = { content?: unknown; bbox?: unknown };
+type MinerUSpan = { content?: unknown; bbox?: unknown; type?: unknown };
 type MinerULine = { spans?: unknown; bbox?: unknown };
-type MinerUBlock = { lines?: unknown; bbox?: unknown };
-type MinerUPage = { para_blocks?: unknown; page_idx?: unknown };
+type MinerUBlock = { lines?: unknown; bbox?: unknown; type?: unknown };
+export type MinerUPage = { para_blocks?: unknown; page_idx?: unknown; [key: string]: unknown };
 
 export type MinerUQuestionBank = {
   name: string;
@@ -33,8 +33,16 @@ export function isMineruHybridJson(value: unknown): value is { pdf_info: MinerUP
   return Boolean(body && Array.isArray(body.pdf_info) && body.pdf_info.length > 0);
 }
 
+function wrapMineruFormula(content: string, display: boolean) {
+  const trimmed = content.trim();
+  if (!trimmed) return "";
+  if (/^(?:\$\$[\s\S]*\$\$|\$[^$]*\$|\\\([\s\S]*\\\)|\\\[[\s\S]*\\\])$/.test(trimmed)) return trimmed;
+  return display ? `$$${trimmed}$$` : `$${trimmed}$`;
+}
+
 function mineruBlockText(value: unknown) {
   const block = record(value) as MinerUBlock | null;
+  const blockType = typeof block?.type === "string" ? block.type.toLowerCase() : "";
   const lines = array(block?.lines)
     .map((line) => record(line) as MinerULine | null)
     .filter((line): line is MinerULine => Boolean(line))
@@ -43,10 +51,56 @@ function mineruBlockText(value: unknown) {
     .map((span) => record(span) as MinerUSpan | null)
     .filter((span): span is MinerUSpan => Boolean(span))
     .sort((left, right) => bboxCoordinate(left.bbox, 0) - bboxCoordinate(right.bbox, 0))
-    .map((span) => typeof span.content === "string" ? span.content : "")
+    .map((span) => {
+      if (typeof span.content !== "string") return "";
+      const spanType = typeof span.type === "string" ? span.type.toLowerCase() : "";
+      if (spanType.includes("equation") || blockType.includes("equation")) {
+        return wrapMineruFormula(span.content, spanType.includes("interline") || blockType.includes("interline"));
+      }
+      return span.content;
+    })
     .join("").trim())
     .filter(Boolean)
     .join("\n");
+}
+
+function pageFingerprint(page: MinerUPage) {
+  return JSON.stringify(page.para_blocks ?? []);
+}
+
+export type MergedMinerUHybrid = {
+  pdf_info: MinerUPage[];
+  _elapse_merge: {
+    sourceCount: number;
+    inputPageCount: number;
+    duplicatePageCount: number;
+  };
+};
+
+export function mergeMineruHybridDocuments(values: unknown[]): MergedMinerUHybrid {
+  if (!values.length) throw new Error("请至少选择一份 MinerU Hybrid JSON");
+  const pages: MinerUPage[] = [];
+  const fingerprints = new Set<string>();
+  let inputPageCount = 0;
+  let duplicatePageCount = 0;
+  for (const value of values) {
+    if (!isMineruHybridJson(value)) throw new Error("选中的文件中包含非 MinerU Hybrid JSON");
+    for (const page of value.pdf_info) {
+      inputPageCount += 1;
+      const fingerprint = pageFingerprint(page);
+      if (fingerprints.has(fingerprint)) {
+        duplicatePageCount += 1;
+        continue;
+      }
+      fingerprints.add(fingerprint);
+      pages.push({ ...page, page_idx: pages.length });
+    }
+  }
+  if (!pages.length) throw new Error("MinerU JSON 中没有可读取的页面");
+  return {
+    pdf_info: pages,
+    _elapse_merge: { sourceCount: values.length, inputPageCount, duplicatePageCount },
+  };
 }
 
 export function extractMineruHybridText(value: unknown) {

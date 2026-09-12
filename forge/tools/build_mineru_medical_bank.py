@@ -20,7 +20,6 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 CHINESE_NUMBER = "一二三四五六七八九十百〇零"
 CHAPTER_RE = re.compile(rf"(第\s*[{CHINESE_NUMBER}\d]+\s*章)[ \t]*(?:\n[ \t]*|[ \t]+)([^\n]{{2,40}})")
 QUESTION_RE = re.compile(r"(?m)^\s*(\d{1,4})\s*[.．、]\s*")

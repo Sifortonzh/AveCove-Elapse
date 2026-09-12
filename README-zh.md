@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 1.4.11" src="https://img.shields.io/badge/version-1.4.11-b43d35" />
+    <img alt="版本 2.1.0" src="https://img.shields.io/badge/version-2.1.0-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v1.4.11。** 医学刷题、题库管理、可选多端同步和西医综合 306 已构成稳定主线；PDF 导入现可读取用黄色标出的正确选项，也能识别直接写在选项后的显式答案标记。English Lab 仍是预览功能，OCR 与 AI 自动整理仍须对照原文件抽查。
+> **当前版本：v2.1.0。** Elapse 内置 MinerU 工作台现可合并多份 Hybrid JSON、去除重复页、统计答案覆盖、保留公式、预览结构并直接入库，全程不消耗 AI 额度。医学刷题、题库管理、可选同步和西医综合 306 继续作为稳定主线。
 
 ## 产品地图
 
@@ -40,7 +40,8 @@
 | **AI 辅学** | 个人或全站 OpenAI 兼容接口、导入整理、解析追问与写入笔记 | 可选 |
 | **多端同步** | 题库、进度、错题、精选、笔记、设置、分组及删除标记 | 可选 |
 | **English Lab** | 完形、阅读、听力、匹配、翻译与写作交互演示 | 预览 |
-| **Elapse Forge** | 独立扫描题库工作台：接入 MinerU 结果、标准化、审校及导出 Elapse | 基础版 0.2 |
+| **MinerU 工作台** | 多 JSON 合并、重复页清理、答案与公式报告、结构预览及一键入库 | v2.1 稳定功能 |
+| **Elapse Forge** | 保留原页坐标、来源证据和审校历史的独立高级工作流 | 高级基础版 |
 
 ## 为什么做 Elapse
 
@@ -63,7 +64,7 @@ flowchart LR
 
 ### 导入与题库管理
 
-- 支持 `.doc`、`.docx`、文字 PDF、扫描 PDF、AveCove 便携 JSON 与官方 MinerU Hybrid JSON；文字 PDF 会保留黄色高亮正确项，也能识别选项后的显式答案标记；耳鼻喉军医题号前答案和皮肤病人卫分章答案已使用专用确定性规则。
+- 支持 `.doc`、`.docx`、文字 PDF、扫描 PDF、AveCove 便携 JSON 与官方 MinerU Hybrid JSON。v2.1 MinerU 工作台可把连续导出的多份 JSON 合并成一份题库，清理完全重复页，保留行内与独立公式，并在保存前报告已有答案与待答案题数；文字 PDF 仍支持黄色高亮答案及选项后显式答案标记。
 - Word 中只要题干与至少两个选项结构完整，即使没有识别出答案也会保留为“待核对”，可在刷题纠错中后补。
 - 可填写题库简介和“章节—题号范围”，并把历年卷或同一学科题库放进同一分组。
 - 搜索题库名、简介、分组、题干、选项、分类和原题号，并高亮结果。
@@ -193,7 +194,9 @@ ADMIN_KEY=管理员专用长随机密钥
 
 ## Elapse Forge
 
-Forge 是位于 `/forge` 的独立导入工作台。它可同时接收原文件、MinerU 已完成的官方 Hybrid JSON 和可选 Markdown，保留页码、坐标、表格与图片证据，不必再次消耗 OCR。
+Elapse v2.1 在普通“导入题库”对话框中加入了本机 MinerU 工作台。它可以一次选择一份或多份 Hybrid JSON，按文件名自然顺序拼接，去掉内容完全相同的重复页，把 MinerU 公式保留为 LaTeX，预览题目结构，并直接保存到当前题库，全程不会调用 AI。
+
+独立的 `/forge` 路由继续承担高级来源审校：它可同时接收原文件、MinerU 已完成的官方 Hybrid JSON 和可选 Markdown，保留页码、坐标、表格与图片证据，不必再次消耗 OCR。
 
 Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章节题号、跨段选项、跨页接缝与答案表关联，但它**不是零错误 OCR 产品**。必须保存原文件用于可视核对，并在学习前抽查生成题库。
 
@@ -218,6 +221,7 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 <details>
 <summary><strong>版本记录</strong></summary>
 
+- **v2.1.0** — 新增内置 MinerU 工作台，支持多文件合并、重复页清理、答案与公式诊断、结构预览和一键入库；题干与选项中的 LaTeX 公式改用 KaTeX 正常排版。
 - **v1.4.11** — 重做 2017 年起的 306 标准化工作台，固定 165 题 A/B/X 与 A-D 四选项；支持 B 型共用选项、绿色解析答案、PDF 黄色高亮及选项后显式答案标记。
 - **v1.4.10** — 支持无答案题手动补录、医学题型纠正、选项增删、完整新题插入与连续题号顺延，并精简刷题学习区。
 - **v1.4.9** — 支持直接导入耳鼻喉军医与皮肤病人卫版式的 MinerU Hybrid JSON，并让 Word 无答案客观题先完整入库、后续纠错。

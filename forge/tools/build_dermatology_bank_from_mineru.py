@@ -19,7 +19,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 CHINESE_NUMBER = "一二三四五六七八九十百"
 CHAPTER_RE = re.compile(rf"第\s*[{CHINESE_NUMBER}]+\s*章[^\n]*|第三篇\s*性传播疾病")
 SINGLE_RE = re.compile(r"(?:[（(]?\s*一\s*[）)]?\s*)?单\s*项\s*选\s*择\s*题")

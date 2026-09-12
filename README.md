@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 1.4.11" src="https://img.shields.io/badge/version-1.4.11-b43d35" />
+    <img alt="Version 2.1.0" src="https://img.shields.io/badge/version-2.1.0-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v1.4.11.** Medical practice, library management, optional synchronization, and the Western Medicine 306 workflow are the stable core. PDF import now recognizes source answers shown by yellow option highlighting as well as explicit answer marks placed after an option. English Lab remains a preview, and automated OCR/AI extraction must always be reviewed against the source.
+> **Current release: v2.1.0.** The in-app MinerU Workbench can combine split Hybrid JSON exports, remove duplicate pages, report answer coverage, preserve formulas, preview the resulting structure, and save the bank without spending AI quota. Medical practice, library management, optional synchronization, and Western Medicine 306 remain the stable core.
 
 ## Product map
 
@@ -40,7 +40,8 @@
 | **AI assistance** | Personal or site-wide OpenAI-compatible providers, import structuring, explanations, follow-up, and note writing | Optional |
 | **Cross-device sync** | Parsed banks, progress, wrong answers, featured items, notes, settings, groups, and deletion tombstones | Optional |
 | **English Lab** | Interactive demos for cloze, reading, listening, matching, translation, and writing | Preview |
-| **Elapse Forge** | Isolated scanned-bank workbench with MinerU-result ingestion, normalization, audit, and Elapse export | Foundation 0.2 |
+| **MinerU Workbench** | In-app multi-JSON merge, duplicate-page removal, answer/formula report, structure preview, and one-click library save | Stable in v2.1 |
+| **Elapse Forge** | Isolated source-preserving review service with page coordinates, audit history, and Elapse export | Advanced foundation |
 
 ## Why Elapse
 
@@ -63,7 +64,7 @@ flowchart LR
 
 ### Import and library management
 
-- Import `.doc`, `.docx`, text PDF, scanned PDF, AveCove portable JSON, and official MinerU Hybrid JSON. Text PDFs can retain yellow-highlighted correct options, while explicit answer marks after an option are also recognized. ENT military-medical inline keys and Renwei dermatology chapter keys have dedicated deterministic profiles.
+- Import `.doc`, `.docx`, text PDF, scanned PDF, AveCove portable JSON, and official MinerU Hybrid JSON. The v2.1 MinerU Workbench combines sequential exports into one bank, drops identical repeated pages, preserves inline/display formulas, and reports answered and pending items before saving. Text PDFs can retain yellow-highlighted correct options, while explicit answer marks after an option are also recognized.
 - Keep structurally complete Word objective questions even when no answer is recognized; they remain visibly pending and editable instead of being discarded.
 - Add a description with chapter-to-question ranges and group related yearly or subject banks.
 - Search titles, descriptions, groups, stems, options, categories, and source numbers.
@@ -193,7 +194,9 @@ The student ID is converted into an irreversible sync identifier; the original v
 
 ## Elapse Forge
 
-Forge is the isolated import workbench under `/forge`. It can ingest the original file together with an already completed official MinerU Hybrid JSON result and optional Markdown, preserving page references, coordinates, tables, and image evidence without spending OCR again.
+Elapse v2.1 adds a browser-local MinerU Workbench to the normal Import dialog. It accepts one or multiple completed Hybrid JSON exports, joins them in natural file-name order, removes byte-identical duplicate pages, preserves MinerU equations as LaTeX, previews the question structure, and saves directly into the active library without AI calls.
+
+The separate `/forge` route remains the advanced source-preserving workflow. It can ingest the original file together with an already completed official MinerU Hybrid JSON result and optional Markdown, preserving page references, coordinates, tables, and image evidence without spending OCR again.
 
 Forge is deliberately separate from the stable practice application. Foundation `0.2.0` improves chapter-scoped numbering, split options, cross-page seams, and answer-table association, but it is **not a zero-error OCR product**. Keep the original document for visual review and verify every generated bank before study.
 
@@ -218,6 +221,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v2.1.0** — Added the in-app MinerU Workbench for multi-file merge, duplicate-page cleanup, answer/formula diagnostics, structure preview, one-click saving, and KaTeX rendering in question stems and options.
 - **v1.4.11** — Rebuilt the post-2017 306 workbench around the fixed 165-question A/B/X and A-D format, with paired B pools, green explanation keys, yellow PDF highlights, and explicit option-answer markers.
 - **v1.4.10** — Added manual answer entry for answerless questions, medical type correction, editable option counts, complete question insertion with sequential renumbering, and a leaner study panel.
 - **v1.4.9** — Added direct MinerU Hybrid JSON import for ENT military-medical and Renwei dermatology layouts, plus answer-optional Word question retention.

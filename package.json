@@ -1,6 +1,6 @@
 {
   "name": "avecove-elapse",
-  "version": "1.4.15",
+  "version": "2.1.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -14,6 +14,8 @@
     "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
+    "@types/katex": "^0.16.8",
+    "katex": "^0.18.7",
     "lucide-react": "^1.25.0",
     "mammoth": "^1.12.0",
     "next": "16.2.10",

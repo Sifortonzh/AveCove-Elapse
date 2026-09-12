@@ -12,6 +12,8 @@ import {
 import questionBank from "./questions.json";
 import { AnnotatedOption, AiDialogue, ChapterDirectory } from "./components/PracticeExtras";
 import EnglishLearningView from "./components/EnglishLearningView";
+import MinerUWorkbench from "./components/MinerUWorkbench";
+import { MathText } from "./components/MathText";
 import { extractQuestionFileText, importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
 import {
   activateQuestionBank, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
@@ -27,7 +29,7 @@ import {
   type RecordLedger,
 } from "./lib/record-sync";
 import { type MedicalQuestionType, type QuizQuestion } from "./lib/question-parser";
-import { isMineruHybridJson, parseMineruHybridQuestionBank } from "./lib/mineru-import";
+import { isMineruHybridJson, parseMineruHybridQuestionBank, type MinerUQuestionBank } from "./lib/mineru-import";
 import {
   detectWestern306Blueprint, parseModernWestern306Questions, reconcileMedicalQuestionsWithSourceAnswers,
   standardizeParsedWestern306Questions, WESTERN_306_SUBJECTS, western306Score,
@@ -322,6 +324,7 @@ export default function HomePage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAnswerSheet, setShowAnswerSheet] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showMineruWorkbench, setShowMineruWorkbench] = useState(false);
   const [show306Workbench, setShow306Workbench] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -1264,6 +1267,22 @@ export default function HomePage() {
     }
   }
 
+  async function saveMineruWorkbenchResult(bank: MinerUQuestionBank) {
+    const saved = await saveActiveBank({
+      ...bank,
+      name: bank.name.trim(),
+      groupName: bank.groupName.trim() || suggestQuestionBankGroup(bank.name, bank.questions),
+      importedAt: new Date().toISOString(),
+    });
+    setQuestions(saved.questions);
+    setBankName(saved.name);
+    setActiveBankId(saved.id);
+    setQuestionBanks(await listQuestionBanks());
+    setShowMineruWorkbench(false);
+    const pending = saved.questions.filter((question) => !question.answer.length).length;
+    setToast(`MinerU 工作台已保存 ${saved.questions.length} 道题${pending ? ` · ${pending} 题待答案` : " · 答案已关联"} ✨`);
+  }
+
   async function save306WorkbenchResult(name: string, questions: QuizQuestion[], report: Western306ImportReport) {
     const counts = report.typeCounts ?? {};
     const description = [
@@ -1735,9 +1754,11 @@ export default function HomePage() {
           onFiles={handleFiles}
           onCancel={cancelImport}
           onDrag={setDragActive}
+          onMineru={() => { setShowImport(false); setShowMineruWorkbench(true); }}
           on306={() => { setShowImport(false); setShow306Workbench(true); }}
         />
       )}
+      {showMineruWorkbench && <MinerUWorkbench onClose={() => setShowMineruWorkbench(false)} onSave={saveMineruWorkbenchResult} />}
       {show306Workbench && <Western306Workbench onClose={() => setShow306Workbench(false)} onSave={save306WorkbenchResult} />}
       {showAiImport && <AiImportFallbackModal files={aiFallbackFiles} onRecognize={recognizeFileWithAi} onClose={() => { setShowAiImport(false); setAiFallbackFiles([]); }} />}
       {answerTargetBank && <AnswerImportModal bank={answerTargetBank} onMerge={mergeAnswerFile} onClose={() => setAnswerTargetBank(null)} />}
@@ -2358,14 +2379,14 @@ function QuizView(props: {
         <button className="question-previous-top subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>
         <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题" aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题" aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} title="纠错编辑" aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} title="搜索题目" aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题" aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已精选" : "精选"}</button></div></div>
         {props.killed && <div className="killed-question-banner"><Scissors size={18} /><div><strong>本题已斩</strong><span>会被后续练习跳过，不计入正确率；可随时恢复。</span></div><button onClick={() => props.onUpdateKilled([current.id], false)}>恢复本题</button></div>}
-        {current.sharedStem && <section className="shared-medical-stem"><span>{current.medicalQuestionType === "A4" ? "递进病例" : "共用题干"}</span><p>{current.sharedStem}</p></section>}
+        {current.sharedStem && <section className="shared-medical-stem"><span>{current.medicalQuestionType === "A4" ? "递进病例" : "共用题干"}</span><p><MathText text={current.sharedStem} /></p></section>}
         {props.relatedQuestions.length > 1 && <section className="linked-question-group"><header><div><strong>同组题目</strong><span>{props.relatedQuestions.length} 题共用{current.medicalQuestionType === "B1" ? "备选答案" : "题干"}，可直接切换</span></div></header><div>{props.relatedQuestions.map((question) => <button key={question.id} className={`${question.id === current.id ? "active" : ""} ${props.relatedProgress[question.id] ?? ""}`} onClick={() => props.onOpenRelated(question.id)}><b>{question.sourceNumber}</b><span>{question.stem}</span>{props.relatedProgress[question.id] === "correct" ? <Check size={14} /> : props.relatedProgress[question.id] === "wrong" ? <X size={14} /> : null}</button>)}</div></section>}
-        <article className="question-body"><h1>{current.stem}</h1><p className="choose-hint">{chooseHint}<span className="option-gesture-hint">单击选择或取消 · 双击排除干扰项</span></p><div className="answer-options">{current.options.map((option) => {
+        <article className="question-body"><h1><MathText text={current.stem} /></h1><p className="choose-hint">{chooseHint}<span className="option-gesture-hint">单击选择或取消 · 双击排除干扰项</span></p><div className="answer-options">{current.options.map((option) => {
           const picked = selected.includes(option.label);
           const ruledOut = excluded.includes(option.label);
           const isAnswer = submitted && current.answer.includes(option.label);
           const isWrong = submitted && picked && !current.answer.includes(option.label);
-          return <AnnotatedOption key={`${current.id}-${option.label}`} label={option.label} submitted={submitted} note={note} onNote={props.onNote}><button className={`answer-option ${picked ? "selected" : ""} ${ruledOut ? "excluded" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} aria-pressed={picked} title={ruledOut ? "已排除；单击可重新选择，双击取消排除" : "单击选择或取消，双击排除"} onClick={() => props.onToggleOption(option.label)} onDoubleClick={(event) => { event.preventDefault(); props.onExcludeOption(option.label); }}><span>{option.label}</span><p>{option.text}</p>{ruledOut && !submitted ? <em className="answer-state-label excluded-label"><X size={16} />已排除</em> : isAnswer ? <em className="answer-state-label correct-label"><Check size={16} />正确</em> : isWrong ? <em className="answer-state-label wrong-label"><X size={16} />错误</em> : null}</button></AnnotatedOption>;
+          return <AnnotatedOption key={`${current.id}-${option.label}`} label={option.label} submitted={submitted} note={note} onNote={props.onNote}><button className={`answer-option ${picked ? "selected" : ""} ${ruledOut ? "excluded" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} aria-pressed={picked} title={ruledOut ? "已排除；单击可重新选择，双击取消排除" : "单击选择或取消，双击排除"} onClick={() => props.onToggleOption(option.label)} onDoubleClick={(event) => { event.preventDefault(); props.onExcludeOption(option.label); }}><span>{option.label}</span><p><MathText text={option.text} /></p>{ruledOut && !submitted ? <em className="answer-state-label excluded-label"><X size={16} />已排除</em> : isAnswer ? <em className="answer-state-label correct-label"><Check size={16} />正确</em> : isWrong ? <em className="answer-state-label wrong-label"><X size={16} />错误</em> : null}</button></AnnotatedOption>;
         })}</div></article>
         {memorizing && answerAvailable && <div className="result-strip memorize-answer"><span><Eye /></span><div><strong>标准答案已展开</strong><p>题库答案：{current.answer.join("、")} · 背题模式不会计入对错记录</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
         {!memorizing && submitted && answerAvailable && <div className={`result-strip ${result}`}><span>{result === "correct" ? <CheckCircle2 /> : <AlertCircle />}</span><div><strong>{result === "correct" ? "√ 正确 · 知识点已加深" : "× 错误 · 这道题值得加入复盘"}</strong><p>你的答案：{selected.join("、")} · 题库答案：{current.answer.join("、")}</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
@@ -2629,14 +2650,14 @@ function AnswerSheet({ questions, progress, favorites, notes, killed, answerSele
   return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose} aria-label="关闭答题卡"><X /></button></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = /^> 选项 [A-G] 批注：\s*\S/m.test(notes[question.id] ?? ""); return <button key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? "，精选" : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★</span>}</button>; })}</div></section></div>;
 }
 
-function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; on306: () => void }) {
+function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, onMineru, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; onMineru: () => void; on306: () => void }) {
   const importStage = state.progress >= 90 ? 4 : state.progress >= 58 ? 3 : state.progress > 0 ? 2 : 1;
   const stages = ["文件准备", "本地提取", "结构识别", "审校保存"];
   return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal spatial-import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>IMPORT WORKBENCH · 文件默认在本机处理</span><h2>把资料整理成可练习的题库</h2><p>一次导入多份文件；系统会先提取文字，再识别题型、答案与章节结构。</p></div><button onClick={onClose} disabled={busy} aria-label="关闭导入工作台"><X /></button></header>
     <ol className="import-stage-strip" aria-label="导入流程">{stages.map((label, index) => { const number = index + 1; return <li className={number < importStage ? "done" : number === importStage ? "active" : ""} key={label}><i>{number < importStage ? <Check size={14} /> : number}</i><span>{label}</span></li>; })}</ol>
     <div className="import-workbench-grid">
       <div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF、MinerU Hybrid JSON 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div>
-      <aside className="import-capability-panel"><span className="overline">SPECIALIZED FLOW</span><button type="button" className="western306-entry" onClick={on306} disabled={busy}><Target /><span><strong>西综 306 标准化工作台</strong><small>2017 年起 165 题、A/B/X 型、A-D 四选项与答案配套校验</small></span><ArrowRight /></button><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>题干末尾答案、章节答案表与历年回忆题</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>单选、多选与判断；自动跳过填空和问答</small></span></div></div></aside>
+      <aside className="import-capability-panel"><span className="overline">SPECIALIZED FLOW</span><button type="button" className="mineru-entry" onClick={onMineru} disabled={busy}><ScanText /><span><strong>MinerU 题库工作台</strong><small>多份 Hybrid JSON 合并、重复页清理、公式排版与一键入库</small></span><ArrowRight /></button><button type="button" className="western306-entry" onClick={on306} disabled={busy}><Target /><span><strong>西综 306 标准化工作台</strong><small>2017 年起 165 题、A/B/X 型、A-D 四选项与答案配套校验</small></span><ArrowRight /></button><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>题干末尾答案、章节答案表与历年回忆题</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>单选、多选与判断；自动跳过填空和问答</small></span></div></div></aside>
     </div>
     {(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={onCancel}><X />取消当前导入</button>}</div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "cancelled" ? <X /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">.docx 与 PDF 默认在浏览器本地处理；由于旧版 .doc 是二进制格式，选择后会临时发送到你部署的本站服务器内存提取文字，不落盘、不保留原文件。普通识别失败时仍会先征求同意，再决定是否交给 AI 整理。</p></section></div>;
 }
