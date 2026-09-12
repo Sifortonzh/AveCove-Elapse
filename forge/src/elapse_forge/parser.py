@@ -4,7 +4,15 @@ import re
 import uuid
 from collections import defaultdict
 
-from .models import Document, ParseResult, Question, QuestionType, RegistryEntry, Source
+from .models import (
+    Document,
+    Option,
+    ParseResult,
+    Question,
+    QuestionType,
+    RegistryEntry,
+    Source,
+)
 
 PARSER_VERSION = "rules-0.1"
 TYPE_HEADINGS = {
@@ -26,6 +34,34 @@ TYPE_HEADINGS = {
     "简答": "short",
     "问答": "essay",
 }
+
+CHAPTER_NUMBER_PATTERN = r"第[一二三四五六七八九十百〇零\d]+章"
+
+
+def _chapter_catalog(document: Document) -> tuple[dict[str, str], dict[str, str]]:
+    """Recover canonical chapter titles from a scanned book's contents page."""
+
+    by_number: dict[str, str] = {}
+    for page in document.pages:
+        for block in page.blocks:
+            if block.type in ("header", "footer", "page_number", "image"):
+                continue
+            for raw in block.text.splitlines():
+                line = raw.strip()
+                match = re.match(
+                    rf"^({CHAPTER_NUMBER_PATTERN})\s+(.+?)(?:…{{2,}}|\.{{3,}})\s*\d+\s*$",
+                    line,
+                )
+                if not match:
+                    continue
+                number, title = match.groups()
+                title = re.sub(r"\s+", " ", title).strip(" ：:")
+                if 2 <= len(title) <= 60:
+                    by_number.setdefault(number, f"{number} {title}")
+    by_title = {
+        full.removeprefix(number).strip(): full for number, full in by_number.items()
+    }
+    return by_number, by_title
 
 
 def _question_type_heading(line: str) -> tuple[QuestionType, str] | None:
@@ -116,6 +152,7 @@ def _table_answers(block, source, document, scope, default_kind, result):
 
 def parse_document(document: Document) -> ParseResult:
     result = ParseResult()
+    chapters_by_number, chapters_by_title = _chapter_catalog(document)
     chapter = ""
     scope = ""
     kind = QuestionType.UNKNOWN
@@ -126,7 +163,7 @@ def parse_document(document: Document) -> ParseResult:
     shared_mode: str | None = None
     shared_group = ""
     shared_buffer: list[str] = []
-    shared_options = []
+    shared_options: list[Option] = []
     shared_question_count = 0
 
     def clear_shared():
@@ -169,6 +206,20 @@ def parse_document(document: Document) -> ParseResult:
                 line = raw.strip()
                 if not line:
                     continue
+                # MinerU can join a repeated page header directly to the first
+                # option on the next page, for example "第八章 ... C. ...".
+                # Strip only a catalog-confirmed current chapter prefix.
+                if chapter and current:
+                    chapter_number = re.match(rf"^({CHAPTER_NUMBER_PATTERN})", chapter)
+                    known_chapter = (
+                        chapters_by_number.get(chapter_number[1], chapter)
+                        if chapter_number
+                        else chapter
+                    )
+                    if line.startswith(known_chapter):
+                        remainder = line[len(known_chapter) :].lstrip()
+                        if re.match(r"^[A-G][.．、]\s*", remainder):
+                            line = remainder
                 if line == "总论" and not re.fullmatch(
                     r"第[一二三四五六七八九十百\d]+篇", chapter
                 ):
@@ -194,9 +245,19 @@ def parse_document(document: Document) -> ParseResult:
                 ):
                     chapter = scope = f"{chapter} {compact_line}"
                     continue
-                if re.match(r"^第[一二三四五六七八九十百\d]+章", line):
+                chapter_match = re.match(rf"^({CHAPTER_NUMBER_PATTERN})(?:\s+(.+))?$", line)
+                if chapter_match and not re.search(r"(?:^|\s)[A-G][.．、]", line):
                     clear_shared()
-                    chapter = scope = line
+                    number, supplied_title = chapter_match.groups()
+                    chapter = scope = chapters_by_number.get(number, line)
+                    if supplied_title and number not in chapters_by_number:
+                        chapter = scope = f"{number} {supplied_title.strip()}"
+                    kind = QuestionType.UNKNOWN
+                    mode, current, entry, option = "ignore", None, None, None
+                    continue
+                if line in chapters_by_title:
+                    clear_shared()
+                    chapter = scope = chapters_by_title[line]
                     kind = QuestionType.UNKNOWN
                     mode, current, entry, option = "ignore", None, None, None
                     continue
@@ -309,7 +370,9 @@ def parse_document(document: Document) -> ParseResult:
                     continue
                 if mode == "ignore":
                     continue
-                number = re.match(r"^(\d+)\s*[.．、]\s*(.+)$", line)
+                # Decimal values at a page break (for example 37.2℃) are
+                # continuations, not a new question numbered 37.
+                number = re.match(r"^(\d+)\s*[.．、](?!\d)\s*(.+)$", line)
                 if mode == "explanations":
                     if number:
                         entry = RegistryEntry(
@@ -359,8 +422,6 @@ def parse_document(document: Document) -> ParseResult:
                     result.questions.append(current)
                     option = None
                     if choices and not current.options:
-                        from .models import Option
-
                         for i, choice in enumerate(choices):
                             text = body[
                                 choice.end() : choices[i + 1].start()
@@ -375,8 +436,6 @@ def parse_document(document: Document) -> ParseResult:
                         re.finditer(r"(?:^|(?<=[\s:：]))([A-G])[.．、]\s*", line)
                     )
                     if choices:
-                        from .models import Option
-
                         for i, choice in enumerate(choices):
                             text = line[
                                 choice.end() : choices[i + 1].start()
@@ -398,8 +457,6 @@ def parse_document(document: Document) -> ParseResult:
                         re.finditer(r"(?:^|(?<=[\s:：]))([A-G])[.．、]\s*", line)
                     )
                     if choices:
-                        from .models import Option
-
                         for i, choice in enumerate(choices):
                             text = line[
                                 choice.end() : choices[i + 1].start()
@@ -473,8 +530,32 @@ def reconcile(result: ParseResult) -> ParseResult:
                 incoming_types = {item.question_type for item in candidates}
                 if len(loose_targets) == 1 and len(incoming_types) == 1:
                     target = loose_targets[0]
-                    target.type = next(iter(incoming_types))
-                    target.flags.append("question_type_from_answer_section")
+                    incoming_type = next(iter(incoming_types))
+                    specific_objective_types = {
+                        QuestionType.A1,
+                        QuestionType.A2,
+                        QuestionType.A3,
+                        QuestionType.A4,
+                        QuestionType.B1,
+                        QuestionType.C,
+                    }
+                    candidate_labels = {
+                        label
+                        for item in candidates
+                        if isinstance(item.value, list)
+                        for label in item.value
+                    }
+                    available_labels = {option.label for option in target.options}
+                    if (
+                        target.type in specific_objective_types
+                        and incoming_type != target.type
+                        and candidate_labels
+                        and candidate_labels <= available_labels
+                    ):
+                        target.flags.append("answer_type_heading_mismatch")
+                    else:
+                        target.type = incoming_type
+                        target.flags.append("question_type_from_answer_section")
                     targets = [target]
                 elif len(incoming_types) == 1 and not identity[1]:
                     document_targets = document_questions.get(

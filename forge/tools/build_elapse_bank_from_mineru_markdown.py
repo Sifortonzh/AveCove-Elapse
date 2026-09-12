@@ -39,6 +39,9 @@ class BuildProfile:
     include_judgement: bool = False
     require_five_options: bool = True
     require_multiple_answers: bool = True
+    edition: str = ""
+    author: str = ""
+    copyright_notice: str = ""
 
 
 PROFILES = {
@@ -62,6 +65,21 @@ PROFILES = {
         include_judgement=True,
         require_five_options=False,
         require_multiple_answers=False,
+    ),
+    "obgyn-renwei": BuildProfile(
+        source_file="妇产科学习指导与习题集（第3版）",
+        id_prefix="renwei-obgyn-9e",
+        bank_name="妇产科学人卫第9版配套 · 客观题全量版",
+        group_name="妇产科学 · 人卫第9版",
+        answer_source="《妇产科学习指导与习题集》第3版（《妇产科学》第9版配套）各章参考答案；MinerU Hybrid JSON 转换，使用时请结合原书复核。",
+        purpose="妇产科学人卫第9版配套 A1/A2/A3/A4/B1 型选择题练习。",
+        source_description="《妇产科学习指导与习题集》第3版，对应人民卫生出版社《妇产科学》第9版教材。",
+        include_judgement=False,
+        require_five_options=True,
+        require_multiple_answers=False,
+        edition="第3版（配套《妇产科学》第9版）",
+        author="主编：谢幸、孔北华、段涛",
+        copyright_notice="原书版权归人民卫生出版社及相关权利人所有；本题库仅供个人学习与校内复习使用。",
     ),
     "ent-head-neck": BuildProfile(
         source_file="耳鼻咽喉头颈外科学学习指导与习题集（第2版）",
@@ -291,6 +309,31 @@ def suitable_complete(question, profile: BuildProfile) -> bool:
     return len(labels) >= 2 and labels == list("ABCDEFG"[: len(labels)])
 
 
+def repair_obvious_source_number_ocr(parsed) -> None:
+    """Repair only a duplicated digit when its neighbors prove the sequence."""
+
+    grouped = {}
+    for question in parsed.questions:
+        grouped.setdefault((question.scope, str(question.type)), []).append(question)
+    for questions in grouped.values():
+        for index in range(1, len(questions) - 1):
+            previous, current, following = questions[index - 1 : index + 2]
+            values = (
+                previous.source_question_number,
+                current.source_question_number,
+                following.source_question_number,
+            )
+            if not all(value.isdigit() for value in values):
+                continue
+            prior, observed, later = map(int, values)
+            expected = prior + 1
+            if observed <= prior and later == expected + 1:
+                current.source_question_number = str(expected)
+                current.flags.append(
+                    f"source_number_ocr_repaired:{observed}->{expected}"
+                )
+
+
 def elapse_question(question, index: int, profile: BuildProfile) -> dict:
     kind = str(question.type)
     category = question.scope.replace(" / ", " · ").strip() or "未分章"
@@ -335,7 +378,7 @@ def elapse_question(question, index: int, profile: BuildProfile) -> dict:
         "sharedStemGroup": question.shared_stem_group,
         "sharedOptionGroup": question.shared_option_group,
         "explanation": explanation,
-        "answerSource": profile.answer_source,
+        "answerSource": profile.answer_source if question.answer else "",
     }
     if kind != "judgement":
         payload["questionType"] = question_type
@@ -366,7 +409,10 @@ def main():
         if suffixes == {".json"}
         else build_document(args.inputs, profile)
     )
-    parsed = reconcile(parse_document(document))
+    parsed = parse_document(document)
+    if args.profile == "obgyn-renwei":
+        repair_obvious_source_number_ocr(parsed)
+    parsed = reconcile(parsed)
     selector = suitable_complete if args.complete else suitable
     selected = [
         question for question in parsed.questions if selector(question, profile)
@@ -419,8 +465,12 @@ def main():
         [
             f"用途：{'保留全部结构完整的客观题，并明确区分原书答案已关联与待核对题。' if args.complete else profile.purpose}",
             f"来源：{profile.source_description}",
-            f"本版收录 {len(selected)} 道结构完整且答案可关联的客观题：A1 {types['A1']}、A2 {types['A2']}、A3 {types['A3']}、A4 {types['A4']}、B1 {types['B1']}、C {types['C']}、单选 {types['single']}、X/多选 {types['multiple']}、判断 {types['judgement']}。",
-            "筛选规则：仅保留结构完整、且答案能从原书答案区可靠关联的选择题与判断题；不收入填空、名词解释、简答和问答题。A3/A4 共用病例题干，B1 共用备选答案。",
+            f"本版收录 {len(selected)} 道结构完整的客观题：A1 {types['A1']}、A2 {types['A2']}、A3 {types['A3']}、A4 {types['A4']}、B1 {types['B1']}、C {types['C']}、单选 {types['single']}、X/多选 {types['multiple']}、判断 {types['judgement']}。",
+            (
+                "筛选规则：保留全部结构完整的选择题与判断题；未能从原书答案区可靠关联的题目明确标记为“待答案”。不收入填空、名词解释、简答和问答题。A3/A4 共用病例题干，B1 共用备选答案。"
+                if args.complete
+                else "筛选规则：仅保留结构完整、且答案能从原书答案区可靠关联的选择题与判断题；不收入填空、名词解释、简答和问答题。A3/A4 共用病例题干，B1 共用备选答案。"
+            ),
             "章节分布："
             + "；".join(f"{name} {count} 道" for name, count in chapters.items()),
             "目录备注（原题号按题型分区）：\n" + "\n".join(scope_distribution),
@@ -436,9 +486,15 @@ def main():
             "name": (
                 "传染病学人卫第9版配套 · 全量结构版"
                 if args.complete and args.profile == "infectious-renwei"
+                else "妇产科学人卫第9版配套 · 客观题全量版"
+                if args.complete and args.profile == "obgyn-renwei"
                 else profile.bank_name
             ),
             "description": description,
+            "sourceTitle": profile.source_file,
+            "edition": profile.edition,
+            "author": profile.author,
+            "copyrightNotice": profile.copyright_notice,
             "groupName": profile.group_name,
             "questions": [
                 elapse_question(question, index, profile)

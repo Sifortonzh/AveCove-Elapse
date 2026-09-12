@@ -103,6 +103,42 @@ def test_type_heading_can_share_line_with_first_question():
     assert [option.label for option in parsed.questions[0].options] == ["A", "B"]
 
 
+def test_contents_catalog_restores_chapter_title_and_ignores_decimal_temperature():
+    doc = Document(
+        id="chapter-catalog",
+        metadata={"source_file": "book.json"},
+        provider="mineru-cloud-hybrid",
+        raw_output_reference=[],
+        pages=[
+            page(1, "第五章 产前检查与孕期保健……43\n第五章\n产前检查与孕期保健\nA2型题\n1. 体温 T"),
+            page(2, "37.2℃，伴腹痛\nA. 甲\nB. 乙\n参考答案\nA2型题\n1.B"),
+        ],
+    )
+    question = reconcile(parse_document(doc)).questions[0]
+    assert question.scope == "第五章 产前检查与孕期保健"
+    assert "37.2℃" in question.stem
+    assert question.answer == ["B"]
+
+
+def test_objective_answer_survives_misread_subjective_answer_heading():
+    doc = Document(
+        id="answer-heading-mismatch",
+        metadata={"source_file": "book.json"},
+        provider="mineru-cloud-hybrid",
+        raw_output_reference=[],
+        pages=[
+            page(
+                1,
+                "第一章 示例\nA1型题\n1. 题干\nA. 甲\nB. 乙\n参考答案\n填空题\n1.B",
+            )
+        ],
+    )
+    question = reconcile(parse_document(doc)).questions[0]
+    assert question.type == "A1"
+    assert question.answer == ["B"]
+    assert "answer_type_heading_mismatch" in question.flags
+
+
 def test_numbered_non_objective_heading_ends_choice_section():
     doc = Document(
         id="numbered-heading",
