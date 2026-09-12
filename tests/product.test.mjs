@@ -1168,7 +1168,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.4\.14"/);
+  assert.match(packageJson, /"version": "1\.4\.15"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
