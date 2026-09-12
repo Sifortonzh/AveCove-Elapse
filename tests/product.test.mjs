@@ -503,7 +503,8 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /本协议不排除或限制依法不得排除的责任/);
   assert.match(page, /正式上线前，站点运营者必须公布有效的版权与隐私联系邮箱/);
   assert.match(styles, /Copyright, disclaimer, and responsible-use agreement/);
-  assert.doesNotMatch(page, /className="community-card"/);
+  assert.match(page, /className="community-card"/);
+  assert.match(page, /当前题库独立讨论/);
   assert.match(page, /AI 学习工作台/);
   assert.match(page, /学号只生成不可逆的同步标识/);
   assert.match(page, /邮箱验证码/);
@@ -749,6 +750,10 @@ test("persists in-practice question corrections into sync and shared banks", asy
   assert.match(styles, /\.answer-revision-warning/);
   assert.match(styles, /\.question-type-edit-section/);
   assert.match(styles, /\.add-option-button/);
+  assert.match(styles, /\.question-edit-modal\.editing \.option-edit-section>label/);
+  assert.match(page, /rows=\{creating \? 2 : 1\}/);
+  assert.match(page, /存为原题解析/);
+  assert.match(page, /explanationSource: "AI 生成解析 · 手动保存"/);
 });
 
 test("inserts a complete manual question and shifts the following continuous source numbers", async () => {
@@ -1160,7 +1165,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "1\.4\.12"/);
+  assert.match(packageJson, /"version": "1\.4\.13"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1366,6 +1371,12 @@ test("keeps touch practice controls, in-quiz search, and reusable note tags disc
   assert.match(styles, /@media\(max-width:620px\)\{\.question-previous-top\{display:none\}\}/);
   assert.match(styles, /answer-option\.excluded/);
   assert.match(styles, /note-preview-compact/);
+  assert.match(page, /className="bank-answer-badge"/);
+  assert.doesNotMatch(page, /className="bank-answer-pending"/);
+  assert.match(page, /className="sheet-answer-missing"/);
+  assert.match(page, /commentThreadId\(activeBankId, current\.id\)/);
+  assert.match(page, /当前题库独立讨论/);
+  assert.match(page, /同学讨论/);
 });
 
 test("ships shared data, moderation, branding, and deployment material", async () => {

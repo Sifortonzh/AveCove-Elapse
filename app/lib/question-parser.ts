@@ -21,6 +21,7 @@ export type QuizQuestion = {
   sharedStemGroup?: string;
   sharedOptionGroup?: string;
   explanation?: string;
+  explanationSource?: string;
   answerSource?: string;
 };
 
