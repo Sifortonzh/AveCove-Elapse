@@ -1485,7 +1485,7 @@ export default function HomePage() {
     const bank = activeBankId ? questionBanks.find((candidate) => candidate.id === activeBankId) : undefined;
     const sourceQuestions = bank?.questions ?? questions;
     const applied = applyBatchAnswers(sourceQuestions, entries);
-    if (!applied.updatedCount) throw new Error("这 5 题还没有可保存的有效答案");
+    if (!applied.updatedCount) throw new Error("本组题目还没有可保存的有效答案");
 
     let saved: SavedQuestionBank;
     if (bank) {
@@ -2711,7 +2711,7 @@ function BatchAnswerModal({ questions, onSave, onClose }: { questions: QuizQuest
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const currentBatch = pendingIds.slice(offset, offset + 5).map((id) => questions.find((question) => question.id === id)).filter((question): question is QuizQuestion => Boolean(question));
+  const currentBatch = pendingIds.slice(offset, offset + 10).map((id) => questions.find((question) => question.id === id)).filter((question): question is QuizQuestion => Boolean(question));
   const complete = currentBatch.length > 0 && currentBatch.every((question) => answers[question.id]?.length);
   const toggle = (question: QuizQuestion, label: string) => setAnswers((current) => {
     const selected = current[question.id] ?? [];
@@ -2731,7 +2731,7 @@ function BatchAnswerModal({ questions, onSave, onClose }: { questions: QuizQuest
       setError(caught instanceof Error ? caught.message : "答案暂时无法保存，请重试");
     } finally { setBusy(false); }
   };
-  return <div className="modal-layer batch-answer-layer" onMouseDown={() => !busy && onClose()}><section className="batch-answer-modal" role="dialog" aria-modal="true" aria-label="批量补录答案" onMouseDown={(event) => event.stopPropagation()}><header><div><span>BATCH ANSWER · 每次 5 题</span><h2>批量补答案</h2><p>按待答案顺序每次录入 5 题；X 型题可多选，其他题型单选。</p></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="batch-answer-progress"><span>第 {offset + 1}–{offset + currentBatch.length} / {pendingIds.length} 个待答案题</span><i><b style={{ width: `${Math.round(offset / Math.max(1, pendingIds.length) * 100)}%` }} /></i></div><div className="batch-answer-list">{currentBatch.map((question) => <article key={question.id}><header><b>原题号 {question.sourceNumber}</b><span>{question.medicalQuestionType || (question.multiple ? "多选题" : "单选题")}</span></header><p>{question.stem}</p><div>{question.options.map((option) => <button key={option.label} className={answers[question.id]?.includes(option.label) ? "active" : ""} onClick={() => toggle(question, option.label)} title={option.text}><b>{option.label}</b><span>{option.text}</span></button>)}</div></article>)}</div>{error && <p className="batch-answer-error"><AlertCircle size={16} />{error}</p>}<footer><button onClick={onClose} disabled={busy}>稍后再补</button><button className="primary-action" onClick={() => void save()} disabled={!complete || busy}><CheckCircle2 />{busy ? "正在保存…" : currentBatch.length === 5 ? "保存这 5 题" : `保存这 ${currentBatch.length} 题`}</button></footer></section></div>;
+  return <div className="modal-layer batch-answer-layer" onMouseDown={() => !busy && onClose()}><section className="batch-answer-modal" role="dialog" aria-modal="true" aria-label="批量补录答案" onMouseDown={(event) => event.stopPropagation()}><header><div><span>BATCH ANSWER · 每次 10 题</span><h2>批量补答案</h2><p>按待答案顺序每次录入 10 题；只显示 A–E，X 型题可多选，其他题型单选。</p></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="batch-answer-progress"><span>第 {offset + 1}–{offset + currentBatch.length} / {pendingIds.length} 个待答案题</span><i><b style={{ width: `${Math.round(offset / Math.max(1, pendingIds.length) * 100)}%` }} /></i></div><div className="batch-answer-list">{currentBatch.map((question) => <article key={question.id}><header><b>原题号 {question.sourceNumber}</b><span>{question.medicalQuestionType || (question.multiple ? "多选题" : "单选题")}</span></header><p>{question.stem}</p><div>{["A", "B", "C", "D", "E"].map((label) => <button key={label} aria-label={`原题号 ${question.sourceNumber} 选择 ${label}`} className={answers[question.id]?.includes(label) ? "active" : ""} onClick={() => toggle(question, label)}><b>{label}</b></button>)}</div></article>)}</div>{error && <p className="batch-answer-error"><AlertCircle size={16} />{error}</p>}<footer><button onClick={onClose} disabled={busy}>稍后再补</button><button className="primary-action" onClick={() => void save()} disabled={!complete || busy}><CheckCircle2 />{busy ? "正在保存…" : `保存这 ${currentBatch.length} 题`}</button></footer></section></div>;
 }
 
 function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, onMineru, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; onMineru: () => void; on306: () => void }) {

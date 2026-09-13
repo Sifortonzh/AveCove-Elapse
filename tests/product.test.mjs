@@ -1539,7 +1539,7 @@ test("ships shared data, moderation, branding, and deployment material", async (
   assert.match(schema, /CREATE TABLE IF NOT EXISTS app_settings/);
 });
 
-test("fills missing answers in deterministic five-question batches", async () => {
+test("fills missing answers in deterministic ten-question batches", async () => {
   const { applyBatchAnswers, pendingAnswerQuestions } = await loadBatchAnswer();
   const questions = Array.from({ length: 7 }, (_, index) => ({
     id: `q-${index + 1}`,
@@ -1595,7 +1595,9 @@ test("builds a print-ready note export from wrong, featured, annotated, and AI-e
 test("exposes the complete v2.1.1 workflow in the practice UI", async () => {
   const [page, extras] = await Promise.all([text("app/page.tsx"), text("app/components/PracticeExtras.tsx")]);
   assert.match(page, /批量补答案/);
-  assert.match(page, /每次 5 题/);
+  assert.match(page, /每次 10 题/);
+  assert.match(page, /\["A", "B", "C", "D", "E"\]/);
+  assert.doesNotMatch(page, /title=\{option\.text\}/);
   assert.match(page, /导出 PDF/);
   assert.match(extras, /可粘贴图片/);
   assert.match(extras, /支持粘贴或上传书本截图/);
