@@ -10,7 +10,7 @@ import {
   Flag, Scissors, Star, Sun, Target, ThumbsUp, Trash2, Upload, UserRound, X, Zap,
 } from "lucide-react";
 import questionBank from "./questions.json";
-import { AnnotatedOption, AiDialogue, ChapterDirectory } from "./components/PracticeExtras";
+import { AnnotatedOption, AiDialogue, ChapterDirectory, InkNote, NoteImages } from "./components/PracticeExtras";
 import EnglishLearningView from "./components/EnglishLearningView";
 import MinerUWorkbench from "./components/MinerUWorkbench";
 import { MathText } from "./components/MathText";
@@ -39,6 +39,9 @@ import { suggestQuestionBankGroup } from "./lib/bank-grouping";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 import { deleteQuestionAndRenumber, insertQuestionAfter } from "./lib/question-edit";
+import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
+import { hasOptionAnnotation, noteImageMarkdown } from "./lib/note-annotations";
+import { collectNoteExportSections, printNotePdf } from "./lib/note-pdf-export";
 
 type Progress = Record<string, "correct" | "wrong">;
 type Scope = "all" | "unanswered" | "wrong" | "favorite";
@@ -178,7 +181,7 @@ function parseNoteSource(markdown: string, question: QuizQuestion) {
 
 function markdownSummary(markdown: string) {
   return markdown
-    .replace(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "笔记图片").replace(/```elapse-ink\n[^`]+\n```/g, "手绘笔记")
+    .replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "笔记图片").replace(/```elapse-ink\n[^`]+\n```/g, "手绘笔记")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^>\s*(?:来源|标签|参考框架|AI整理)[：:].*$/gm, "")
     .replace(/^[-*]\s+/gm, "")
@@ -219,7 +222,7 @@ function inlineMarkdown(text: string) {
 }
 
 function MarkdownNotePreview({ value, empty = "还没有可预览的内容。" }: { value: string; empty?: string }) {
-  const lines = value.replace(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "📷 笔记图片（进入题目查看）").replace(/```elapse-ink\n[^`]+\n```/g, "✎ 已保存手绘笔记（进入题目查看）").replace(/\r/g, "").split("\n");
+  const lines = value.replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "📷 笔记图片（进入题目查看）").replace(/```elapse-ink\n[^`]+\n```/g, "✎ 已保存手绘笔记（进入题目查看）").replace(/\r/g, "").split("\n");
   const rendered = lines.map((line, index) => {
     let kind: MarkdownLineKind = "paragraph";
     let content = line;
@@ -1478,6 +1481,56 @@ export default function HomePage() {
     setToast("题目修订已保存 ✏️✨ 当前题库、多端同步与后续分享都会使用这个版本。");
   }
 
+  async function saveBatchAnswerEntries(entries: BatchAnswerEntry[]) {
+    const bank = activeBankId ? questionBanks.find((candidate) => candidate.id === activeBankId) : undefined;
+    const sourceQuestions = bank?.questions ?? questions;
+    const applied = applyBatchAnswers(sourceQuestions, entries);
+    if (!applied.updatedCount) throw new Error("这 5 题还没有可保存的有效答案");
+
+    let saved: SavedQuestionBank;
+    if (bank) {
+      saved = await saveQuestionBank({ ...bank, questions: applied.questions, updatedAt: new Date().toISOString() }, true);
+      setQuestionBanks((banks) => banks.map((candidate) => candidate.id === saved.id ? saved : candidate));
+    } else {
+      saved = await saveQuestionBank({
+        id: `answered-demo-${Date.now()}`,
+        name: `${bankName}（已补答案）`,
+        description: "由演示题库在答题卡中批量补录标准答案并保存。",
+        questions: applied.questions,
+        importedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, true);
+      setActiveBankId(saved.id);
+      setBankName(saved.name);
+      setQuestionBanks((banks) => [saved, ...banks.filter((candidate) => candidate.id !== saved.id)]);
+    }
+
+    const replacement = new Map(saved.questions.map((question) => [question.id, question]));
+    setQuestions(saved.questions);
+    setSessionQuestions((session) => session.map((question) => replacement.get(question.id) ?? question));
+
+    const nextProgress = { ...progress };
+    const nextFirstProgress = { ...firstProgress };
+    let nextLedger = { ...recordLedger };
+    let checkedDrafts = 0;
+    for (const entry of entries) {
+      const question = replacement.get(entry.questionId);
+      const draft = answerSelections[entry.questionId] ?? question?.draftAnswer ?? [];
+      if (!question?.answer.length || !draft.length) continue;
+      const status = [...draft].sort().join("") === [...question.answer].sort().join("") ? "correct" : "wrong";
+      nextProgress[question.id] = status;
+      const firstWasMissing = !nextFirstProgress[question.id];
+      if (firstWasMissing) nextFirstProgress[question.id] = status;
+      nextLedger = stampLearningRecord(nextLedger, question.id, {
+        progress: status,
+        ...(firstWasMissing ? { firstProgress: status } : {}),
+      });
+      checkedDrafts += 1;
+    }
+    if (checkedDrafts) persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites, notes, killed: killedQuestions, ledger: nextLedger });
+    setToast(`已补录 ${applied.updatedCount} 题答案${checkedDrafts ? `，并核对 ${checkedDrafts} 份先前作答` : ""} ✅`);
+  }
+
   async function insertQuestionAfterCurrent(afterQuestionId: string, draft: QuizQuestion) {
     const baseQuestions = activeBankId
       ? questionBanks.find((candidate) => candidate.id === activeBankId)?.questions
@@ -1740,7 +1793,7 @@ export default function HomePage() {
         <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} western306SubjectCounts={western306SubjectCounts} showWestern306Subjects={hasModernWestern306} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
-        <AnswerSheet questions={sessionQuestions} progress={progress} favorites={favorites} notes={notes} killed={killedQuestions} answerSelections={answerSelections} currentIndex={currentIndex} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
+        <AnswerSheet questions={sessionQuestions} progress={progress} favorites={favorites} notes={notes} killed={killedQuestions} answerSelections={answerSelections} currentIndex={currentIndex} onBatchAnswers={saveBatchAnswerEntries} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
       )}
       {showImport && (
         <ImportModal
@@ -1763,7 +1816,7 @@ export default function HomePage() {
       {showAiImport && <AiImportFallbackModal files={aiFallbackFiles} onRecognize={recognizeFileWithAi} onClose={() => { setShowAiImport(false); setAiFallbackFiles([]); }} />}
       {answerTargetBank && <AnswerImportModal bank={answerTargetBank} onMerge={mergeAnswerFile} onClose={() => setAnswerTargetBank(null)} />}
       {showSearch && <SearchModal banks={searchableBanks} returnToQuiz={view === "quiz" && Boolean(current)} onOpen={async (bank, questionId) => { if (bank.id === "__demo__") openQuestion(questionId); else { await openSavedQuestion(bank, questionId); setShowSearch(false); } }} onClose={() => setShowSearch(false)} />}
-      {showNotes && <NotesModal questions={questions} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
+      {showNotes && <NotesModal bankName={bankName} questions={questions} progress={progress} favorites={favorites} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
       {showAccount && <AccountModal account={account} syncStatus={syncStatus} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pushRemoteState(true)} onExport={() => { void exportLearningRecord(); }} onImport={importLearningRecord} />}
       {incomingBankShare && <IncomingBankShareModal share={incomingBankShare} onImport={() => void importIncomingBankShare()} onClose={clearIncomingBankShare} />}
       {toast && <SuccessToast message={toast} onClose={() => setToast("")} />}
@@ -2620,7 +2673,7 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
     <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className="original-explanation-panel"><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“大神总结”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入我的笔记</button>}</> : <>{generatedText && <p className="ai-copy">{generatedText}</p>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入我的笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "存为原题解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
     {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={current.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
     <details className="community-card"><summary className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>{bankName} · {comments.length} 条</span></summary><div className="community-body"><p className="comment-scope-note">当前题库独立讨论 · 原题号 {current.sourceNumber}</p>{account ? <div className="comment-identity"><UserRound size={15} /><span>{account.nickname}</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={15} />登录后参与讨论</button>}<div className="comment-form"><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 300))} placeholder="写下你的判断依据、易错点或疑问…" disabled={!account || commentBusy} /><button onClick={() => void publishComment()} disabled={!account || commentBusy || commentDraft.trim().length < 2}><Send size={14} />{commentBusy ? "发布中…" : "发布"}</button></div>{commentMessage && <p className="comment-message">{commentMessage}</p>}<div className="local-comments">{comments.length ? comments.map((comment) => <article key={comment.id}><div><b>{comment.nickname}</b><time>{new Date(comment.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p>{comment.text}</p><div className="comment-tools"><button onClick={() => void runCommentAction(() => onLikeComment(comment.id))}><ThumbsUp size={13} />{comment.likes || "赞"}</button><button onClick={() => void runCommentAction(() => onReportComment(comment.id))}><Flag size={13} />举报</button>{comment.own && <button onClick={() => void runCommentAction(() => onDeleteComment(comment.id))}><Trash2 size={13} />删除</button>}</div></article>) : <p className="empty-comments">还没有讨论，成为这份题库中第一个留下学习线索的人。</p>}</div></div></details>
-    <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(event.target.value + "\n" + [...note.matchAll(/!\[笔记图片\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g)].map((match) => match[0]).join("\n") + (note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? "\n" + note.match(/```elapse-ink\n[^`]+\n```/)![0] : ""))} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
+    <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} /><InkNote note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
   </aside>;
 }
 
@@ -2644,10 +2697,41 @@ function SwitchRow({ label, detail, value, onChange }: { label: string; detail: 
   return <button className="switch-row" onClick={() => onChange(!value)}><div><strong>{label}</strong><span>{detail}</span></div><i className={value ? "on" : ""}><b /></i></button>;
 }
 
-function AnswerSheet({ questions, progress, favorites, notes, killed, answerSelections, currentIndex, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; favorites: string[]; notes: Record<string, string>; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onJump: (index: number) => void; onClose: () => void }) {
+function AnswerSheet({ questions, progress, favorites, notes, killed, answerSelections, currentIndex, onBatchAnswers, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; favorites: string[]; notes: Record<string, string>; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onBatchAnswers: (entries: BatchAnswerEntry[]) => Promise<void>; onJump: (index: number) => void; onClose: () => void }) {
   const favoriteIds = new Set(favorites);
   const killedIds = new Set(killed);
-  return <div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><button onClick={onClose} aria-label="关闭答题卡"><X /></button></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = /^> 选项 [A-G] 批注：\s*\S/m.test(notes[question.id] ?? ""); return <button key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? "，精选" : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★</span>}</button>; })}</div></section></div>;
+  const [batchOpen, setBatchOpen] = useState(false);
+  const pendingCount = pendingAnswerQuestions(questions).length;
+  return <><div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><div className="answer-sheet-actions">{pendingCount > 0 && <button className="batch-answer-trigger" onClick={() => setBatchOpen(true)}><Plus size={16} />批量补答案 <em>{pendingCount}</em></button>}<button onClick={onClose} aria-label="关闭答题卡"><X /></button></div></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = hasOptionAnnotation(notes[question.id] ?? ""); return <button key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? "，精选" : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★</span>}</button>; })}</div></section></div>{batchOpen && <BatchAnswerModal questions={questions} onSave={onBatchAnswers} onClose={() => setBatchOpen(false)} />}</>;
+}
+
+function BatchAnswerModal({ questions, onSave, onClose }: { questions: QuizQuestion[]; onSave: (entries: BatchAnswerEntry[]) => Promise<void>; onClose: () => void }) {
+  const [pendingIds] = useState(() => pendingAnswerQuestions(questions).map((question) => question.id));
+  const [offset, setOffset] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const currentBatch = pendingIds.slice(offset, offset + 5).map((id) => questions.find((question) => question.id === id)).filter((question): question is QuizQuestion => Boolean(question));
+  const complete = currentBatch.length > 0 && currentBatch.every((question) => answers[question.id]?.length);
+  const toggle = (question: QuizQuestion, label: string) => setAnswers((current) => {
+    const selected = current[question.id] ?? [];
+    const multiple = question.questionType === "X" || question.multiple;
+    const next = multiple ? selected.includes(label) ? selected.filter((item) => item !== label) : [...selected, label] : [label];
+    return { ...current, [question.id]: next };
+  });
+  const save = async () => {
+    if (!complete || busy) return;
+    setBusy(true); setError("");
+    try {
+      await onSave(currentBatch.map((question) => ({ questionId: question.id, answer: answers[question.id] })));
+      const nextOffset = offset + currentBatch.length;
+      if (nextOffset >= pendingIds.length) onClose();
+      else setOffset(nextOffset);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "答案暂时无法保存，请重试");
+    } finally { setBusy(false); }
+  };
+  return <div className="modal-layer batch-answer-layer" onMouseDown={() => !busy && onClose()}><section className="batch-answer-modal" role="dialog" aria-modal="true" aria-label="批量补录答案" onMouseDown={(event) => event.stopPropagation()}><header><div><span>BATCH ANSWER · 每次 5 题</span><h2>批量补答案</h2><p>按待答案顺序每次录入 5 题；X 型题可多选，其他题型单选。</p></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="batch-answer-progress"><span>第 {offset + 1}–{offset + currentBatch.length} / {pendingIds.length} 个待答案题</span><i><b style={{ width: `${Math.round(offset / Math.max(1, pendingIds.length) * 100)}%` }} /></i></div><div className="batch-answer-list">{currentBatch.map((question) => <article key={question.id}><header><b>原题号 {question.sourceNumber}</b><span>{question.medicalQuestionType || (question.multiple ? "多选题" : "单选题")}</span></header><p>{question.stem}</p><div>{question.options.map((option) => <button key={option.label} className={answers[question.id]?.includes(option.label) ? "active" : ""} onClick={() => toggle(question, option.label)} title={option.text}><b>{option.label}</b><span>{option.text}</span></button>)}</div></article>)}</div>{error && <p className="batch-answer-error"><AlertCircle size={16} />{error}</p>}<footer><button onClick={onClose} disabled={busy}>稍后再补</button><button className="primary-action" onClick={() => void save()} disabled={!complete || busy}><CheckCircle2 />{busy ? "正在保存…" : currentBatch.length === 5 ? "保存这 5 题" : `保存这 ${currentBatch.length} 题`}</button></footer></section></div>;
 }
 
 function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, onMineru, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; onMineru: () => void; on306: () => void }) {
@@ -2884,10 +2968,13 @@ function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: 
   return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>跨题库检索 · 按相关度排序</span><h2>搜索全部题库</h2></div><button onClick={onClose} aria-label={returnToQuiz ? "关闭搜索并返回当前题目" : "关闭搜索"}><X /></button></header>{returnToQuiz && <button className="search-return-strip" onClick={onClose}><ChevronLeft size={16} /><span><strong>当前练习已为你保留</strong><small>关闭搜索即可回到刚才的题目与已选答案</small></span></button>}<label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="题库名、疾病、症状或知识点；多个词用空格分隔" /><kbd>{results.length}</kbd></label><div className="search-results">{query.trim() ? results.length ? results.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => void onOpen(bank, question.id)}><span>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b> · {question.category} · 原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight size={17} /></button>) : <div className="search-empty"><CircleHelp /><p>没有找到同时匹配这些关键词的题目。可减少一个词，或改用疾病、症状及题库名称。</p></div> : <div className="search-empty search-guide"><Search /><p>输入关键词后，会同时检索所有题库，并优先显示题库名、分类和题干中的精准命中。</p></div>}</div></section></div>;
 }
 
-function NotesModal({ questions, notes, onOpen, onClose }: { questions: QuizQuestion[]; notes: Record<string, string>; onOpen: (id: string) => void; onClose: () => void }) {
+function NotesModal({ bankName, questions, progress, favorites, notes, onOpen, onClose }: { bankName: string; questions: QuizQuestion[]; progress: Progress; favorites: string[]; notes: Record<string, string>; onOpen: (id: string) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState("");
+  const [exportMessage, setExportMessage] = useState("");
   const allEntries = useMemo(() => questions.filter((question) => notes[question.id]?.trim()), [questions, notes]);
+  const exportSections = useMemo(() => collectNoteExportSections(questions, progress, favorites, notes), [favorites, notes, progress, questions]);
+  const exportCount = exportSections.reduce((sum, section) => sum + section.questions.length, 0);
   const tags = useMemo(() => [...new Set(allEntries.flatMap((question) => parseNoteTags(notes[question.id] ?? "")))].sort(), [allEntries, notes]);
   const entries = useMemo(() => {
     const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -2898,7 +2985,15 @@ function NotesModal({ questions, notes, onOpen, onClose }: { questions: QuizQues
       return terms.every((term) => searchable.includes(term));
     });
   }, [activeTag, allEntries, notes, query]);
-  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal notes-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>Markdown 知识库 · 个人复盘</span><h2>我的笔记</h2></div><button onClick={onClose}><X /></button></header><label className="search-field note-search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题目、来源、笔记正文或标签" /><kbd>{entries.length}</kbd></label>{tags.length > 0 && <div className="notes-tag-filter"><button className={!activeTag ? "active" : ""} onClick={() => setActiveTag("")}>全部</button>{tags.map((tag) => <button key={tag} className={activeTag === tag ? "active" : ""} onClick={() => setActiveTag(tag)}>#{tag}</button>)}</div>}<div className="notes-list">{entries.length ? entries.map((question) => { const markdown = notes[question.id] ?? ""; return <button key={question.id} onClick={() => onOpen(question.id)}><NotebookPen size={17} /><div><strong>{question.stem}</strong><small><FileText size={12} />{parseNoteSource(markdown, question)}</small>{parseNoteTags(markdown).length > 0 && <div className="notes-entry-tags">{parseNoteTags(markdown).map((tag) => <span key={tag}>#{tag}</span>)}</div>}<p>{markdownSummary(markdown)}</p></div><ChevronRight size={17} /></button>; }) : <div className="search-empty"><NotebookPen /><p>{allEntries.length ? "没有找到匹配的笔记，请更换关键词或标签。" : "还没有笔记。答题时写下判断依据，或把 AI 整理快速写入，会自动汇总到这里。"}</p></div>}</div></section></div>;
+  const exportPdf = () => {
+    setExportMessage("");
+    try {
+      if (!exportCount) throw new Error("当前题库还没有可导出的错题、精选、批注或 AI 原题解析");
+      printNotePdf(bankName, exportSections, notes);
+      setExportMessage("已打开打印版，请在系统打印面板选择“存储为 PDF”");
+    } catch (caught) { setExportMessage(caught instanceof Error ? caught.message : "暂时无法导出 PDF"); }
+  };
+  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal notes-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>Markdown 知识库 · 个人复盘</span><h2>我的笔记</h2></div><div className="notes-modal-actions"><button className="notes-pdf-export" onClick={exportPdf} disabled={!exportCount}><Download size={16} />导出 PDF <em>{exportCount}</em></button><button onClick={onClose} aria-label="关闭我的笔记"><X /></button></div></header>{exportMessage && <p className="notes-export-message">{exportMessage}</p>}<label className="search-field note-search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题目、来源、笔记正文或标签" /><kbd>{entries.length}</kbd></label>{tags.length > 0 && <div className="notes-tag-filter"><button className={!activeTag ? "active" : ""} onClick={() => setActiveTag("")}>全部</button>{tags.map((tag) => <button key={tag} className={activeTag === tag ? "active" : ""} onClick={() => setActiveTag(tag)}>#{tag}</button>)}</div>}<div className="notes-list">{entries.length ? entries.map((question) => { const markdown = notes[question.id] ?? ""; return <button key={question.id} onClick={() => onOpen(question.id)}><NotebookPen size={17} /><div><strong>{question.stem}</strong><small><FileText size={12} />{parseNoteSource(markdown, question)}</small>{parseNoteTags(markdown).length > 0 && <div className="notes-entry-tags">{parseNoteTags(markdown).map((tag) => <span key={tag}>#{tag}</span>)}</div>}<p>{markdownSummary(markdown)}</p></div><ChevronRight size={17} /></button>; }) : <div className="search-empty"><NotebookPen /><p>{allEntries.length ? "没有找到匹配的笔记，请更换关键词或标签。" : "还没有笔记。答题时写下判断依据，或把 AI 整理快速写入，会自动汇总到这里。"}</p></div>}</div></section></div>;
 }
 
 function SuccessToast({ message, onClose }: { message: string; onClose: () => void }) {

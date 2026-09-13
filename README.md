@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.1.0" src="https://img.shields.io/badge/version-2.1.0-b43d35" />
+    <img alt="Version 2.1.1" src="https://img.shields.io/badge/version-2.1.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.1.0.** The in-app MinerU Workbench can combine split Hybrid JSON exports, remove duplicate pages, report answer coverage, preserve formulas, preview the resulting structure, and save the bank without spending AI quota. Medical practice, library management, optional synchronization, and Western Medicine 306 remain the stable core.
+> **Current release: v2.1.1.** Missing answers can now be repaired from the answer sheet in five-question batches; study notes can be exported through a print-ready PDF view; and option annotations accept pasted or uploaded images while remaining synchronized with the question record.
 
 ## Product map
 
@@ -221,6 +221,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v2.1.1** — Added five-at-a-time answer repair from the answer sheet, print-ready PDF study-note export grouped by wrong/featured/annotated questions, and pasted or uploaded images in option annotations.
 - **v2.1.0** — Added the in-app MinerU Workbench for multi-file merge, duplicate-page cleanup, answer/formula diagnostics, structure preview, one-click saving, and KaTeX rendering in question stems and options.
 - **v1.4.11** — Rebuilt the post-2017 306 workbench around the fixed 165-question A/B/X and A-D format, with paired B pools, green explanation keys, yellow PDF highlights, and explicit option-answer markers.
 - **v1.4.10** — Added manual answer entry for answerless questions, medical type correction, editable option counts, complete question insertion with sequential renumbering, and a leaner study panel.

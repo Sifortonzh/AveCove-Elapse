@@ -54,6 +54,27 @@ async function loadQuestionEdit() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadBatchAnswer() {
+  const source = (await text("app/lib/batch-answer.ts")).replace(/^import type .*?;\n/, "");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
+async function loadNoteAnnotations() {
+  const source = await text("app/lib/note-annotations.ts");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
+async function loadNotePdfExport() {
+  const annotations = await text("app/lib/note-annotations.ts");
+  const exportSource = (await text("app/lib/note-pdf-export.ts"))
+    .replace(/^import type .*?;\n/, "")
+    .replace(/^import \{.*?\} from "\.\/note-annotations";\n/, "");
+  const output = ts.transpileModule(`${annotations}\n${exportSource}`, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 async function loadPdfAnswerHighlights() {
   const source = await text("app/lib/pdf-answer-highlights.ts");
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -510,7 +531,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.1.0");
+  assert.equal(JSON.parse(manifest).version, "2.1.1");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1228,7 +1249,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.1\.0"/);
+  assert.match(packageJson, /"version": "2\.1\.1"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1419,7 +1440,7 @@ test("separates personal BYOK AI from administrator-wide AI", async () => {
 });
 
 test("keeps touch practice controls, in-quiz search, and reusable note tags discoverable", async () => {
-  const [page, styles] = await Promise.all([text("app/page.tsx"), text("app/globals.css")]);
+  const [page, styles, annotations] = await Promise.all([text("app/page.tsx"), text("app/globals.css"), text("app/lib/note-annotations.ts")]);
 
   assert.match(page, /onDoubleClick=.*onExcludeOption/);
   assert.match(page, /单击选择或取消 · 双击排除干扰项/);
@@ -1438,7 +1459,7 @@ test("keeps touch practice controls, in-quiz search, and reusable note tags disc
   assert.doesNotMatch(page, /className="bank-answer-pending"/);
   assert.match(page, /className="sheet-answer-missing"/);
   assert.match(page, /className="sheet-annotation"/);
-  assert.match(page, /选项 \[A-G\] 批注/);
+  assert.match(annotations, /选项 \[A-G\] 批注/);
   assert.match(page, /commentThreadId\(activeBankId, current\.id\)/);
   assert.match(page, /当前题库独立讨论/);
   assert.match(page, /同学讨论/);
@@ -1516,4 +1537,66 @@ test("ships shared data, moderation, branding, and deployment material", async (
   assert.match(schema, /CREATE TABLE IF NOT EXISTS learning_states/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS comment_reports/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS app_settings/);
+});
+
+test("fills missing answers in deterministic five-question batches", async () => {
+  const { applyBatchAnswers, pendingAnswerQuestions } = await loadBatchAnswer();
+  const questions = Array.from({ length: 7 }, (_, index) => ({
+    id: `q-${index + 1}`,
+    sourceNumber: String(index + 1),
+    category: "测试",
+    stem: `题目 ${index + 1}`,
+    options: ["A", "B", "C", "D"].map((label) => ({ label, text: label })),
+    answer: [],
+    answerPending: true,
+    multiple: index === 1,
+    questionType: index === 1 ? "X" : "A",
+  }));
+  assert.equal(pendingAnswerQuestions(questions).length, 7);
+  const result = applyBatchAnswers(questions, [
+    { questionId: "q-1", answer: ["b"] },
+    { questionId: "q-2", answer: ["A", "C", "Z"] },
+  ]);
+  assert.equal(result.updatedCount, 2);
+  assert.deepEqual(result.questions[0].answer, ["B"]);
+  assert.deepEqual(result.questions[1].answer, ["A", "C"]);
+  assert.equal(result.questions[0].answerPending, false);
+  assert.equal(result.questions[1].multiple, true);
+});
+
+test("keeps text and image option annotations backward compatible", async () => {
+  const { appendOptionAnnotationImage, hasOptionAnnotation, readOptionAnnotation, removeOptionAnnotationImage, updateOptionAnnotationText } = await loadNoteAnnotations();
+  const image = "data:image/jpeg;base64,QUJDRA==";
+  let note = updateOptionAnnotationText("# 复盘", "B", "易混点");
+  note = appendOptionAnnotationImage(note, "B", image);
+  assert.equal(hasOptionAnnotation(note), true);
+  assert.deepEqual(readOptionAnnotation(note, "B"), { text: "易混点", images: [image] });
+  note = removeOptionAnnotationImage(note, "B", 0);
+  assert.deepEqual(readOptionAnnotation(note, "B"), { text: "易混点", images: [] });
+});
+
+test("builds a print-ready note export from wrong, featured, annotated, and AI-explained questions", async () => {
+  const { buildNotePdfHtml, collectNoteExportSections } = await loadNotePdfExport();
+  const questions = [
+    { id: "wrong", sourceNumber: "1", category: "感染", stem: "错题", options: [{ label: "A", text: "甲" }], answer: ["A"], multiple: false },
+    { id: "featured", sourceNumber: "2", category: "感染", stem: "精选", options: [{ label: "A", text: "乙" }], answer: ["A"], multiple: false },
+    { id: "annotated", sourceNumber: "3", category: "感染", stem: "批注", options: [{ label: "A", text: "丙" }], answer: ["A"], multiple: false },
+    { id: "ai", sourceNumber: "4", category: "感染", stem: "AI", options: [{ label: "A", text: "丁" }], answer: ["A"], multiple: false, explanation: "解析正文", explanationSource: "AI 生成解析 · 手动保存" },
+  ];
+  const notes = { annotated: "> 选项 A 批注：注意鉴别" };
+  const sections = collectNoteExportSections(questions, { wrong: "wrong" }, ["featured"], notes);
+  assert.deepEqual(sections.map((section) => [section.title, section.questions.length]), [["错题复现", 1], ["精选温习", 1], ["批注与 AI 原题解析", 2]]);
+  const html = buildNotePdfHtml("传染病题库", sections, notes);
+  assert.match(html, /AVECOVE ELAPSE · v2\.1\.1/);
+  assert.match(html, /注意鉴别/);
+  assert.match(html, /题目、选项和选项批注均保留/);
+});
+
+test("exposes the complete v2.1.1 workflow in the practice UI", async () => {
+  const [page, extras] = await Promise.all([text("app/page.tsx"), text("app/components/PracticeExtras.tsx")]);
+  assert.match(page, /批量补答案/);
+  assert.match(page, /每次 5 题/);
+  assert.match(page, /导出 PDF/);
+  assert.match(extras, /可粘贴图片/);
+  assert.match(extras, /支持粘贴或上传书本截图/);
 });
