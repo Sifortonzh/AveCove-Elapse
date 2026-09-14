@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.1.1" src="https://img.shields.io/badge/version-2.1.1-b43d35" />
+    <img alt="Version 2.1.2" src="https://img.shields.io/badge/version-2.1.2-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.1.1.** Missing answers can now be repaired from the answer sheet in ten-question batches using compact A–E answer keys; study notes can be exported through a print-ready PDF view; and option annotations accept pasted or uploaded images while remaining synchronized with the question record.
+> **Current release: v2.1.2.** Practice progress now reflects completed questions instead of the current position; the answer sheet automatically locates the current question; each library card can export its review PDF; question stems are larger; and the redundant top previous-question control has been removed.
 
 ## Product map
 
@@ -221,6 +221,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v2.1.2** — Made practice progress jump-safe, auto-located the current answer-card item, added per-bank review PDF export, enlarged question stems, and removed the redundant top previous-question control.
 - **v2.1.1** — Added ten-at-a-time answer repair with compact A–E answer keys, print-ready PDF study-note export grouped by wrong/featured/annotated questions, and pasted or uploaded images in option annotations.
 - **v2.1.0** — Added the in-app MinerU Workbench for multi-file merge, duplicate-page cleanup, answer/formula diagnostics, structure preview, one-click saving, and KaTeX rendering in question stems and options.
 - **v1.4.11** — Rebuilt the post-2017 306 workbench around the fixed 165-question A/B/X and A-D format, with paired B pools, green explanation keys, yellow PDF highlights, and explicit option-answer markers.

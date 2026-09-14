@@ -531,7 +531,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.1.1");
+  assert.equal(JSON.parse(manifest).version, "2.1.2");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1249,7 +1249,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.1\.1"/);
+  assert.match(packageJson, /"version": "2\.1\.2"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1445,14 +1445,13 @@ test("keeps touch practice controls, in-quiz search, and reusable note tags disc
   assert.match(page, /onDoubleClick=.*onExcludeOption/);
   assert.match(page, /单击选择或取消 · 双击排除干扰项/);
   assert.match(page, /className="tablet-quiz-action"/);
-  assert.match(page, /className="question-previous-top subtle-button"/);
+  assert.doesNotMatch(page, /question-previous-top/);
   assert.match(page, /returnToQuiz=\{view === "quiz"/);
   assert.match(page, /关闭搜索即可回到刚才的题目与已选答案/);
   assert.match(page, /已存标签/);
   assert.match(page, /Markdown 显示效果/);
   assert.match(styles, /pointer:coarse/);
-  assert.match(styles, /\.question-previous-top\{position:fixed;z-index:24;top:calc\(108px \+ env\(safe-area-inset-top\)\)/);
-  assert.match(styles, /@media\(max-width:620px\)\{\.question-previous-top\{display:none\}\}/);
+  assert.doesNotMatch(styles, /\.question-previous-top/);
   assert.match(styles, /answer-option\.excluded/);
   assert.match(styles, /note-preview-compact/);
   assert.match(page, /className="bank-answer-badge"/);
@@ -1587,7 +1586,7 @@ test("builds a print-ready note export from wrong, featured, annotated, and AI-e
   const sections = collectNoteExportSections(questions, { wrong: "wrong" }, ["featured"], notes);
   assert.deepEqual(sections.map((section) => [section.title, section.questions.length]), [["错题复现", 1], ["精选温习", 1], ["批注与 AI 原题解析", 2]]);
   const html = buildNotePdfHtml("传染病题库", sections, notes);
-  assert.match(html, /AVECOVE ELAPSE · v2\.1\.1/);
+  assert.match(html, /AVECOVE ELAPSE · v2\.1\.2/);
   assert.match(html, /注意鉴别/);
   assert.match(html, /题目、选项和选项批注均保留/);
 });
@@ -1601,4 +1600,20 @@ test("exposes the complete v2.1.1 workflow in the practice UI", async () => {
   assert.match(page, /导出 PDF/);
   assert.match(extras, /可粘贴图片/);
   assert.match(extras, /支持粘贴或上传书本截图/);
+});
+
+test("ships the v2.1.2 jump-safe practice and library refinements", async () => {
+  const [page, styles] = await Promise.all([text("app/page.tsx"), text("app/globals.css")]);
+
+  assert.match(page, /const sessionCompleted = sessionQuestions\.filter/);
+  assert.match(page, /completed=\{sessionCompleted\}/);
+  assert.match(page, /props\.completed \/ Math\.max\(total, 1\)/);
+  assert.match(page, /已完成 \{props\.completed\}\/\{total\}/);
+  assert.match(page, /scrollIntoView\(\{ block: "center", inline: "center" \}\)/);
+  assert.match(page, /aria-current=\{index === currentIndex/);
+  assert.match(page, /aria-label="导出题库复习笔记"/);
+  assert.match(page, /function exportBankNotes/);
+  assert.doesNotMatch(page, /question-previous-top/);
+  assert.match(styles, /\.question-body h1\{font-size:1\.5rem!important/);
+  assert.match(styles, /\.bank-card>footer\{grid-template-columns:1fr repeat\(5,44px\)\}/);
 });

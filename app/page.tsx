@@ -516,6 +516,9 @@ export default function HomePage() {
     ? western306Score(sessionQuestions.filter((question) => !killedIds.has(question.id)), progress, firstProgress)
     : undefined;
   const sessionAnswered = sessionQuestions.filter((question) => !killedIds.has(question.id) && Boolean(progress[question.id])).length;
+  const sessionCompleted = sessionQuestions.filter((question) => !killedIds.has(question.id) && (
+    Boolean(progress[question.id]) || (sessionStudyMode === "blind" && Boolean(answerSelections[question.id]?.length))
+  )).length;
   const sessionCorrect = sessionQuestions.filter((question) => !killedIds.has(question.id) && progress[question.id] === "correct").length;
   const sessionAccuracy = sessionAnswered ? (sessionCorrect / sessionAnswered) * 100 : 0;
   const isFavorite = current ? favorites.includes(current.id) : false;
@@ -1738,6 +1741,7 @@ export default function HomePage() {
           current={current}
           currentIndex={currentIndex}
           total={sessionQuestions.length}
+          completed={sessionCompleted}
           accuracy={sessionAccuracy}
           examScore={sessionExamScore}
           selected={selected}
@@ -2102,6 +2106,11 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
     setExpandedDescriptionIds((ids) => ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]);
   }
 
+  function exportBankNotes(bank: SavedQuestionBank) {
+    const sections = collectNoteExportSections(bank.questions, progress, favorites, notes);
+    if (sections.length) printNotePdf(bank.name, sections, notes);
+  }
+
   return <div className="bank-page">
     <header className="bank-page-header"><button className="icon-button" onClick={onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><button className="request-bank-action" onClick={onRequests}><Library size={17} />藏经阁</button><button className="primary-action" onClick={onImport}><Import size={17} />导入题库</button></header>
     <main>
@@ -2128,6 +2137,8 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
         const completedCount = bank.questions.filter((question) => Boolean(progress[question.id])).length;
         const completion = bank.questions.length ? (completedCount / bank.questions.length) * 100 : 0;
         const completionLabel = completion.toFixed(2);
+        const noteExportCount = collectNoteExportSections(bank.questions, progress, favorites, notes)
+          .reduce((sum, section) => sum + section.questions.length, 0);
         return <article className={`bank-card ${isActive ? "active" : ""} ${locatedBankId === bank.id ? "located" : ""}`} data-bank-id={bank.id} key={bank.id}>
           <header><span className="bank-card-icon"><Database /></span><div className="bank-card-head-actions">{pendingAnswerCount > 0 && <button type="button" className="bank-answer-badge" title={`${pendingAnswerCount} 题待答案，点击导入答案`} onClick={() => onImportAnswers(bank)}><CircleHelp size={13} />待答案</button>}{isActive && <em><Check size={13} />当前题库</em>}{sortMode === "custom" && <span className="bank-item-order"><button type="button" aria-label={`上移题库 ${bank.name}`} title="上移题库" disabled={bankIndex === 0} onClick={() => moveBank(group.name, bank.id, -1)}><ArrowUp /></button><button type="button" aria-label={`下移题库 ${bank.name}`} title="下移题库" disabled={bankIndex === group.banks.length - 1} onClick={() => moveBank(group.name, bank.id, 1)}><ArrowDown /></button></span>}<button type="button" className={`bank-feature-toggle ${bank.featured ? "active" : ""}`} aria-label={`${bank.featured ? "取消精选" : "设为精选"} ${bank.name}`} aria-pressed={bank.featured} title={bank.featured ? "移出精选试卷" : "加入精选试卷"} onClick={() => void onToggleFeatured(bank.id, !bank.featured)}><Star fill={bank.featured ? "currentColor" : "none"} /></button></div></header>
           {isEditing ? <form className="bank-edit" onSubmit={(event) => { event.preventDefault(); void submitEdit(bank); }}>
@@ -2145,7 +2156,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
             <div className="bank-card-progress" aria-label={`已完成 ${completedCount} 道，共 ${bank.questions.length} 道，进度 ${completionLabel}%`}><div><span>学习进度 · {completedCount}/{bank.questions.length}</span><b>{completionLabel}%</b></div><i><b style={{ width: `${completion}%` }} /></i></div>
           </>}
           <div className="bank-card-meta"><span>导入于 {new Date(bank.importedAt).toLocaleDateString("zh-CN")}</span><span>仅存本机</span></div>
-          {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
+          {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="导出题库复习笔记" title={noteExportCount ? `导出 ${noteExportCount} 道复习题为 PDF` : "暂无可导出的错题、精选或批注题"} disabled={!noteExportCount} onClick={() => exportBankNotes(bank)}><Download /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
         </article>;
       })}</div>{group.banks.length > groupVisibleLimit && <button type="button" className={`bank-group-toggle ${groupExpanded ? "expanded" : ""}`} aria-expanded={groupExpanded} onClick={() => toggleGroup(group.name)}>{groupExpanded ? "收起题库" : `展开其余 ${hiddenCount} 份题库`}<ChevronRight /></button>}</section>;
       })}</div></div> : <div className="bank-empty">{keyword ? <CircleHelp /> : <Database />}<h2>{keyword ? "没有找到匹配的题库" : "题库书架还是空的"}</h2><p>{keyword ? "这里只搜索题库名称、分组、简介和来源；刷题时仍可使用“搜题”检索题目内容。" : "导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。"}</p>{keyword ? <button className="ghost-action" onClick={() => setQuery("")}><X size={17} />清除搜索</button> : <button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button>}</div>}</section>
@@ -2371,7 +2382,7 @@ function IncomingBankShareModal({ share, onImport, onClose }: {
 
 function QuizView(props: {
   bankName: string; bankQuestions: QuizQuestion[]; onOpenQuestion: (id: string) => void; onSearchNotes: () => void;
-  current: QuizQuestion; currentIndex: number; total: number; accuracy: number; selected: string[]; excluded: string[]; submitted: boolean; studyMode: StudyMode;
+  current: QuizQuestion; currentIndex: number; total: number; completed: number; accuracy: number; selected: string[]; excluded: string[]; submitted: boolean; studyMode: StudyMode;
   examScore?: { earned: number; answeredMaximum: number; total: number };
   result?: "correct" | "wrong"; favorite: boolean; note: string; aiMode: AiMode;
   killed: boolean; relatedQuestions: QuizQuestion[]; relatedProgress: Progress;
@@ -2400,8 +2411,8 @@ function QuizView(props: {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [showChapters, setShowChapters] = useState(false);
-  const { current, currentIndex, total, selected, excluded, submitted, studyMode, result, favorite, note, aiMode, aiTexts, aiLoading, examScore } = props;
-  const progress = ((currentIndex + 1) / total) * 100;
+  const { current, total, selected, excluded, submitted, studyMode, result, favorite, note, aiMode, aiTexts, aiLoading, examScore } = props;
+  const progress = Math.min(100, (props.completed / Math.max(total, 1)) * 100);
   const progressLabel = progress.toFixed(2);
   const answerAvailable = current.answer.length > 0;
   const memorizing = studyMode === "memorize";
@@ -2426,10 +2437,9 @@ function QuizView(props: {
     medicalQuestionType: "A1",
   });
   return <div className="quiz-shell">
-    <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b title={`学习进度 ${progressLabel}% · 正确率 ${props.accuracy.toFixed(2)}%`}>进度 {progressLabel}% · 正确率 {props.accuracy.toFixed(2)}% · {currentIndex + 1}/{total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
+    <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b title={`已完成 ${props.completed}/${total} · 学习进度 ${progressLabel}% · 正确率 ${props.accuracy.toFixed(2)}%`}>进度 {progressLabel}% · 正确率 {props.accuracy.toFixed(2)}% · 已完成 {props.completed}/{total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
-        <button className="question-previous-top subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>
         <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题" aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题" aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} title="纠错编辑" aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} title="搜索题目" aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题" aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已精选" : "精选"}</button></div></div>
         {props.killed && <div className="killed-question-banner"><Scissors size={18} /><div><strong>本题已斩</strong><span>会被后续练习跳过，不计入正确率；可随时恢复。</span></div><button onClick={() => props.onUpdateKilled([current.id], false)}>恢复本题</button></div>}
         {current.sharedStem && <section className="shared-medical-stem"><span>{current.medicalQuestionType === "A4" ? "递进病例" : "共用题干"}</span><p><MathText text={current.sharedStem} /></p></section>}
@@ -2701,8 +2711,13 @@ function AnswerSheet({ questions, progress, favorites, notes, killed, answerSele
   const favoriteIds = new Set(favorites);
   const killedIds = new Set(killed);
   const [batchOpen, setBatchOpen] = useState(false);
+  const currentButtonRef = useRef<HTMLButtonElement | null>(null);
   const pendingCount = pendingAnswerQuestions(questions).length;
-  return <><div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><div className="answer-sheet-actions">{pendingCount > 0 && <button className="batch-answer-trigger" onClick={() => setBatchOpen(true)}><Plus size={16} />批量补答案 <em>{pendingCount}</em></button>}<button onClick={onClose} aria-label="关闭答题卡"><X /></button></div></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = hasOptionAnnotation(notes[question.id] ?? ""); return <button key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? "，精选" : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★</span>}</button>; })}</div></section></div>{batchOpen && <BatchAnswerModal questions={questions} onSave={onBatchAnswers} onClose={() => setBatchOpen(false)} />}</>;
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => currentButtonRef.current?.scrollIntoView({ block: "center", inline: "center" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentIndex]);
+  return <><div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><div className="answer-sheet-actions">{pendingCount > 0 && <button className="batch-answer-trigger" onClick={() => setBatchOpen(true)}><Plus size={16} />批量补答案 <em>{pendingCount}</em></button>}<button onClick={onClose} aria-label="关闭答题卡"><X /></button></div></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = hasOptionAnnotation(notes[question.id] ?? ""); return <button ref={index === currentIndex ? currentButtonRef : undefined} aria-current={index === currentIndex ? "true" : undefined} key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? "，精选" : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★</span>}</button>; })}</div></section></div>{batchOpen && <BatchAnswerModal questions={questions} onSave={onBatchAnswers} onClose={() => setBatchOpen(false)} />}</>;
 }
 
 function BatchAnswerModal({ questions, onSave, onClose }: { questions: QuizQuestion[]; onSave: (entries: BatchAnswerEntry[]) => Promise<void>; onClose: () => void }) {

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.1.1" src="https://img.shields.io/badge/version-2.1.1-b43d35" />
+    <img alt="版本 2.1.2" src="https://img.shields.io/badge/version-2.1.2-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.1.1。** 答题卡现可按每次 10 题、仅显示 A–E 答案键批量补录缺失答案；学习笔记可按错题、精选、批注及 AI 原题解析整理为打印版 PDF；选项批注支持直接粘贴或上传图片，并继续随题目记录同步。
+> **当前版本：v2.1.2。** 刷题进度改为按已完成题数统计；答题卡打开后自动定位当前题；题库卡片可直接导出复习 PDF；题干字号增大；并移除重复的题目顶部“上一题”按钮。
 
 ## 产品地图
 
@@ -221,6 +221,7 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 <details>
 <summary><strong>版本记录</strong></summary>
 
+- **v2.1.2** — 刷题进度按已完成题数统计，答题卡自动定位当前题，题库内可直接导出复习 PDF，增大题干字号，并移除重复的题目顶部“上一题”按钮。
 - **v2.1.1** — 新增答题卡每次 10 题、仅显示 A–E 答案键的批量补答案，按错题/精选/批注整理的打印版 PDF 笔记，以及选项批注粘贴或上传图片。
 - **v2.1.0** — 新增内置 MinerU 工作台，支持多文件合并、重复页清理、答案与公式诊断、结构预览和一键入库；题干与选项中的 LaTeX 公式改用 KaTeX 正常排版。
 - **v1.4.11** — 重做 2017 年起的 306 标准化工作台，固定 165 题 A/B/X 与 A-D 四选项；支持 B 型共用选项、绿色解析答案、PDF 黄色高亮及选项后显式答案标记。
