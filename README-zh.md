@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.1.2" src="https://img.shields.io/badge/version-2.1.2-b43d35" />
+    <img alt="版本 2.1.3" src="https://img.shields.io/badge/version-2.1.3-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,13 +27,13 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.1.2。** 刷题进度改为按已完成题数统计；答题卡打开后自动定位当前题；题库卡片可直接导出复习 PDF；题干字号增大；并移除重复的题目顶部“上一题”按钮。
+> **当前版本：v2.1.3。** 藏经阁新增学习阶段导航、常用科目、搜索、同名需求合并和题库一键导入链接；AI 追问新增从基础理解到跨章节串联的五级引导。
 
 ## 产品地图
 
 | 模块 | 当前能力 | 阶段 |
 | --- | --- | :---: |
-| **我的题库** | 多题库保存、两行折叠简介、来源与版权信息、搜索、分组、自定义排序、精选试卷、便携文件、7 天导入链接及本机“藏经阁”Demo | 稳定 |
+| **我的题库** | 多题库保存、两行折叠简介、来源与版权信息、搜索、分组、自定义排序、精选试卷、便携文件、7 天导入链接及本机藏经阁清单 | 稳定 |
 | **刷题与复盘** | 标准、盲刷、背题；答题卡、错题复盘、斩题、纠错、笔记与原题解析 | 稳定 |
 | **医学题型** | 单选、多选、判断，以及带共用题干或备选项的 A1/A2/A3/A4/B1/C/X | 重点推进 |
 | **西医综合 306** | 2017 年起固定 165 题 / 300 分审校、A/B/X 分区、A-D 四选项、首次评分和五科单独练习 | 重点推进 |
@@ -221,6 +221,7 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 <details>
 <summary><strong>版本记录</strong></summary>
 
+- **v2.1.3** — 藏经阁新增阶段导航、常用科目、搜索、同名需求合并和题库一键导入链接；AI 追问加入五级理解引导。
 - **v2.1.2** — 刷题进度按已完成题数统计，答题卡自动定位当前题，题库内可直接导出复习 PDF，增大题干字号，并移除重复的题目顶部“上一题”按钮。
 - **v2.1.1** — 新增答题卡每次 10 题、仅显示 A–E 答案键的批量补答案，按错题/精选/批注整理的打印版 PDF 笔记，以及选项批注粘贴或上传图片。
 - **v2.1.0** — 新增内置 MinerU 工作台，支持多文件合并、重复页清理、答案与公式诊断、结构预览和一键入库；题干与选项中的 LaTeX 公式改用 KaTeX 正常排版。

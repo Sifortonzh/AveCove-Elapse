@@ -36,6 +36,13 @@ export function ChapterDirectory({ questions, onOpen, onClose }: { questions: Qu
 }
 
 export function AiDialogue({ question, onSave }: { question: QuizQuestion; onSave: (text: string) => void }) {
+  const guidedPrompts = [
+    ["1 基础", "请用一句话复述本题考查的核心概念，并解释正确答案为什么成立"],
+    ["2 辨析", "请逐项比较本题选项，指出每个错误选项错在哪里"],
+    ["3 机制", "请从病理生理或临床机制解释本题，补充最容易误判的原因"],
+    ["4 迁移", "请给出两个同类考点或变式，并说明遇到新题时如何迁移判断"],
+    ["5 串联", "请把本题与教材章节、鉴别诊断和临床决策串联成一份复习框架"],
+  ] as const;
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -56,7 +63,7 @@ export function AiDialogue({ question, onSave }: { question: QuizQuestion; onSav
     } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "请求失败"); else setError("请求已取消或超时，可重新提问"); }
     finally { window.clearTimeout(timer); setBusy(false); }
   }
-  return <section className="practice-dialogue"><h3>追问 AI · 同类考点</h3>{messages.map((message, i) => <div key={i} className={`dialogue-${message.role}`}><strong>{message.role === "user" ? "我" : "AI"}</strong><p>{message.text}</p>{message.role === "assistant" && <button onClick={() => onSave(message.text)}>写入笔记</button>}</div>)}<textarea value={draft} maxLength={500} onChange={(e) => setDraft(e.target.value)} placeholder="追问判断依据、易混点或同类考点…" /><button disabled={busy || !draft.trim()} onClick={() => void ask(draft)}>{busy ? "正在回答…" : "发送追问"}</button><button disabled={busy} onClick={() => void ask("请总结本题的同类考点及易混淆区别")}>总结同类考点</button>{busy && <button onClick={() => request.current?.abort()}>取消</button>}{error && <p role="alert">{error}</p>}</section>;
+  return <section className="practice-dialogue"><h3>追问 AI · 五级理解</h3><div className="ai-guided-prompts">{guidedPrompts.map(([label, prompt]) => <button key={label} disabled={busy} title={prompt} onClick={() => void ask(prompt)}>{label}</button>)}</div>{messages.map((message, i) => <div key={i} className={`dialogue-${message.role}`}><strong>{message.role === "user" ? "我" : "AI"}</strong><p>{message.text}</p>{message.role === "assistant" && <button onClick={() => onSave(message.text)}>写入笔记</button>}</div>)}<textarea value={draft} maxLength={500} onChange={(e) => setDraft(e.target.value)} placeholder="追问判断依据、易混点或同类考点…" /><button disabled={busy || !draft.trim()} onClick={() => void ask(draft)}>{busy ? "正在回答…" : "发送追问"}</button>{busy && <button onClick={() => request.current?.abort()}>取消</button>}{error && <p role="alert">{error}</p>}</section>;
 }
 
 type Point = [number, number];

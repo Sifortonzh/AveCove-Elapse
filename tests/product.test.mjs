@@ -531,7 +531,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.1.2");
+  assert.equal(JSON.parse(manifest).version, "2.1.3");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -761,9 +761,10 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(page, /精选试卷/);
   assert.match(page, /keyword \? "题库搜索结果" : "全部题库"/);
   assert.match(page, /filteredBanks\.length/);
-  assert.match(page, /藏经阁 · Demo/);
+  assert.match(page, /bank-request-page-title">藏经阁/);
+  assert.doesNotMatch(page, /藏经阁 · Demo/);
   assert.match(page, /const BANK_REQUESTS_KEY = "hongdou-bank-requests-v1"/);
-  assert.match(page, /暂不接入公开社区，也不会上传题库文件/);
+  assert.match(page, /打开并导入题库/);
   assert.match(page, /题库来源/);
   assert.match(page, /版权与使用说明/);
   assert.match(page, /className="featured-bank-section"/);
@@ -1249,7 +1250,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.1\.2"/);
+  assert.match(packageJson, /"version": "2\.1\.3"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1616,4 +1617,25 @@ test("ships the v2.1.2 jump-safe practice and library refinements", async () => 
   assert.doesNotMatch(page, /question-previous-top/);
   assert.match(styles, /\.question-body h1\{font-size:1\.5rem!important/);
   assert.match(styles, /\.bank-card>footer\{grid-template-columns:1fr repeat\(5,44px\)\}/);
+});
+
+test("ships the v2.1.3 Pavilion workflow and five-level AI follow-up", async () => {
+  const [page, extras, styles] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/components/PracticeExtras.tsx"),
+    text("app/globals.css"),
+  ]);
+
+  assert.match(page, /const BANK_REQUEST_STAGES = \["大一", "大二", "大三", "大四", "大五", "考研", "执医", "规培", "其他"\]/);
+  assert.match(page, /const BANK_REQUEST_SUBJECTS/);
+  assert.match(page, /function normalizeBankRequestStage/);
+  assert.match(page, /已识别相同需求，并将补充内容合并到原记录/);
+  assert.match(page, /题库链接/);
+  assert.match(page, /打开并导入题库/);
+  assert.match(page, /bank-request-stage-nav/);
+  assert.match(page, /bank-request-search/);
+  assert.match(extras, /追问 AI · 五级理解/);
+  assert.match(extras, /1 基础/);
+  assert.match(extras, /5 串联/);
+  assert.match(styles, /\.ai-guided-prompts/);
 });

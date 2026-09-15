@@ -88,6 +88,7 @@ type BankRequest = {
   subject: string;
   preferredSource: string;
   details: string;
+  resourceUrl?: string;
   status: BankRequestStatus;
   createdAt: string;
   updatedAt: string;
@@ -2167,16 +2168,48 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
 }
 
 const BANK_REQUESTS_KEY = "hongdou-bank-requests-v1";
-const BANK_REQUEST_STAGES = ["大一上", "大一下", "大二上", "大二下", "大三", "大四", "实习", "考研", "其他"];
+const BANK_REQUEST_STAGES = ["大一", "大二", "大三", "大四", "大五", "考研", "执医", "规培", "其他"];
+const BANK_REQUEST_SUBJECTS: Record<string, string[]> = {
+  大一: ["系统解剖学", "组织胚胎学", "生理学", "生物化学"],
+  大二: ["病理学", "病理生理学", "药理学", "医学微生物学"],
+  大三: ["诊断学", "内科学", "外科学", "医学影像学"],
+  大四: ["妇产科学", "儿科学", "传染病学", "急救医学"],
+  大五: ["眼科学", "耳鼻咽喉头颈外科学", "皮肤性病学", "全科医学"],
+  考研: ["西医综合 306", "英语", "政治"],
+  执医: ["执业医师综合", "实践技能"],
+  规培: ["住院医师规范化培训", "临床技能"],
+  其他: ["口腔医学", "护理学", "康复医学"],
+};
 const BANK_REQUEST_STATUS: Record<BankRequestStatus, string> = { looking: "征集中", found: "已找到", paused: "已暂停" };
 
+function normalizeBankRequestUrl(value: string) {
+  if (!value.trim()) return "";
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function normalizeBankRequestStage(value: string) {
+  if (value === "大一上" || value === "大一下") return "大一";
+  if (value === "大二上" || value === "大二下") return "大二";
+  if (value === "实习") return "大五";
+  return BANK_REQUEST_STAGES.includes(value) ? value : "其他";
+}
+
 function QuestionBankRequestPage({ onBack }: { onBack: () => void }) {
-  const emptyDraft = { title: "", stage: "大一上", subject: "", preferredSource: "", details: "" };
+  const emptyDraft = { title: "", stage: "大一", subject: "", preferredSource: "", details: "", resourceUrl: "" };
   const [requests, setRequests] = useState<BankRequest[]>(() => {
     if (typeof window === "undefined") return [];
     try {
       const value = JSON.parse(localStorage.getItem(BANK_REQUESTS_KEY) ?? "[]") as unknown;
-      return Array.isArray(value) ? value.filter((item): item is BankRequest => Boolean(item && typeof item === "object" && "id" in item && "title" in item)) : [];
+      return Array.isArray(value)
+        ? value
+          .filter((item): item is BankRequest => Boolean(item && typeof item === "object" && "id" in item && "title" in item))
+          .map((item) => ({ ...item, stage: normalizeBankRequestStage(item.stage), resourceUrl: normalizeBankRequestUrl(item.resourceUrl ?? "") }))
+        : [];
     } catch {
       return [];
     }
@@ -2185,6 +2218,7 @@ function QuestionBankRequestPage({ onBack }: { onBack: () => void }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState("全部年级");
   const [statusFilter, setStatusFilter] = useState<"all" | BankRequestStatus>("all");
+  const [query, setQuery] = useState("");
   const [message, setMessage] = useState("");
 
   function persist(next: BankRequest[]) {
@@ -2197,13 +2231,23 @@ function QuestionBankRequestPage({ onBack }: { onBack: () => void }) {
     const title = draft.title.trim().slice(0, 80);
     const subject = draft.subject.trim().slice(0, 60);
     if (!title || !subject) return;
+    const resourceUrl = normalizeBankRequestUrl(draft.resourceUrl);
+    if (draft.resourceUrl.trim() && !resourceUrl) return setMessage("题库链接需要使用 http:// 或 https:// 地址");
     const now = new Date().toISOString();
     if (editingId) {
-      persist(requests.map((item) => item.id === editingId ? { ...item, ...draft, title, subject, preferredSource: draft.preferredSource.trim().slice(0, 160), details: draft.details.trim().slice(0, 800), updatedAt: now } : item));
+      persist(requests.map((item) => item.id === editingId ? { ...item, ...draft, title, subject, resourceUrl, preferredSource: draft.preferredSource.trim().slice(0, 160), details: draft.details.trim().slice(0, 800), updatedAt: now } : item));
       setMessage("藏经阁条目已更新");
     } else {
-      persist([{ id: crypto.randomUUID(), ...draft, title, subject, preferredSource: draft.preferredSource.trim().slice(0, 160), details: draft.details.trim().slice(0, 800), status: "looking", createdAt: now, updatedAt: now }, ...requests]);
-      setMessage("寻卷需求已收入藏经阁，可直接分享给同学");
+      const duplicate = requests.find((item) => item.title === title && item.stage === draft.stage && item.subject === subject);
+      if (duplicate) {
+        const additions = draft.details.trim().slice(0, 800);
+        const details = [duplicate.details, additions].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join("\n\n补充：");
+        persist(requests.map((item) => item.id === duplicate.id ? { ...item, preferredSource: draft.preferredSource.trim().slice(0, 160) || item.preferredSource, details, resourceUrl: resourceUrl || item.resourceUrl, updatedAt: now } : item));
+        setMessage("已识别相同需求，并将补充内容合并到原记录");
+      } else {
+        persist([{ id: crypto.randomUUID(), ...draft, title, subject, resourceUrl, preferredSource: draft.preferredSource.trim().slice(0, 160), details: draft.details.trim().slice(0, 800), status: "looking", createdAt: now, updatedAt: now }, ...requests]);
+        setMessage("寻卷需求已收入藏经阁，可直接分享给同学");
+      }
     }
     setEditingId(null);
     setDraft(emptyDraft);
@@ -2211,7 +2255,7 @@ function QuestionBankRequestPage({ onBack }: { onBack: () => void }) {
 
   function beginEdit(request: BankRequest) {
     setEditingId(request.id);
-    setDraft({ title: request.title, stage: request.stage, subject: request.subject, preferredSource: request.preferredSource, details: request.details });
+    setDraft({ title: request.title, stage: request.stage, subject: request.subject, preferredSource: request.preferredSource, details: request.details, resourceUrl: request.resourceUrl ?? "" });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -2226,6 +2270,7 @@ function QuestionBankRequestPage({ onBack }: { onBack: () => void }) {
       `科目：${request.subject}`,
       request.preferredSource ? `希望版本 / 来源：${request.preferredSource}` : "",
       request.details ? `补充说明：${request.details}` : "",
+      request.resourceUrl ? `题库链接：${request.resourceUrl}` : "",
       "仅用于个人学习交流；请尊重原作者及出版机构版权。",
       "来自「红豆生南国 · Elapse」",
     ].filter(Boolean).join("\n");
@@ -2247,13 +2292,14 @@ function QuestionBankRequestPage({ onBack }: { onBack: () => void }) {
   const visibleRequests = useMemo(() => requests.filter((request) => (
     (stageFilter === "全部年级" || request.stage === stageFilter)
     && (statusFilter === "all" || request.status === statusFilter)
-  )), [requests, stageFilter, statusFilter]);
+    && (!query.trim() || [request.title, request.subject, request.preferredSource, request.details].join(" ").toLocaleLowerCase("zh-CN").includes(query.trim().toLocaleLowerCase("zh-CN")))
+  )), [query, requests, stageFilter, statusFilter]);
 
   return <div className="bank-request-page">
-    <header className="bank-page-header"><button className="icon-button" onClick={onBack} aria-label="返回题库"><ChevronLeft /></button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><strong className="bank-request-page-title">藏经阁 · Demo</strong></header>
+    <header className="bank-page-header"><button className="bank-request-back" onClick={onBack} aria-label="返回我的题库"><ChevronLeft />返回题库</button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><strong className="bank-request-page-title">藏经阁</strong></header>
     <main>
-      <section className="bank-request-compose"><header><div><span>QUESTION BANK PAVILION · DEMO</span><h1>{editingId ? "修改寻卷需求" : "藏经阁：整理你想找的题库"}</h1><p>这是预览版：按学习阶段和科目管理寻卷需求，可复制或分享给同学；暂不接入公开社区，也不会上传题库文件。</p></div><Library /></header><form onSubmit={saveRequest}><div className="bank-request-form-grid"><label><span>需求标题 *</span><input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={80} placeholder="如：求传染病学期中复习题" /></label><label><span>学习阶段</span><select value={draft.stage} onChange={(event) => setDraft({ ...draft, stage: event.target.value })}>{BANK_REQUEST_STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select></label><label><span>科目 *</span><input value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} maxLength={60} placeholder="如：儿科学、眼科学" /></label><label><span>希望版本 / 来源</span><input value={draft.preferredSource} onChange={(event) => setDraft({ ...draft, preferredSource: event.target.value })} maxLength={160} placeholder="如：人民卫生出版社第 9 版配套习题" /></label></div><label><span>补充说明</span><textarea value={draft.details} onChange={(event) => setDraft({ ...draft, details: event.target.value })} maxLength={800} rows={4} placeholder="可注明考试时间、题型范围或希望包含的章节；不要填写患者或个人敏感信息。" /></label><footer>{editingId && <button type="button" className="ghost-action" onClick={() => { setEditingId(null); setDraft(emptyDraft); }}>取消修改</button>}<button className="primary-action" disabled={!draft.title.trim() || !draft.subject.trim()}><Check />{editingId ? "保存修改" : "加入寻卷清单"}</button></footer></form></section>
-      <section className="bank-request-list"><header><div><span>REQUEST MANAGER</span><h2>需求清单 <em>{requests.length}</em></h2></div><div><select aria-label="按学习阶段筛选" value={stageFilter} onChange={(event) => setStageFilter(event.target.value)}><option>全部年级</option>{BANK_REQUEST_STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select><select aria-label="按状态筛选" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | BankRequestStatus)}><option value="all">全部状态</option><option value="looking">征集中</option><option value="found">已找到</option><option value="paused">已暂停</option></select></div></header>{visibleRequests.length ? <div className="bank-request-grid">{visibleRequests.map((request) => <article key={request.id} className={request.status}><header><span>{request.stage}</span><em>{BANK_REQUEST_STATUS[request.status]}</em></header><h3>{request.title}</h3><p className="bank-request-subject">{request.subject}</p>{request.preferredSource && <p><b>版本 / 来源</b>{request.preferredSource}</p>}{request.details && <p><b>补充说明</b>{request.details}</p>}<small>更新于 {new Date(request.updatedAt).toLocaleDateString("zh-CN")}</small><footer><button onClick={() => void shareRequest(request)}><Share2 />分享求助</button><button aria-label={`编辑 ${request.title}`} title="编辑" onClick={() => beginEdit(request)}><Pencil /></button><select aria-label={`${request.title}的状态`} value={request.status} onChange={(event) => updateStatus(request.id, event.target.value as BankRequestStatus)}><option value="looking">征集中</option><option value="found">已找到</option><option value="paused">已暂停</option></select><button className="danger" aria-label={`删除 ${request.title}`} title="删除" onClick={() => persist(requests.filter((item) => item.id !== request.id))}><Trash2 /></button></footer></article>)}</div> : <div className="bank-request-empty"><MessageCircle /><strong>这里还没有符合条件的需求</strong><p>创建一条后，可以复制文字或调用系统分享发给同学。</p></div>}</section>
+      <section className="bank-request-compose"><header><div><span>QUESTION BANK PAVILION</span><h1>{editingId ? "修改藏经阁条目" : "藏经阁：汇集你想找的题库"}</h1><p>按学习阶段和科目整理需求；找到题库后可挂上一键导入链接，继续补充时会自动合并同名记录。</p></div><Library /></header><form onSubmit={saveRequest}><div className="bank-request-form-grid"><label><span>需求标题 *</span><input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={80} placeholder="如：传染病学期中复习题" /></label><label><span>学习阶段</span><select value={draft.stage} onChange={(event) => setDraft({ ...draft, stage: event.target.value, subject: "" })}>{BANK_REQUEST_STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select></label><label><span>科目 *</span><input value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} maxLength={60} placeholder="可直接填写或点选下方科目" /></label><label><span>希望版本 / 来源</span><input value={draft.preferredSource} onChange={(event) => setDraft({ ...draft, preferredSource: event.target.value })} maxLength={160} placeholder="如：人民卫生出版社第 9 版配套习题" /></label></div><div className="bank-request-subject-presets" aria-label={`${draft.stage}常用科目`}>{(BANK_REQUEST_SUBJECTS[draft.stage] ?? []).map((subject) => <button type="button" className={draft.subject === subject ? "active" : ""} key={subject} onClick={() => setDraft({ ...draft, subject })}>{subject}</button>)}</div><label><span>题库链接 <small>可选 · 支持红豆一键导入链接</small></span><input type="url" value={draft.resourceUrl} onChange={(event) => setDraft({ ...draft, resourceUrl: event.target.value })} maxLength={500} placeholder="https://allo.avecrouge.top/?share=…" /></label><label><span>补充说明</span><textarea value={draft.details} onChange={(event) => setDraft({ ...draft, details: event.target.value })} maxLength={800} rows={4} placeholder="可从任意进度开始补充：注明缺少的题号、章节、答案或解析；不要填写患者或个人敏感信息。" /></label><footer>{editingId && <button type="button" className="ghost-action" onClick={() => { setEditingId(null); setDraft(emptyDraft); }}>取消修改</button>}<button className="primary-action" disabled={!draft.title.trim() || !draft.subject.trim()}><Check />{editingId ? "保存修改" : "收入藏经阁"}</button></footer></form></section>
+      <section className="bank-request-list"><nav className="bank-request-stage-nav" aria-label="按学习阶段查看"><button className={stageFilter === "全部年级" ? "active" : ""} onClick={() => setStageFilter("全部年级")}>全部</button>{BANK_REQUEST_STAGES.map((stage) => <button className={stageFilter === stage ? "active" : ""} key={stage} onClick={() => setStageFilter(stage)}>{stage}</button>)}</nav><header><div><span>PAVILION COLLECTION</span><h2>题库清单 <em>{visibleRequests.length}/{requests.length}</em></h2></div><div><label className="bank-request-search"><Search size={16} /><input aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索科目或题库" /></label><select aria-label="按状态筛选" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | BankRequestStatus)}><option value="all">全部状态</option><option value="looking">征集中</option><option value="found">已找到</option><option value="paused">已暂停</option></select></div></header>{visibleRequests.length ? <div className="bank-request-grid">{visibleRequests.map((request) => <article key={request.id} className={request.status}><header><span>{request.stage}</span><em>{BANK_REQUEST_STATUS[request.status]}</em></header><h3>{request.title}</h3><p className="bank-request-subject">{request.subject}</p>{request.preferredSource && <p><b>版本 / 来源</b>{request.preferredSource}</p>}{request.details && <p><b>补充说明</b>{request.details}</p>}{request.resourceUrl && <a className="bank-request-resource" href={request.resourceUrl} target="_blank" rel="noreferrer"><Download size={15} />打开并导入题库<ExternalLink size={13} /></a>}<small>更新于 {new Date(request.updatedAt).toLocaleDateString("zh-CN")}</small><footer><button onClick={() => void shareRequest(request)}><Share2 />分享条目</button><button aria-label={`编辑 ${request.title}`} title="编辑" onClick={() => beginEdit(request)}><Pencil /></button><select aria-label={`${request.title}的状态`} value={request.status} onChange={(event) => updateStatus(request.id, event.target.value as BankRequestStatus)}><option value="looking">征集中</option><option value="found">已找到</option><option value="paused">已暂停</option></select><button className="danger" aria-label={`删除 ${request.title}`} title="删除" onClick={() => persist(requests.filter((item) => item.id !== request.id))}><Trash2 /></button></footer></article>)}</div> : <div className="bank-request-empty"><MessageCircle /><strong>这里还没有符合条件的题库</strong><p>新建条目后可持续补充，重复内容会合并到原记录。</p></div>}</section>
     </main>
     {message && <SuccessToast message={message} onClose={() => setMessage("")} />}
   </div>;

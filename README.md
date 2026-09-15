@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.1.2" src="https://img.shields.io/badge/version-2.1.2-b43d35" />
+    <img alt="Version 2.1.3" src="https://img.shields.io/badge/version-2.1.3-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,13 +27,13 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.1.2.** Practice progress now reflects completed questions instead of the current position; the answer sheet automatically locates the current question; each library card can export its review PDF; question stems are larger; and the redundant top previous-question control has been removed.
+> **Current release: v2.1.3.** The Pavilion now supports study-stage navigation, subject presets, search, duplicate-request merging, and one-click question-bank links; AI follow-up adds five guided depths from basic recall to cross-topic synthesis.
 
 ## Product map
 
 | Area | What is available | Stage |
 | --- | --- | :---: |
-| **Question Library** | Multi-bank storage, two-line expandable descriptions, source/copyright metadata, search, groups, custom ordering, featured papers, portable files, seven-day import links, and a local-only Pavilion demo | Stable |
+| **Question Library** | Multi-bank storage, two-line expandable descriptions, source/copyright metadata, search, groups, custom ordering, featured papers, portable files, seven-day import links, and a local Pavilion collection | Stable |
 | **Practice** | Standard, Blind Review, and Answer-first Memorization; answer sheet, wrong-answer review, Slash Skip, corrections, notes, and source explanations | Stable |
 | **Medical formats** | Single/multiple choice, true/false, and A1/A2/A3/A4/B1/C/X structures with shared stems or option pools | Active focus |
 | **Western Medicine 306** | Fixed post-2017 165-question / 300-point audit, A/B/X sections, strict A-D options, first-attempt scoring, and five-subject practice | Active focus |
@@ -221,6 +221,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v2.1.3** — Upgraded the Pavilion with stage navigation, subject presets, search, duplicate-request merging, one-click resource links, and added five-level guided AI follow-up.
 - **v2.1.2** — Made practice progress jump-safe, auto-located the current answer-card item, added per-bank review PDF export, enlarged question stems, and removed the redundant top previous-question control.
 - **v2.1.1** — Added ten-at-a-time answer repair with compact A–E answer keys, print-ready PDF study-note export grouped by wrong/featured/annotated questions, and pasted or uploaded images in option annotations.
 - **v2.1.0** — Added the in-app MinerU Workbench for multi-file merge, duplicate-page cleanup, answer/formula diagnostics, structure preview, one-click saving, and KaTeX rendering in question stems and options.
