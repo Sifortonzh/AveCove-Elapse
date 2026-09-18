@@ -39,7 +39,9 @@ export type PavilionQuestionBank = {
   groupName: string;
   studyStage: PavilionStudyStage;
   uploadedAt: string;
-  package: SharedQuestionBankPackage;
+  package?: SharedQuestionBankPackage;
+  uploaderNickname?: string;
+  own?: boolean;
 };
 
 export const PAVILION_STUDY_STAGES = ["大一", "大二", "大三", "大四", "大五", "考研", "执医", "主治", "副高", "其他"] as const;

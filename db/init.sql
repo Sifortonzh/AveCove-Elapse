@@ -78,3 +78,19 @@ CREATE TABLE IF NOT EXISTS shared_question_banks (
   expires_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS shared_question_banks_expiry_idx ON shared_question_banks(expires_at);
+
+CREATE TABLE IF NOT EXISTS pavilion_question_banks (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source_bank_id VARCHAR(160) NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  group_name VARCHAR(60) NOT NULL DEFAULT '',
+  study_stage VARCHAR(20) NOT NULL DEFAULT '其他',
+  question_count INTEGER NOT NULL,
+  payload JSONB NOT NULL,
+  uploader_nickname VARCHAR(30) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, source_bank_id)
+);
+CREATE INDEX IF NOT EXISTS pavilion_question_banks_stage_idx ON pavilion_question_banks(study_stage, updated_at DESC);

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.1.5" src="https://img.shields.io/badge/version-2.1.5-b43d35" />
+    <img alt="版本 2.1.6" src="https://img.shields.io/badge/version-2.1.6-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.1.5。** 补答案题号改为与当前答题卡完全一致；藏经阁依据临床五年培养计划增加简洁分组与筛选，并保留考研、执医、主治、副高和其他阶段。
+> **当前版本：v2.1.6。** 藏经阁已改为由 PostgreSQL 支撑的注册用户公共题库：所有注册用户看到同一清单，登录后才能上传，且仅上传者可以移除；大型题库 JSON 只在下载时读取。
 
 ## 产品地图
 
@@ -221,6 +221,7 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 <details>
 <summary><strong>版本记录</strong></summary>
 
+- **v2.1.6** — 藏经阁从浏览器本地存储迁移到 Elapse 数据库，注册用户共享公共清单，并加入登录上传、上传者身份和仅本人移除权限。
 - **v2.1.5** — 补答案统一使用答题卡题号；藏经阁增加大一至大五、考研、执医、主治、副高和其他分组及筛选，并按临床培养计划自动归组。
 - **v2.1.4** — 藏经阁改为批量上传 JSON 题库，补答案支持任意起点和部分提交，同主键导入支持选择替换方式，并精简 AI 操作文案。
 - **v2.1.3** — 藏经阁新增阶段导航、常用科目、搜索、同名需求合并和题库一键导入链接；AI 追问加入五级理解引导。

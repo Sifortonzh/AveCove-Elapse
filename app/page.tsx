@@ -17,9 +17,9 @@ import { MathText } from "./components/MathText";
 import { extractQuestionFileText, importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
 import {
   activateQuestionBank, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
-  deletePavilionQuestionBank, exportQuestionBankSyncBundle, listPavilionQuestionBanks, listQuestionBanks, loadActiveBank, loadQuestionBankGroupOrder, loadQuestionBankOrder,
+  exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, loadQuestionBankGroupOrder, loadQuestionBankOrder,
   loadQuestionBankSortMode, mergeQuestionBankSyncBundle, parseSharedQuestionBankPackage, saveActiveBank,
-  savePavilionQuestionBanks, saveQuestionBank, saveQuestionBankGroupOrder, saveQuestionBankOrder, saveQuestionBankSortMode,
+  saveQuestionBank, saveQuestionBankGroupOrder, saveQuestionBankOrder, saveQuestionBankSortMode,
   updateQuestionBankDetails, PAVILION_STUDY_STAGES, type PavilionQuestionBank, type PavilionStudyStage, type QuestionBankInput, type QuestionBankSortMode, type SavedQuestionBank,
 } from "./lib/local-bank";
 import { exportEnglishTestSyncBundle, mergeEnglishTestSyncBundle } from "./lib/english-test";
@@ -1768,7 +1768,7 @@ export default function HomePage() {
           notes={notes}
         />
       ) : view === "bank-requests" ? (
-        <QuestionBankVaultPage banks={questionBanks} onBack={() => setView("banks")} />
+        <QuestionBankVaultPage banks={questionBanks} account={account} onRequireLogin={() => setShowAccount(true)} onBack={() => setView("banks")} />
       ) : view === "copyright" ? (
         <CopyrightPage bankName={bankName} onHome={() => setView("home")} onRestoreDemo={restoreDemoBank} />
       ) : current ? (
@@ -2346,7 +2346,14 @@ function QuestionBankRequestPage({ onBack }: { onBack: () => void }) {
   </div>;
 }
 
-function QuestionBankVaultPage({ banks, onBack }: { banks: SavedQuestionBank[]; onBack: () => void }) {
+async function fetchPublicPavilionEntries() {
+  const response = await fetch("/api/pavilion", { cache: "no-store" });
+  const result = await response.json() as { entries?: PavilionQuestionBank[]; error?: string };
+  if (!response.ok) throw new Error(result.error ?? "公共藏经阁暂时无法读取");
+  return result.entries ?? [];
+}
+
+function QuestionBankVaultPage({ banks, account, onRequireLogin, onBack }: { banks: SavedQuestionBank[]; account: AccountSession | null; onRequireLogin: () => void; onBack: () => void }) {
   const [entries, setEntries] = useState<PavilionQuestionBank[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -2354,7 +2361,13 @@ function QuestionBankVaultPage({ banks, onBack }: { banks: SavedQuestionBank[]; 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => { void listPavilionQuestionBanks().then(setEntries); }, []);
+  useEffect(() => {
+    let active = true;
+    if (account) void fetchPublicPavilionEntries()
+      .then((items) => { if (active) setEntries(items); })
+      .catch((error) => { if (active) setMessage(error instanceof Error ? error.message : "公共藏经阁暂时无法读取"); });
+    return () => { active = false; };
+  }, [account]);
 
   const visibleEntries = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase("zh-CN");
@@ -2369,12 +2382,17 @@ function QuestionBankVaultPage({ banks, onBack }: { banks: SavedQuestionBank[]; 
   }
 
   async function uploadSelected() {
+    if (!account) { onRequireLogin(); return; }
     const chosen = banks.filter((bank) => selected.includes(bank.id));
     if (!chosen.length || busy) return;
     setBusy(true);
     try {
-      await savePavilionQuestionBanks(chosen);
-      setEntries(await listPavilionQuestionBanks());
+      for (const bank of chosen) {
+        const response = await fetch("/api/pavilion", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceBankId: bank.id, package: createSharedQuestionBankPackage(bank) }) });
+        const result = await response.json() as { error?: string };
+        if (!response.ok) throw new Error(result.error ?? `“${bank.name}”上传失败`);
+      }
+      setEntries(await fetchPublicPavilionEntries());
       setSelected([]);
       setMessage(`已将 ${chosen.length} 份题库以红豆 JSON 收入藏经阁`);
     } catch (error) {
@@ -2382,8 +2400,11 @@ function QuestionBankVaultPage({ banks, onBack }: { banks: SavedQuestionBank[]; 
     } finally { setBusy(false); }
   }
 
-  function downloadEntry(entry: PavilionQuestionBank) {
-    const blob = new Blob([JSON.stringify(entry.package, null, 2)], { type: "application/json" });
+  async function downloadEntry(entry: PavilionQuestionBank) {
+    const response = await fetch(`/api/pavilion?id=${encodeURIComponent(entry.id)}`, { cache: "no-store" });
+    const result = await response.json() as { package?: unknown; error?: string };
+    if (!response.ok || !result.package) { setMessage(result.error ?? "题库下载失败"); return; }
+    const blob = new Blob([JSON.stringify(result.package, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -2393,7 +2414,9 @@ function QuestionBankVaultPage({ banks, onBack }: { banks: SavedQuestionBank[]; 
   }
 
   async function removeEntry(id: string) {
-    await deletePavilionQuestionBank(id);
+    const response = await fetch(`/api/pavilion?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    const result = await response.json() as { error?: string };
+    if (!response.ok) { setMessage(result.error ?? "题库移除失败"); return; }
     setEntries((items) => items.filter((item) => item.id !== id));
     setMessage("已从藏经阁移除，‘我的题库’原文件不受影响");
   }
@@ -2402,8 +2425,8 @@ function QuestionBankVaultPage({ banks, onBack }: { banks: SavedQuestionBank[]; 
   return <div className="bank-request-page bank-vault-page">
     <header className="bank-page-header"><button className="bank-request-back" onClick={onBack} aria-label="返回我的题库"><ChevronLeft />返回题库</button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><strong className="bank-request-page-title">藏经阁</strong></header>
     <main>
-      <section className="bank-request-compose bank-vault-uploader"><header><div><span>QUESTION BANK PAVILION</span><h1>把现有题库收入藏经阁</h1><p>从“我的题库”批量选择，系统会保存为可随时下载的红豆 JSON；重复上传同一主键时自动更新藏经阁版本。</p></div><Upload /></header><div className="bank-vault-select-head"><button type="button" onClick={() => setSelected(allSelected ? [] : banks.map((bank) => bank.id))}><CheckCircle2 />{allSelected ? "取消全选" : "全选题库"}</button><span>已选择 {selected.length}/{banks.length}</span></div>{banks.length ? <div className="bank-vault-source-grid">{banks.map((bank) => <button type="button" key={bank.id} className={selected.includes(bank.id) ? "active" : ""} onClick={() => toggleSelected(bank.id)}><i>{selected.includes(bank.id) && <Check />}</i><span><strong>{bank.name}</strong><small>{bank.groupName || "未分组"} · {bank.questions.length} 题</small></span></button>)}</div> : <div className="bank-request-empty"><Database /><strong>“我的题库”还是空的</strong><p>请先返回题库页导入文件，再批量收入藏经阁。</p></div>}<footer><button className="primary-action" onClick={() => void uploadSelected()} disabled={!selected.length || busy}><Upload />{busy ? "正在上传…" : `上传 ${selected.length || ""} 份题库`}</button></footer></section>
-      <section className="bank-request-list"><nav className="bank-request-stage-nav" aria-label="按培养阶段筛选藏经阁"><button className={stageFilter === "全部" ? "active" : ""} onClick={() => setStageFilter("全部")}>全部</button>{PAVILION_STUDY_STAGES.map((stage) => <button className={stageFilter === stage ? "active" : ""} key={stage} onClick={() => setStageFilter(stage)}>{stage}</button>)}</nav><header><div><span>PAVILION COLLECTION</span><h2>题库清单 <em>{visibleEntries.length}/{entries.length}</em></h2></div><label className="bank-request-search"><Search size={16} /><input aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库或原分组" /></label></header>{visibleEntries.length ? <div className="bank-request-grid bank-vault-grid">{visibleEntries.map((entry) => <article key={entry.id}><header><span>{entry.studyStage}</span><em>JSON</em></header><h3>{entry.name}</h3><p className="bank-request-subject">{entry.groupName || "未分组"} · {entry.questionCount} 道题</p><small>更新于 {new Date(entry.uploadedAt).toLocaleString("zh-CN")}</small><footer><button onClick={() => downloadEntry(entry)}><Download />下载 JSON</button><button className="danger" aria-label={`移出 ${entry.name}`} title="移出藏经阁" onClick={() => void removeEntry(entry.id)}><Trash2 /></button></footer></article>)}</div> : <div className="bank-request-empty"><Library /><strong>{entries.length ? "当前筛选没有题库" : "藏经阁里还没有题库"}</strong><p>{entries.length ? "可切换培养阶段或减少搜索词。" : "从上方选择一份或多份现有题库，批量上传即可。"}</p></div>}</section>
+      <section className="bank-request-compose bank-vault-uploader"><header><div><span>PUBLIC QUESTION BANK PAVILION</span><h1>把现有题库收入公共藏经阁</h1><p>登录后可把“我的题库”批量上传；所有注册用户均可浏览与下载，重复上传同一主键时自动更新你的版本。</p></div><Upload /></header><div className="bank-vault-select-head"><button type="button" onClick={() => setSelected(allSelected ? [] : banks.map((bank) => bank.id))}><CheckCircle2 />{allSelected ? "取消全选" : "全选题库"}</button><span>已选择 {selected.length}/{banks.length}</span></div>{banks.length ? <div className="bank-vault-source-grid">{banks.map((bank) => <button type="button" key={bank.id} className={selected.includes(bank.id) ? "active" : ""} onClick={() => toggleSelected(bank.id)}><i>{selected.includes(bank.id) && <Check />}</i><span><strong>{bank.name}</strong><small>{bank.groupName || "未分组"} · {bank.questions.length} 题</small></span></button>)}</div> : <div className="bank-request-empty"><Database /><strong>“我的题库”还是空的</strong><p>请先返回题库页导入文件，再批量收入藏经阁。</p></div>}<footer><button className="primary-action" onClick={() => void uploadSelected()} disabled={!selected.length || busy}><Upload />{busy ? "正在上传…" : `上传 ${selected.length || ""} 份题库`}</button></footer></section>
+      <section className="bank-request-list"><nav className="bank-request-stage-nav" aria-label="按培养阶段筛选藏经阁"><button className={stageFilter === "全部" ? "active" : ""} onClick={() => setStageFilter("全部")}>全部</button>{PAVILION_STUDY_STAGES.map((stage) => <button className={stageFilter === stage ? "active" : ""} key={stage} onClick={() => setStageFilter(stage)}>{stage}</button>)}</nav><header><div><span>PUBLIC PAVILION COLLECTION</span><h2>公共题库清单 <em>{visibleEntries.length}/{entries.length}</em></h2></div><label className="bank-request-search"><Search size={16} /><input aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库或原分组" /></label></header>{!account ? <div className="bank-request-empty"><UserRound /><strong>登录后查看公共藏经阁</strong><p>注册用户共享同一份题库清单，登录后即可浏览和下载。</p><button className="primary-action" onClick={onRequireLogin}>登录 / 注册</button></div> : visibleEntries.length ? <div className="bank-request-grid bank-vault-grid">{visibleEntries.map((entry) => <article key={entry.id}><header><span>{entry.studyStage}</span><em>{entry.own ? "我的上传" : entry.uploaderNickname || "共享"}</em></header><h3>{entry.name}</h3><p className="bank-request-subject">{entry.groupName || "未分组"} · {entry.questionCount} 道题</p><small>更新于 {new Date(entry.uploadedAt).toLocaleString("zh-CN")}</small><footer><button onClick={() => void downloadEntry(entry)}><Download />下载 JSON</button>{entry.own && <button className="danger" aria-label={`移出 ${entry.name}`} title="移出藏经阁" onClick={() => void removeEntry(entry.id)}><Trash2 /></button>}</footer></article>)}</div> : <div className="bank-request-empty"><Library /><strong>{entries.length ? "当前筛选没有题库" : "藏经阁里还没有题库"}</strong><p>{entries.length ? "可切换培养阶段或减少搜索词。" : "从上方选择一份或多份现有题库，批量上传即可。"}</p></div>}</section>
     </main>{message && <SuccessToast message={message} onClose={() => setMessage("")} />}
   </div>;
 }

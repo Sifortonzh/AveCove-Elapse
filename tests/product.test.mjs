@@ -531,7 +531,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.1.5");
+  assert.equal(JSON.parse(manifest).version, "2.1.6");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1250,7 +1250,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.1\.5"/);
+  assert.match(packageJson, /"version": "2\.1\.6"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1648,9 +1648,9 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.1.5");
+  assert.equal(JSON.parse(manifest).version, "2.1.6");
   assert.match(page, /function QuestionBankVaultPage/);
-  assert.match(page, /批量选择/);
+  assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
   assert.match(localBank, /export async function savePavilionQuestionBanks/);
   assert.match(localBank, /export async function listPavilionQuestionBanks/);
@@ -1667,4 +1667,19 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
   assert.match(localBank, /\["大一", "大二", "大三", "大四", "大五", "考研", "执医", "主治", "副高", "其他"\]/);
   assert.match(localBank, /export function inferPavilionStudyStage/);
   assert.match(styles, /\.bank-replacement-modal/);
+});
+
+test("ships the v2.1.6 registered-user public Pavilion", async () => {
+  const [page, route, schema] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/api/pavilion/route.ts"),
+    text("db/init.sql"),
+  ]);
+  assert.match(page, /fetch\("\/api\/pavilion"/);
+  assert.match(page, /所有注册用户均可浏览与下载/);
+  assert.match(page, /entry\.own &&/);
+  assert.match(route, /readSession\(request\)/);
+  assert.match(route, /ON CONFLICT \(user_id, source_bank_id\)/);
+  assert.match(route, /DELETE FROM pavilion_question_banks WHERE id = \$1 AND user_id = \$2/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS pavilion_question_banks/);
 });
