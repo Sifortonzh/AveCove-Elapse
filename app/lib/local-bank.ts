@@ -37,9 +37,35 @@ export type PavilionQuestionBank = {
   name: string;
   questionCount: number;
   groupName: string;
+  studyStage: PavilionStudyStage;
   uploadedAt: string;
   package: SharedQuestionBankPackage;
 };
+
+export const PAVILION_STUDY_STAGES = ["大一", "大二", "大三", "大四", "大五", "考研", "执医", "主治", "副高", "其他"] as const;
+export type PavilionStudyStage = typeof PAVILION_STUDY_STAGES[number];
+
+const CLINICAL_STAGE_KEYWORDS: Record<Exclude<PavilionStudyStage, "考研" | "执医" | "主治" | "副高" | "其他">, string[]> = {
+  大一: ["系统解剖", "组织学", "胚胎学", "医学细胞", "基础化学", "有机化学", "医学物理", "医学史", "早期临床"],
+  大二: ["生理学", "局部解剖", "医学遗传", "生物化学", "医学微生物", "医学伦理", "病理生理", "医学免疫", "病理学", "医学寄生虫", "医学心理"],
+  大三: ["中医学基础", "实验诊断", "临床诊断", "诊断学", "手术学基础", "基础外科", "医学统计", "药理", "基础护理", "临床技能", "内科", "外科", "医学影像"],
+  大四: ["口腔", "皮肤性病", "皮肤病", "急救", "急诊", "传染病", "眼科", "全科", "神经精神", "神经病", "精神病", "儿科", "康复", "妇产", "耳鼻咽喉", "耳鼻喉", "头颈外科"],
+  大五: ["卫生法", "流行病学", "卫生经济", "循证医学", "临床科研", "卫生事业管理", "卫生学", "毕业实践", "毕业理论"],
+};
+
+export function inferPavilionStudyStage(name: string, groupName = ""): PavilionStudyStage {
+  const text = `${name} ${groupName}`.replace(/\s+/g, "").toLocaleLowerCase("zh-CN");
+  const explicit = PAVILION_STUDY_STAGES.find((stage) => stage !== "其他" && text.includes(stage.toLocaleLowerCase("zh-CN")));
+  if (explicit) return explicit;
+  if (/(306|西综|考研)/i.test(text)) return "考研";
+  if (/(执业医师|执医|医师资格)/i.test(text)) return "执医";
+  if (/(主治|中级职称)/i.test(text)) return "主治";
+  if (/(副高|副主任医师|高级职称)/i.test(text)) return "副高";
+  for (const stage of ["大四", "大三", "大二", "大一", "大五"] as const) {
+    if (CLINICAL_STAGE_KEYWORDS[stage].some((keyword) => text.includes(keyword.toLocaleLowerCase("zh-CN")))) return stage;
+  }
+  return "其他";
+}
 
 export type SharedQuestionBankPackage = {
   format: "hongdou-question-bank";
@@ -288,7 +314,9 @@ export async function listPavilionQuestionBanks(): Promise<PavilionQuestionBank[
       if (!cursor) return;
       if (typeof cursor.key === "string" && cursor.key.startsWith(PAVILION_KEY_PREFIX)) {
         const value = cursor.value as PavilionQuestionBank;
-        if (value?.package?.format === "hongdou-question-bank" && value.package.bank?.questions?.length) entries.push(value);
+        if (value?.package?.format === "hongdou-question-bank" && value.package.bank?.questions?.length) {
+          entries.push({ ...value, studyStage: inferPavilionStudyStage(value.name, value.groupName) });
+        }
       }
       cursor.continue();
     };
@@ -308,6 +336,7 @@ export async function savePavilionQuestionBanks(banks: SavedQuestionBank[]): Pro
     name: bank.name,
     questionCount: bank.questions.length,
     groupName: bank.groupName,
+    studyStage: inferPavilionStudyStage(bank.name, bank.groupName),
     uploadedAt,
     package: createSharedQuestionBankPackage(bank),
   }));

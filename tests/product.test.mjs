@@ -531,7 +531,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.1.4");
+  assert.equal(JSON.parse(manifest).version, "2.1.5");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1250,7 +1250,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.1\.4"/);
+  assert.match(packageJson, /"version": "2\.1\.5"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1640,7 +1640,7 @@ test("ships the v2.1.3 Pavilion workflow and five-level AI follow-up", async () 
   assert.match(styles, /\.ai-guided-prompts/);
 });
 
-test("ships the v2.1.4 JSON Pavilion, flexible answer repair, and safe same-key replacement", async () => {
+test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair", async () => {
   const [page, localBank, styles, manifest] = await Promise.all([
     text("app/page.tsx"),
     text("app/lib/local-bank.ts"),
@@ -1648,18 +1648,23 @@ test("ships the v2.1.4 JSON Pavilion, flexible answer repair, and safe same-key 
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.1.4");
+  assert.equal(JSON.parse(manifest).version, "2.1.5");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量选择/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
   assert.match(localBank, /export async function savePavilionQuestionBanks/);
   assert.match(localBank, /export async function listPavilionQuestionBanks/);
   assert.match(page, /BATCH ANSWER · 任意起点/);
+  assert.match(page, /从答题卡题号开始/);
+  assert.match(page, /答题卡第 \{answerSheetNumber\} 题/);
   assert.match(page, /保存已选 \$\{selectedEntries\.length\} 题/);
   assert.match(page, /完全替换/);
   assert.match(page, /保留刷题记录/);
   assert.match(page, /label: "AI 解析"/);
   assert.match(page, />写入笔记</);
   assert.match(page, /"录入解析"/);
+  assert.match(page, /PAVILION_STUDY_STAGES\.map/);
+  assert.match(localBank, /\["大一", "大二", "大三", "大四", "大五", "考研", "执医", "主治", "副高", "其他"\]/);
+  assert.match(localBank, /export function inferPavilionStudyStage/);
   assert.match(styles, /\.bank-replacement-modal/);
 });

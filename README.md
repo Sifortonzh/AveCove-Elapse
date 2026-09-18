@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.1.4" src="https://img.shields.io/badge/version-2.1.4-b43d35" />
+    <img alt="Version 2.1.5" src="https://img.shields.io/badge/version-2.1.5-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.1.4.** The Pavilion is now a batch-upload JSON vault for banks already in the library; answer repair can begin at any source number and save any partial set; same-key imports offer full replacement or record-preserving updates; AI action labels are shorter and clearer.
+> **Current release: v2.1.5.** Answer repair now uses the current answer-sheet numbering; the Pavilion adds concise study-stage groups and filters based on the five-year clinical curriculum, plus postgraduate and professional-title tracks.
 
 ## Product map
 
@@ -221,6 +221,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v2.1.5** — Aligned answer repair with answer-sheet numbering and added curriculum-aware Pavilion groups for Years 1–5, postgraduate exams, licensing, attending, associate chief, and other banks.
 - **v2.1.4** — Replaced Pavilion requests with a batch-upload JSON vault, added partial answer repair from any source number, same-key replacement choices, and concise AI action labels.
 - **v2.1.3** — Upgraded the Pavilion with stage navigation, subject presets, search, duplicate-request merging, one-click resource links, and added five-level guided AI follow-up.
 - **v2.1.2** — Made practice progress jump-safe, auto-located the current answer-card item, added per-bank review PDF export, enlarged question stems, and removed the redundant top previous-question control.

@@ -20,7 +20,7 @@ import {
   deletePavilionQuestionBank, exportQuestionBankSyncBundle, listPavilionQuestionBanks, listQuestionBanks, loadActiveBank, loadQuestionBankGroupOrder, loadQuestionBankOrder,
   loadQuestionBankSortMode, mergeQuestionBankSyncBundle, parseSharedQuestionBankPackage, saveActiveBank,
   savePavilionQuestionBanks, saveQuestionBank, saveQuestionBankGroupOrder, saveQuestionBankOrder, saveQuestionBankSortMode,
-  updateQuestionBankDetails, type PavilionQuestionBank, type QuestionBankInput, type QuestionBankSortMode, type SavedQuestionBank,
+  updateQuestionBankDetails, PAVILION_STUDY_STAGES, type PavilionQuestionBank, type PavilionStudyStage, type QuestionBankInput, type QuestionBankSortMode, type SavedQuestionBank,
 } from "./lib/local-bank";
 import { exportEnglishTestSyncBundle, mergeEnglishTestSyncBundle } from "./lib/english-test";
 import { exportEnglishPracticeSyncBundle, mergeEnglishPracticeSyncBundle } from "./lib/english-practice";
@@ -2350,6 +2350,7 @@ function QuestionBankVaultPage({ banks, onBack }: { banks: SavedQuestionBank[]; 
   const [entries, setEntries] = useState<PavilionQuestionBank[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [stageFilter, setStageFilter] = useState<"全部" | PavilionStudyStage>("全部");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -2357,8 +2358,11 @@ function QuestionBankVaultPage({ banks, onBack }: { banks: SavedQuestionBank[]; 
 
   const visibleEntries = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase("zh-CN");
-    return keyword ? entries.filter((entry) => [entry.name, entry.groupName].join(" ").toLocaleLowerCase("zh-CN").includes(keyword)) : entries;
-  }, [entries, query]);
+    return entries.filter((entry) => (
+      (stageFilter === "全部" || entry.studyStage === stageFilter)
+      && (!keyword || [entry.name, entry.groupName, entry.studyStage].join(" ").toLocaleLowerCase("zh-CN").includes(keyword))
+    ));
+  }, [entries, query, stageFilter]);
 
   function toggleSelected(id: string) {
     setSelected((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]);
@@ -2399,7 +2403,7 @@ function QuestionBankVaultPage({ banks, onBack }: { banks: SavedQuestionBank[]; 
     <header className="bank-page-header"><button className="bank-request-back" onClick={onBack} aria-label="返回我的题库"><ChevronLeft />返回题库</button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><strong className="bank-request-page-title">藏经阁</strong></header>
     <main>
       <section className="bank-request-compose bank-vault-uploader"><header><div><span>QUESTION BANK PAVILION</span><h1>把现有题库收入藏经阁</h1><p>从“我的题库”批量选择，系统会保存为可随时下载的红豆 JSON；重复上传同一主键时自动更新藏经阁版本。</p></div><Upload /></header><div className="bank-vault-select-head"><button type="button" onClick={() => setSelected(allSelected ? [] : banks.map((bank) => bank.id))}><CheckCircle2 />{allSelected ? "取消全选" : "全选题库"}</button><span>已选择 {selected.length}/{banks.length}</span></div>{banks.length ? <div className="bank-vault-source-grid">{banks.map((bank) => <button type="button" key={bank.id} className={selected.includes(bank.id) ? "active" : ""} onClick={() => toggleSelected(bank.id)}><i>{selected.includes(bank.id) && <Check />}</i><span><strong>{bank.name}</strong><small>{bank.groupName || "未分组"} · {bank.questions.length} 题</small></span></button>)}</div> : <div className="bank-request-empty"><Database /><strong>“我的题库”还是空的</strong><p>请先返回题库页导入文件，再批量收入藏经阁。</p></div>}<footer><button className="primary-action" onClick={() => void uploadSelected()} disabled={!selected.length || busy}><Upload />{busy ? "正在上传…" : `上传 ${selected.length || ""} 份题库`}</button></footer></section>
-      <section className="bank-request-list"><header><div><span>PAVILION COLLECTION</span><h2>题库清单 <em>{visibleEntries.length}/{entries.length}</em></h2></div><label className="bank-request-search"><Search size={16} /><input aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库或分组" /></label></header>{visibleEntries.length ? <div className="bank-request-grid bank-vault-grid">{visibleEntries.map((entry) => <article key={entry.id}><header><span>{entry.groupName || "未分组"}</span><em>JSON</em></header><h3>{entry.name}</h3><p className="bank-request-subject">{entry.questionCount} 道题</p><small>更新于 {new Date(entry.uploadedAt).toLocaleString("zh-CN")}</small><footer><button onClick={() => downloadEntry(entry)}><Download />下载 JSON</button><button className="danger" aria-label={`移出 ${entry.name}`} title="移出藏经阁" onClick={() => void removeEntry(entry.id)}><Trash2 /></button></footer></article>)}</div> : <div className="bank-request-empty"><Library /><strong>藏经阁里还没有题库</strong><p>从上方选择一份或多份现有题库，批量上传即可。</p></div>}</section>
+      <section className="bank-request-list"><nav className="bank-request-stage-nav" aria-label="按培养阶段筛选藏经阁"><button className={stageFilter === "全部" ? "active" : ""} onClick={() => setStageFilter("全部")}>全部</button>{PAVILION_STUDY_STAGES.map((stage) => <button className={stageFilter === stage ? "active" : ""} key={stage} onClick={() => setStageFilter(stage)}>{stage}</button>)}</nav><header><div><span>PAVILION COLLECTION</span><h2>题库清单 <em>{visibleEntries.length}/{entries.length}</em></h2></div><label className="bank-request-search"><Search size={16} /><input aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库或原分组" /></label></header>{visibleEntries.length ? <div className="bank-request-grid bank-vault-grid">{visibleEntries.map((entry) => <article key={entry.id}><header><span>{entry.studyStage}</span><em>JSON</em></header><h3>{entry.name}</h3><p className="bank-request-subject">{entry.groupName || "未分组"} · {entry.questionCount} 道题</p><small>更新于 {new Date(entry.uploadedAt).toLocaleString("zh-CN")}</small><footer><button onClick={() => downloadEntry(entry)}><Download />下载 JSON</button><button className="danger" aria-label={`移出 ${entry.name}`} title="移出藏经阁" onClick={() => void removeEntry(entry.id)}><Trash2 /></button></footer></article>)}</div> : <div className="bank-request-empty"><Library /><strong>{entries.length ? "当前筛选没有题库" : "藏经阁里还没有题库"}</strong><p>{entries.length ? "可切换培养阶段或减少搜索词。" : "从上方选择一份或多份现有题库，批量上传即可。"}</p></div>}</section>
     </main>{message && <SuccessToast message={message} onClose={() => setMessage("")} />}
   </div>;
 }
@@ -2899,15 +2903,17 @@ function BatchAnswerModal({ questions, onSave, onClose }: { questions: QuizQuest
   const jumpToQuestion = () => {
     const target = jumpValue.trim();
     if (!target) return;
-    const index = pendingIds.findIndex((id) => questions.find((question) => question.id === id)?.sourceNumber === target);
-    if (index < 0) return setError(`没有找到原题号 ${target} 的待答案题`);
+    const answerSheetIndex = Number(target) - 1;
+    const targetQuestion = Number.isInteger(answerSheetIndex) && answerSheetIndex >= 0 ? questions[answerSheetIndex] : undefined;
+    const index = targetQuestion ? pendingIds.indexOf(targetQuestion.id) : -1;
+    if (index < 0) return setError(`答题卡第 ${target} 题不存在或已经有答案`);
     setOffset(index); setError("");
   };
   return <div className="modal-layer batch-answer-layer" onMouseDown={() => !busy && onClose()}><section className="batch-answer-modal" role="dialog" aria-modal="true" aria-label="批量补录答案" onMouseDown={(event) => event.stopPropagation()}>
-    <header><div><span>BATCH ANSWER · 任意起点</span><h2>批量补答案</h2><p>可跳到任意原题号，选中一题或多题即可提交；只显示 A–E，X 型题可多选。</p></div><button onClick={onClose} disabled={busy}><X /></button></header>
-    <div className="batch-answer-jump"><label htmlFor="batch-answer-start">从原题号开始</label><input id="batch-answer-start" value={jumpValue} onChange={(event) => setJumpValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") jumpToQuestion(); }} placeholder="如 137" /><button type="button" onClick={jumpToQuestion}>跳转</button></div>
+    <header><div><span>BATCH ANSWER · 任意起点</span><h2>批量补答案</h2><p>题号与当前答题卡完全一致；可从任意题开始，选中一题或多题即可提交。只显示 A–E，X 型题可多选。</p></div><button onClick={onClose} disabled={busy}><X /></button></header>
+    <div className="batch-answer-jump"><label htmlFor="batch-answer-start">从答题卡题号开始</label><input id="batch-answer-start" value={jumpValue} onChange={(event) => setJumpValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") jumpToQuestion(); }} placeholder="如 137" /><button type="button" onClick={jumpToQuestion}>跳转</button></div>
     <div className="batch-answer-progress"><span>当前显示第 {offset + 1}–{offset + currentBatch.length} 个待答案题 · 已选 {selectedEntries.length} 题</span><i><b style={{ width: `${Math.round(offset / Math.max(1, pendingIds.length) * 100)}%` }} /></i></div>
-    <div className="batch-answer-list">{currentBatch.map((question) => <article key={question.id}><header><b>原题号 {question.sourceNumber}</b><span>{question.medicalQuestionType || (question.multiple ? "多选题" : "单选题")}</span></header><p>{question.stem}</p><div>{["A", "B", "C", "D", "E"].map((label) => <button key={label} aria-label={`原题号 ${question.sourceNumber} 选择 ${label}`} className={answers[question.id]?.includes(label) ? "active" : ""} onClick={() => toggle(question, label)}><b>{label}</b></button>)}</div></article>)}</div>
+    <div className="batch-answer-list">{currentBatch.map((question) => { const answerSheetNumber = questions.findIndex((item) => item.id === question.id) + 1; return <article key={question.id}><header><b>答题卡第 {answerSheetNumber} 题</b><span>{question.medicalQuestionType || (question.multiple ? "多选题" : "单选题")}</span></header><p>{question.stem}</p><div>{["A", "B", "C", "D", "E"].map((label) => <button key={label} aria-label={`答题卡第 ${answerSheetNumber} 题选择 ${label}`} className={answers[question.id]?.includes(label) ? "active" : ""} onClick={() => toggle(question, label)}><b>{label}</b></button>)}</div></article>; })}</div>
     {error && <p className="batch-answer-error"><AlertCircle size={16} />{error}</p>}<footer><button onClick={onClose} disabled={busy}>稍后再补</button><button className="primary-action" onClick={() => void save()} disabled={!complete || busy}><CheckCircle2 />{busy ? "正在保存…" : `保存已选 ${selectedEntries.length} 题`}</button></footer>
   </section></div>;
 }
