@@ -31,11 +31,22 @@ export type QuestionBankInput = {
   updatedAt?: string;
 };
 
+export type PavilionQuestionBank = {
+  id: string;
+  sourceBankId: string;
+  name: string;
+  questionCount: number;
+  groupName: string;
+  uploadedAt: string;
+  package: SharedQuestionBankPackage;
+};
+
 export type SharedQuestionBankPackage = {
   format: "hongdou-question-bank";
   version: 1;
   exportedAt: string;
   bank: {
+    id?: string;
     name: string;
     description?: string;
     sourceTitle?: string;
@@ -88,6 +99,7 @@ const SORT_MODE_KEY = "question-bank-sort-mode";
 const DELETED_BANKS_KEY = "question-bank-deletions";
 const PREFERENCES_UPDATED_AT_KEY = "question-bank-preferences-updated-at";
 const BANK_KEY_PREFIX = "bank:";
+const PAVILION_KEY_PREFIX = "pavilion:";
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -262,6 +274,54 @@ export async function listQuestionBanks(): Promise<SavedQuestionBank[]> {
       database.close();
       resolve(banks.sort((left, right) => right.importedAt.localeCompare(left.importedAt)));
     };
+  });
+}
+
+export async function listPavilionQuestionBanks(): Promise<PavilionQuestionBank[]> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const entries: PavilionQuestionBank[] = [];
+    const transaction = database.transaction(STORE_NAME, "readonly");
+    const request = transaction.objectStore(STORE_NAME).openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      if (typeof cursor.key === "string" && cursor.key.startsWith(PAVILION_KEY_PREFIX)) {
+        const value = cursor.value as PavilionQuestionBank;
+        if (value?.package?.format === "hongdou-question-bank" && value.package.bank?.questions?.length) entries.push(value);
+      }
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error ?? new Error("读取藏经阁失败"));
+    transaction.oncomplete = () => {
+      database.close();
+      resolve(entries.sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt)));
+    };
+  });
+}
+
+export async function savePavilionQuestionBanks(banks: SavedQuestionBank[]): Promise<PavilionQuestionBank[]> {
+  const uploadedAt = new Date().toISOString();
+  const entries = banks.map((bank): PavilionQuestionBank => ({
+    id: bank.id,
+    sourceBankId: bank.id,
+    name: bank.name,
+    questionCount: bank.questions.length,
+    groupName: bank.groupName,
+    uploadedAt,
+    package: createSharedQuestionBankPackage(bank),
+  }));
+  await writeValues(entries.map((entry) => [`${PAVILION_KEY_PREFIX}${entry.id}`, entry]));
+  return entries;
+}
+
+export async function deletePavilionQuestionBank(id: string): Promise<void> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    transaction.objectStore(STORE_NAME).delete(`${PAVILION_KEY_PREFIX}${id}`);
+    transaction.oncomplete = () => { database.close(); notifySyncChange(); resolve(); };
+    transaction.onerror = () => reject(transaction.error ?? new Error("移出藏经阁失败"));
   });
 }
 
@@ -452,6 +512,7 @@ export function createSharedQuestionBankPackage(bank: SavedQuestionBank): Shared
     version: 1,
     exportedAt: new Date().toISOString(),
     bank: {
+      id: bank.id,
       name: bank.name,
       description: bank.description,
       sourceTitle: bank.sourceTitle,
@@ -473,7 +534,9 @@ export function parseSharedQuestionBankPackage(value: unknown): QuestionBankInpu
     question && typeof question.stem === "string" && Array.isArray(question.options) && Array.isArray(question.answer),
   ));
   if (!questions.length) throw new Error("分享文件中没有可用题目");
+  const packageBank = payload.bank as typeof payload.bank & { id?: unknown };
   return {
+    id: typeof packageBank.id === "string" && packageBank.id.length <= 160 ? packageBank.id : undefined,
     name: typeof payload.bank.name === "string" ? payload.bank.name : "分享题库",
     description: typeof payload.bank.description === "string" ? payload.bank.description.slice(0, 4_000) : "",
     sourceTitle: typeof payload.bank.sourceTitle === "string" ? payload.bank.sourceTitle.slice(0, 160) : "",

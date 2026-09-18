@@ -531,7 +531,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.1.3");
+  assert.equal(JSON.parse(manifest).version, "2.1.4");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -834,7 +834,7 @@ test("persists in-practice question corrections into sync and shared banks", asy
   assert.match(styles, /\.add-option-button/);
   assert.match(styles, /\.question-edit-modal\.editing \.option-edit-section>label/);
   assert.match(page, /rows=\{creating \? 2 : 1\}/);
-  assert.match(page, /存为原题解析/);
+  assert.match(page, /录入解析/);
   assert.match(page, /explanationSource: "AI 生成解析 · 手动保存"/);
 });
 
@@ -1096,7 +1096,7 @@ test("keeps imported explanations separate and upgrades AI-assisted notes to sea
   assert.match(page, /className="source-explanation"/);
   assert.match(page, /原资料解析/);
   assert.match(page, /current\.answerSource/);
-  assert.match(page, /写入我的笔记/);
+  assert.match(page, /写入笔记/);
   assert.match(page, /Markdown 编辑/);
   assert.match(page, /function MarkdownNotePreview/);
   assert.match(page, /parseNoteTags/);
@@ -1250,7 +1250,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.1\.3"/);
+  assert.match(packageJson, /"version": "2\.1\.4"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1595,7 +1595,7 @@ test("builds a print-ready note export from wrong, featured, annotated, and AI-e
 test("exposes the complete v2.1.1 workflow in the practice UI", async () => {
   const [page, extras] = await Promise.all([text("app/page.tsx"), text("app/components/PracticeExtras.tsx")]);
   assert.match(page, /批量补答案/);
-  assert.match(page, /每次 10 题/);
+  assert.match(page, /BATCH ANSWER · 任意起点/);
   assert.match(page, /\["A", "B", "C", "D", "E"\]/);
   assert.doesNotMatch(page, /title=\{option\.text\}/);
   assert.match(page, /导出 PDF/);
@@ -1638,4 +1638,28 @@ test("ships the v2.1.3 Pavilion workflow and five-level AI follow-up", async () 
   assert.match(extras, /1 基础/);
   assert.match(extras, /5 串联/);
   assert.match(styles, /\.ai-guided-prompts/);
+});
+
+test("ships the v2.1.4 JSON Pavilion, flexible answer repair, and safe same-key replacement", async () => {
+  const [page, localBank, styles, manifest] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/lib/local-bank.ts"),
+    text("app/globals.css"),
+    text("package.json"),
+  ]);
+
+  assert.equal(JSON.parse(manifest).version, "2.1.4");
+  assert.match(page, /function QuestionBankVaultPage/);
+  assert.match(page, /批量选择/);
+  assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
+  assert.match(localBank, /export async function savePavilionQuestionBanks/);
+  assert.match(localBank, /export async function listPavilionQuestionBanks/);
+  assert.match(page, /BATCH ANSWER · 任意起点/);
+  assert.match(page, /保存已选 \$\{selectedEntries\.length\} 题/);
+  assert.match(page, /完全替换/);
+  assert.match(page, /保留刷题记录/);
+  assert.match(page, /label: "AI 解析"/);
+  assert.match(page, />写入笔记</);
+  assert.match(page, /"录入解析"/);
+  assert.match(styles, /\.bank-replacement-modal/);
 });
