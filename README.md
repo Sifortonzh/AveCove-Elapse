@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.1.6" src="https://img.shields.io/badge/version-2.1.6-b43d35" />
+    <img alt="Version 2.2.0" src="https://img.shields.io/badge/version-2.2.0-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.1.6.** The Pavilion is now a PostgreSQL-backed public library shared by all registered users, with authenticated upload and owner-only removal; large bank JSON is fetched only when downloaded.
+> **Current release: v2.2.0.** Wrong-answer review now runs as an isolated current-bank session: first-attempt traces are hidden, order is randomized, and progress is recalculated for the new run. Correct retries leave Featured while repeated misses enter it automatically; explanation provenance, tags, compact PDF export, and answer-card highlighting were also refined.
 
 ## Product map
 
@@ -221,6 +221,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v2.2.0** — Rebuilt wrong-answer review as an isolated current-bank session with fresh statistics, automatic Featured mastery handling, explicit AI/source explanation provenance, removable/searchable tags, compact PDF output, and stronger answer-card focus.
 - **v2.1.6** — Moved the Pavilion from browser-local storage to the Elapse database so every registered user sees the same public catalog, while keeping uploads authenticated and removal owner-only.
 - **v2.1.5** — Aligned answer repair with answer-sheet numbering and added curriculum-aware Pavilion groups for Years 1–5, postgraduate exams, licensing, attending, associate chief, and other banks.
 - **v2.1.4** — Replaced Pavilion requests with a batch-upload JSON vault, added partial answer repair from any source number, same-key replacement choices, and concise AI action labels.

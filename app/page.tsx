@@ -186,6 +186,15 @@ function parseNoteTags(markdown: string) {
   return [...new Set([...markdown.matchAll(/#([\p{L}\p{N}_-]{1,24})/gu)].map((match) => match[1]))];
 }
 
+function removeNoteTag(markdown: string, tag: string) {
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return markdown
+    .replace(new RegExp(`(^|\\s)#${escaped}(?=\\s|$|[，。；、,.!?！？])`, "gu"), "$1")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function parseNoteSource(markdown: string, question: QuizQuestion) {
   return markdown.match(/^>\s*来源[：:]\s*(.+)$/m)?.[1]?.trim() || noteSource(question);
 }
@@ -326,6 +335,9 @@ export default function HomePage() {
   const [excludedOptions, setExcludedOptions] = useState<Record<string, string[]>>({});
   const [submitted, setSubmitted] = useState(false);
   const [sessionStudyMode, setSessionStudyMode] = useState<StudyMode>("standard");
+  const [sessionScope, setSessionScope] = useState<Scope>("all");
+  const [reviewProgress, setReviewProgress] = useState<Progress>({});
+  const [reviewSelections, setReviewSelections] = useState<Record<string, string[]>>({});
   const [revealedAnswers, setRevealedAnswers] = useState<string[]>([]);
   const [progress, setProgress] = useState<Progress>({});
   const [firstProgress, setFirstProgress] = useState<Progress>({});
@@ -513,26 +525,24 @@ export default function HomePage() {
     return () => controller.abort();
   }, [account, currentDiscussionId]);
 
-  const activeGroupName = activeBankId ? questionBanks.find((bank) => bank.id === activeBankId)?.groupName ?? "" : "";
-  const activeGroupQuestions = activeGroupName
-    ? questionBanks.filter((bank) => bank.groupName === activeGroupName).flatMap((bank) => bank.questions)
-    : questions;
   const killedIds = useMemo(() => new Set(killedQuestions), [killedQuestions]);
+  const displayedProgress = sessionScope === "wrong" ? reviewProgress : progress;
+  const displayedAnswerSelections = sessionScope === "wrong" ? reviewSelections : answerSelections;
   const answered = Object.keys(progress).filter((id) => !killedIds.has(id) && questions.some((question) => question.id === id)).length;
   const correct = questions.filter((question) => !killedIds.has(question.id) && progress[question.id] === "correct").length;
-  const wrong = activeGroupQuestions.filter((question) => !killedIds.has(question.id) && progress[question.id] === "wrong").length;
+  const wrong = questions.filter((question) => !killedIds.has(question.id) && progress[question.id] === "wrong").length;
   const accuracy = answered ? Math.round((correct / answered) * 100) : 0;
   const examScore = questions.some((question) => question.examProfile === "western-medicine-306")
     ? western306Score(questions.filter((question) => !killedIds.has(question.id)), progress, firstProgress)
     : undefined;
-  const sessionExamScore = sessionQuestions.some((question) => question.examProfile === "western-medicine-306")
+  const sessionExamScore = sessionScope !== "wrong" && sessionQuestions.some((question) => question.examProfile === "western-medicine-306")
     ? western306Score(sessionQuestions.filter((question) => !killedIds.has(question.id)), progress, firstProgress)
     : undefined;
-  const sessionAnswered = sessionQuestions.filter((question) => !killedIds.has(question.id) && Boolean(progress[question.id])).length;
+  const sessionAnswered = sessionQuestions.filter((question) => !killedIds.has(question.id) && Boolean(displayedProgress[question.id])).length;
   const sessionCompleted = sessionQuestions.filter((question) => !killedIds.has(question.id) && (
-    Boolean(progress[question.id]) || (sessionStudyMode === "blind" && Boolean(answerSelections[question.id]?.length))
+    Boolean(displayedProgress[question.id]) || (sessionStudyMode === "blind" && Boolean(displayedAnswerSelections[question.id]?.length))
   )).length;
-  const sessionCorrect = sessionQuestions.filter((question) => !killedIds.has(question.id) && progress[question.id] === "correct").length;
+  const sessionCorrect = sessionQuestions.filter((question) => !killedIds.has(question.id) && displayedProgress[question.id] === "correct").length;
   const sessionAccuracy = sessionAnswered ? (sessionCorrect / sessionAnswered) * 100 : 0;
   const isFavorite = current ? favorites.includes(current.id) : false;
   const currentGroupKey = current?.sharedStemGroup || current?.sharedOptionGroup || "";
@@ -547,9 +557,6 @@ export default function HomePage() {
   const subjectFilteredQuestions = settings.western306Subject !== "all" && hasModernWestern306
     ? questions.filter((question) => western306SubjectForQuestion(question) === settings.western306Subject)
     : questions;
-  const subjectFilteredGroupQuestions = settings.western306Subject !== "all" && hasModernWestern306
-    ? activeGroupQuestions.filter((question) => western306SubjectForQuestion(question) === settings.western306Subject)
-    : activeGroupQuestions;
   const western306SubjectCounts = useMemo(() => Object.fromEntries([
     ["all", questions.length],
     ...WESTERN_306_SUBJECTS.map((subject) => [
@@ -564,18 +571,14 @@ export default function HomePage() {
   }), [subjectFilteredQuestions]);
   const scopeCounts = useMemo(() => {
     const availableSubjectQuestions = subjectFilteredQuestions.filter((question) => !killedIds.has(question.id));
-    const availableGroupQuestions = subjectFilteredGroupQuestions.filter((question) => !killedIds.has(question.id));
     const typedQuestions = settings.questionTypes === "single" ? availableSubjectQuestions.filter((question) => !question.multiple) : availableSubjectQuestions;
-    const typedGroupQuestions = settings.questionTypes === "single"
-      ? availableGroupQuestions.filter((question) => !question.multiple)
-      : availableGroupQuestions;
     return {
       all: typedQuestions.length,
       unanswered: typedQuestions.filter((question) => !progress[question.id]).length,
-      wrong: typedGroupQuestions.filter((question) => progress[question.id] === "wrong").length,
+      wrong: typedQuestions.filter((question) => progress[question.id] === "wrong").length,
       favorite: typedQuestions.filter((question) => favorites.includes(question.id)).length,
     };
-  }, [favorites, killedIds, progress, settings.questionTypes, subjectFilteredGroupQuestions, subjectFilteredQuestions]);
+  }, [favorites, killedIds, progress, settings.questionTypes, subjectFilteredQuestions]);
   const searchableBanks = useMemo(() => {
     const savedCurrent = activeBankId ? questionBanks.find((bank) => bank.id === activeBankId) : undefined;
     const currentBank: SavedQuestionBank = savedCurrent ? { ...savedCurrent, name: bankName, questions } : {
@@ -798,7 +801,7 @@ export default function HomePage() {
 
   function buildSession(custom?: Partial<Settings>, limit?: number) {
     const active = { ...settings, ...custom };
-    const sourceQuestions = active.scope === "wrong" ? activeGroupQuestions : questions;
+    const sourceQuestions = questions;
     const sourceHasModernWestern306 = sourceQuestions.some((question) => question.examProfile === "western-medicine-306"
       && (question.examFormat === "modern-165" || (question.examYear ?? 0) >= 2017));
     const subjectQuestions = active.western306Subject !== "all" && sourceHasModernWestern306
@@ -812,13 +815,16 @@ export default function HomePage() {
       if (active.scope === "favorite") return favorites.includes(question.id);
       return true;
     });
-    if (active.questionOrder === "random") pool = shuffle(pool);
+    if (active.questionOrder === "random" || active.scope === "wrong") pool = shuffle(pool);
     if (limit && limit > 0) pool = pool.slice(0, limit);
     if (active.shuffleOptions) pool = pool.map((question) => ({ ...question, options: shuffle(question.options) }));
     const firstQuestion = pool[0];
     const memorizing = active.studyMode === "memorize";
     setSessionQuestions(pool);
     setSessionStudyMode(active.studyMode);
+    setSessionScope(active.scope);
+    setReviewProgress({});
+    setReviewSelections({});
     setRevealedAnswers([]);
     setCurrentIndex(0);
     setSelected(memorizing ? [...(firstQuestion?.answer ?? [])] : []);
@@ -848,10 +854,10 @@ export default function HomePage() {
       sessionStudyMode === "standard"
       && revealAnswer
       && target
-      && (progress[target.id] || target.draftAnswer?.length)
+      && (displayedProgress[target.id] || (sessionScope !== "wrong" && target.draftAnswer?.length))
       && target.answer.length,
     );
-    const restoredSelection = target ? [...(answerSelections[target.id] ?? target.draftAnswer ?? [])] : [];
+    const restoredSelection = target ? [...(displayedAnswerSelections[target.id] ?? (sessionScope === "wrong" ? [] : target.draftAnswer ?? []))] : [];
     setCurrentIndex(boundedIndex);
     setSelected(memorizing ? [...(target?.answer ?? [])] : restoredSelection);
     setSubmitted(memorizing || blindRevealed || shouldRevealPrevious);
@@ -904,6 +910,7 @@ export default function HomePage() {
     if (index < 0) return;
     setSessionQuestions(questions);
     setSessionStudyMode("standard");
+    setSessionScope("all");
     setRevealedAnswers([]);
     setCurrentIndex(index);
     setSelected([...(answerSelections[questionId] ?? questions[index].draftAnswer ?? [])]);
@@ -922,16 +929,19 @@ export default function HomePage() {
       ? selected.includes(label) ? selected.filter((item) => item !== label) : [...selected, label]
       : selected.includes(label) ? [] : [label];
     setSelected(next);
-    setAnswerSelections((answers) => ({ ...answers, [current.id]: next }));
+    if (sessionScope === "wrong") setReviewSelections((answers) => ({ ...answers, [current.id]: next }));
+    else setAnswerSelections((answers) => ({ ...answers, [current.id]: next }));
   }
 
   function toggleExcludedOption(label: string) {
     if (!current || submitted) return;
     setSelected((value) => value.filter((item) => item !== label));
-    setAnswerSelections((answers) => ({
-        ...answers,
-        [current.id]: (answers[current.id] ?? []).filter((item) => item !== label),
-    }));
+    const removeSelection = (answers: Record<string, string[]>) => ({
+      ...answers,
+      [current.id]: (answers[current.id] ?? []).filter((item) => item !== label),
+    });
+    if (sessionScope === "wrong") setReviewSelections(removeSelection);
+    else setAnswerSelections(removeSelection);
     setExcludedOptions((value) => {
       const currentExcluded = value[current.id] ?? [];
       const next = currentExcluded.includes(label)
@@ -943,7 +953,8 @@ export default function HomePage() {
 
   function submitAnswer() {
     if (!current || !selected.length) return;
-    setAnswerSelections((value) => ({ ...value, [current.id]: [...selected] }));
+    if (sessionScope === "wrong") setReviewSelections((value) => ({ ...value, [current.id]: [...selected] }));
+    else setAnswerSelections((value) => ({ ...value, [current.id]: [...selected] }));
     if (sessionStudyMode === "blind") {
       setRevealedAnswers((value) => value.includes(current.id) ? value : [...value, current.id]);
     }
@@ -965,15 +976,19 @@ export default function HomePage() {
     }
     const result = [...selected].sort().join("") === [...current.answer].sort().join("") ? "correct" : "wrong";
     const nextProgress = { ...progress, [current.id]: result as "correct" | "wrong" };
+    if (sessionScope === "wrong") setReviewProgress((value) => ({ ...value, [current.id]: result as "correct" | "wrong" }));
     const nextFirstProgress = firstProgress[current.id]
       ? firstProgress
       : { ...firstProgress, [current.id]: result as "correct" | "wrong" };
-    const shouldFavorite = result === "wrong" && settings.autoFavoriteWrong && !favorites.includes(current.id);
-    const nextFavorites = shouldFavorite ? [...favorites, current.id] : favorites;
+    const shouldFavorite = result === "wrong" && (sessionScope === "wrong" || settings.autoFavoriteWrong) && !favorites.includes(current.id);
+    const shouldUnfavorite = sessionScope === "wrong" && result === "correct" && favorites.includes(current.id);
+    const nextFavorites = shouldUnfavorite
+      ? favorites.filter((id) => id !== current.id)
+      : shouldFavorite ? [...favorites, current.id] : favorites;
     const nextLedger = stampLearningRecord(recordLedger, current.id, {
       progress: result,
       ...(!firstProgress[current.id] ? { firstProgress: result } : {}),
-      ...(shouldFavorite ? { favorite: true } : {}),
+      ...(shouldFavorite ? { favorite: true } : shouldUnfavorite ? { favorite: false } : {}),
     });
     persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites: nextFavorites, notes, ledger: nextLedger });
     setSubmitted(true);
@@ -1708,6 +1723,7 @@ export default function HomePage() {
     const index = bank.questions.findIndex((question) => question.id === questionId);
     setSessionQuestions(bank.questions);
     setSessionStudyMode("standard");
+    setSessionScope("all");
     setRevealedAnswers([]);
     setCurrentIndex(Math.max(0, index));
     setSelected([...(answerSelections[questionId] ?? bank.questions[index]?.draftAnswer ?? [])]);
@@ -1787,10 +1803,10 @@ export default function HomePage() {
           excluded={excludedOptions[current.id] ?? []}
           submitted={submitted}
           studyMode={sessionStudyMode}
-          result={progress[current.id]}
+          result={displayedProgress[current.id]}
           killed={killedIds.has(current.id)}
           relatedQuestions={currentGroupQuestions}
-          relatedProgress={progress}
+          relatedProgress={displayedProgress}
           favorite={isFavorite}
           note={notes[current.id] ?? ""}
           aiMode={aiMode}
@@ -1836,7 +1852,7 @@ export default function HomePage() {
         <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} western306SubjectCounts={western306SubjectCounts} showWestern306Subjects={hasModernWestern306} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
-        <AnswerSheet questions={sessionQuestions} progress={progress} favorites={favorites} notes={notes} killed={killedQuestions} answerSelections={answerSelections} currentIndex={currentIndex} onBatchAnswers={saveBatchAnswerEntries} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
+        <AnswerSheet questions={sessionQuestions} progress={displayedProgress} favorites={favorites} notes={notes} killed={killedQuestions} answerSelections={displayedAnswerSelections} currentIndex={currentIndex} onBatchAnswers={saveBatchAnswerEntries} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
       )}
       {showImport && (
         <ImportModal
@@ -2196,7 +2212,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
             <div className="bank-card-progress" aria-label={`已完成 ${completedCount} 道，共 ${bank.questions.length} 道，进度 ${completionLabel}%`}><div><span>学习进度 · {completedCount}/{bank.questions.length}</span><b>{completionLabel}%</b></div><i><b style={{ width: `${completion}%` }} /></i></div>
           </>}
           <div className="bank-card-meta"><span>导入于 {new Date(bank.importedAt).toLocaleDateString("zh-CN")}</span><span>仅存本机</span></div>
-          {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="导出题库复习笔记" title={noteExportCount ? `导出 ${noteExportCount} 道复习题为 PDF` : "暂无可导出的错题、精选或批注题"} disabled={!noteExportCount} onClick={() => exportBankNotes(bank)}><Download /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
+          {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="导出题库复习笔记" title={noteExportCount ? `导出 ${noteExportCount} 道精选或批注题为 PDF` : "暂无可导出的精选或批注题"} disabled={!noteExportCount} onClick={() => exportBankNotes(bank)}><Download /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
         </article>;
       })}</div>{group.banks.length > groupVisibleLimit && <button type="button" className={`bank-group-toggle ${groupExpanded ? "expanded" : ""}`} aria-expanded={groupExpanded} onClick={() => toggleGroup(group.name)}>{groupExpanded ? "收起题库" : `展开其余 ${hiddenCount} 份题库`}<ChevronRight /></button>}</section>;
       })}</div></div> : <div className="bank-empty">{keyword ? <CircleHelp /> : <Database />}<h2>{keyword ? "没有找到匹配的题库" : "题库书架还是空的"}</h2><p>{keyword ? "这里只搜索题库名称、分组、简介和来源；刷题时仍可使用“搜题”检索题目内容。" : "导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。"}</p>{keyword ? <button className="ghost-action" onClick={() => setQuery("")}><X size={17} />清除搜索</button> : <button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button>}</div>}</section>
@@ -2589,6 +2605,7 @@ function QuizView(props: {
   const answerAvailable = current.answer.length > 0;
   const memorizing = studyMode === "memorize";
   const blind = studyMode === "blind";
+  const explanationIsAi = /AI/i.test(current.explanationSource ?? "");
   const modeSuffix = blind ? " · 盲刷" : memorizing ? " · 背题" : "";
   const questionKind = `${current.medicalQuestionType || current.questionType || (current.multiple ? "多" : "单")}${answerAvailable ? modeSuffix : " · 测试模式"}`;
   const chooseHint = memorizing
@@ -2626,7 +2643,7 @@ function QuizView(props: {
         {memorizing && answerAvailable && <div className="result-strip memorize-answer"><span><Eye /></span><div><strong>标准答案已展开</strong><p>题库答案：{current.answer.join("、")} · 背题模式不会计入对错记录</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
         {!memorizing && submitted && answerAvailable && <div className={`result-strip ${result}`}><span>{result === "correct" ? <CheckCircle2 /> : <AlertCircle />}</span><div><strong>{result === "correct" ? "√ 正确 · 知识点已加深" : "× 错误 · 这道题值得加入复盘"}</strong><p>你的答案：{selected.join("、")} · 题库答案：{current.answer.join("、")}</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
         {submitted && !answerAvailable && <div className="result-strip pending-answer"><span><Clock3 /></span><div><strong>{memorizing ? "本题暂无标准答案" : "本题选择已锁定，等待答案"}</strong><p>{memorizing ? "导入答案后再使用背题模式，即可直接查看。" : `你的选择：${selected.join("、")} · 导入答案后会自动核对`}</p></div></div>}
-        {submitted && current.explanation && <section className="source-explanation"><header><span><FileText size={17} /></span><div><strong>原资料解析</strong><small>随题库保存 · 请结合教材版本核对</small></div></header><MarkdownNotePreview value={current.explanation} /><footer>解析来源：{current.explanationSource || current.answerSource || "导入文件中的答案或解析部分"}</footer></section>}
+        {submitted && current.explanation && <section className="source-explanation" data-explanation-kind={explanationIsAi ? "ai" : "source"}><header><span>{explanationIsAi ? <BrainCircuit size={17} /> : <FileText size={17} />}</span><div><strong>{explanationIsAi ? "AI 解析" : "原题解析"}</strong><small>{explanationIsAi ? "AI 生成并手动保存 · 不能替代教材原文" : "来自导入文件 · 请结合教材版本核对"}</small></div></header><MarkdownNotePreview value={current.explanation} /><footer>解析来源：{current.explanationSource || current.answerSource || "导入文件中的答案或解析部分"}</footer></section>}
         {!memorizing && !submitted && <div className={`mobile-submit-bar ${blind ? "blind" : ""}`}><button onClick={props.onSubmit} disabled={!selected.length}>{blind ? <Eye size={18} /> : <CheckCircle2 size={18} />}{blind && answerAvailable ? "对答案" : answerAvailable ? "确认答案" : "锁定作答"}</button><small>{selected.length ? `已选择 ${selected.join("、")}` : blind ? "可先选答案并继续做题" : "选择答案后再确认"}</small></div>}
         <div className={`quiz-actions ${blind && !submitted ? "blind-actions" : ""}`}>{blind && !submitted ? <button className="blind-check-action" onClick={props.onSubmit} disabled={!selected.length}><Eye size={17} />{answerAvailable ? "对答案" : "锁定作答"}</button> : <button className="subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>}{submitted || memorizing || blind ? <button className="primary-action" onClick={props.onNext}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length}>{answerAvailable ? "提交答案" : "锁定作答"}<ArrowRight size={17} /></button>}</div>
       </section>
@@ -2797,12 +2814,14 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
   const [commentBusy, setCommentBusy] = useState(false);
   const [commentMessage, setCommentMessage] = useState("");
   const [savingExplanation, setSavingExplanation] = useState(false);
-  const modes: Array<{ id: AiMode; label: string; icon: React.ReactNode }> = [
+  const explanationIsAi = /AI/i.test(current.explanationSource ?? "");
+  const modes: Array<{ id: AiMode; label: string; displayLabel?: string; icon: React.ReactNode }> = [
     { id: "summary", label: "AI 解析", icon: <BrainCircuit size={16} /> },
-    { id: "pitfall", label: "原题解析", icon: <FileText size={16} /> },
+    { id: "pitfall", label: "原题解析", displayLabel: explanationIsAi ? "AI 解析存档" : "原题解析", icon: explanationIsAi ? <BrainCircuit size={16} /> : <FileText size={16} /> },
     { id: "companion", label: "同类考点", icon: <Library size={16} /> },
   ];
-  const activeModeLabel = modes.find((mode) => mode.id === aiMode)?.label ?? "AI 整理";
+  const activeMode = modes.find((mode) => mode.id === aiMode);
+  const activeModeLabel = activeMode?.displayLabel ?? activeMode?.label ?? "AI 整理";
   const originalExplanation = current.explanation?.trim() ?? "";
   const generatedText = aiMode === "pitfall" ? undefined : aiTexts[aiMode];
   const writableAiText = aiMode === "pitfall" ? originalExplanation : generatedText;
@@ -2851,11 +2870,11 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
     setCommentMessage("");
     try { await action(); } catch (error) { setCommentMessage(error instanceof Error ? error.message : "操作失败"); }
   };
-  return <aside className="learning-panel"><div className="learning-heading"><h2>解析与考点</h2><button className="note-search-trigger" onClick={onSearchNotes}><Search size={16} />搜索笔记</button></div><div className="learning-tabs">{modes.map((mode) => <button key={mode.id} className={aiMode === mode.id ? "active" : ""} onClick={() => onAi(mode.id)}>{mode.icon}{mode.label}</button>)}</div>
-    <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className="original-explanation-panel"><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“AI 解析”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>}</> : <>{generatedText && <p className="ai-copy">{generatedText}</p>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "录入解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
+  return <aside className="learning-panel"><div className="learning-heading"><h2>解析与考点</h2><button className="note-search-trigger" onClick={onSearchNotes}><Search size={16} />搜索笔记</button></div><div className="learning-tabs">{modes.map((mode) => <button key={mode.id} className={aiMode === mode.id ? "active" : ""} onClick={() => onAi(mode.id)}>{mode.icon}{mode.displayLabel ?? mode.label}</button>)}</div>
+    <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? explanationIsAi ? "AI 生成后存入题库 · 与原题解析分开标识" : "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className={`original-explanation-panel ${explanationIsAi ? "ai-saved" : "source-saved"}`}><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“AI 解析”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>}</> : <>{generatedText && <p className="ai-copy">{generatedText}</p>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "录入解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
     {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={current.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
     <details className="community-card"><summary className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>{bankName} · {comments.length} 条</span></summary><div className="community-body"><p className="comment-scope-note">当前题库独立讨论 · 原题号 {current.sourceNumber}</p>{account ? <div className="comment-identity"><UserRound size={15} /><span>{account.nickname}</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={15} />登录后参与讨论</button>}<div className="comment-form"><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 300))} placeholder="写下你的判断依据、易错点或疑问…" disabled={!account || commentBusy} /><button onClick={() => void publishComment()} disabled={!account || commentBusy || commentDraft.trim().length < 2}><Send size={14} />{commentBusy ? "发布中…" : "发布"}</button></div>{commentMessage && <p className="comment-message">{commentMessage}</p>}<div className="local-comments">{comments.length ? comments.map((comment) => <article key={comment.id}><div><b>{comment.nickname}</b><time>{new Date(comment.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p>{comment.text}</p><div className="comment-tools"><button onClick={() => void runCommentAction(() => onLikeComment(comment.id))}><ThumbsUp size={13} />{comment.likes || "赞"}</button><button onClick={() => void runCommentAction(() => onReportComment(comment.id))}><Flag size={13} />举报</button>{comment.own && <button onClick={() => void runCommentAction(() => onDeleteComment(comment.id))}><Trash2 size={13} />删除</button>}</div></article>) : <p className="empty-comments">还没有讨论，成为这份题库中第一个留下学习线索的人。</p>}</div></div></details>
-    <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} /><InkNote note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
+    <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} /><InkNote note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <button key={tag} title={`删除标签 ${tag}`} onClick={() => onNote(removeNoteTag(note, tag))}>#{tag}<X size={12} /></button>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
   </aside>;
 }
 
@@ -3182,11 +3201,13 @@ function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: 
 function NotesModal({ bankName, questions, progress, favorites, notes, onOpen, onClose }: { bankName: string; questions: QuizQuestion[]; progress: Progress; favorites: string[]; notes: Record<string, string>; onOpen: (id: string) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState("");
+  const [tagQuery, setTagQuery] = useState("");
   const [exportMessage, setExportMessage] = useState("");
   const allEntries = useMemo(() => questions.filter((question) => notes[question.id]?.trim()), [questions, notes]);
   const exportSections = useMemo(() => collectNoteExportSections(questions, progress, favorites, notes), [favorites, notes, progress, questions]);
   const exportCount = exportSections.reduce((sum, section) => sum + section.questions.length, 0);
   const tags = useMemo(() => [...new Set(allEntries.flatMap((question) => parseNoteTags(notes[question.id] ?? "")))].sort(), [allEntries, notes]);
+  const visibleTags = useMemo(() => tags.filter((tag) => tag.toLocaleLowerCase().includes(tagQuery.trim().toLocaleLowerCase())), [tagQuery, tags]);
   const entries = useMemo(() => {
     const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
     return allEntries.filter((question) => {
@@ -3199,12 +3220,12 @@ function NotesModal({ bankName, questions, progress, favorites, notes, onOpen, o
   const exportPdf = () => {
     setExportMessage("");
     try {
-      if (!exportCount) throw new Error("当前题库还没有可导出的错题、精选、批注或 AI 原题解析");
+      if (!exportCount) throw new Error("当前题库还没有可导出的精选题或带批注题");
       printNotePdf(bankName, exportSections, notes);
       setExportMessage("已打开打印版，请在系统打印面板选择“存储为 PDF”");
     } catch (caught) { setExportMessage(caught instanceof Error ? caught.message : "暂时无法导出 PDF"); }
   };
-  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal notes-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>Markdown 知识库 · 个人复盘</span><h2>我的笔记</h2></div><div className="notes-modal-actions"><button className="notes-pdf-export" onClick={exportPdf} disabled={!exportCount}><Download size={16} />导出 PDF <em>{exportCount}</em></button><button onClick={onClose} aria-label="关闭我的笔记"><X /></button></div></header>{exportMessage && <p className="notes-export-message">{exportMessage}</p>}<label className="search-field note-search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题目、来源、笔记正文或标签" /><kbd>{entries.length}</kbd></label>{tags.length > 0 && <div className="notes-tag-filter"><button className={!activeTag ? "active" : ""} onClick={() => setActiveTag("")}>全部</button>{tags.map((tag) => <button key={tag} className={activeTag === tag ? "active" : ""} onClick={() => setActiveTag(tag)}>#{tag}</button>)}</div>}<div className="notes-list">{entries.length ? entries.map((question) => { const markdown = notes[question.id] ?? ""; return <button key={question.id} onClick={() => onOpen(question.id)}><NotebookPen size={17} /><div><strong>{question.stem}</strong><small><FileText size={12} />{parseNoteSource(markdown, question)}</small>{parseNoteTags(markdown).length > 0 && <div className="notes-entry-tags">{parseNoteTags(markdown).map((tag) => <span key={tag}>#{tag}</span>)}</div>}<p>{markdownSummary(markdown)}</p></div><ChevronRight size={17} /></button>; }) : <div className="search-empty"><NotebookPen /><p>{allEntries.length ? "没有找到匹配的笔记，请更换关键词或标签。" : "还没有笔记。答题时写下判断依据，或把 AI 整理快速写入，会自动汇总到这里。"}</p></div>}</div></section></div>;
+  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal notes-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>Markdown 知识库 · 个人复盘</span><h2>我的笔记</h2></div><div className="notes-modal-actions"><button className="notes-pdf-export" onClick={exportPdf} disabled={!exportCount}><Download size={16} />导出 PDF <em>{exportCount}</em></button><button onClick={onClose} aria-label="关闭我的笔记"><X /></button></div></header>{exportMessage && <p className="notes-export-message">{exportMessage}</p>}<label className="search-field note-search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题目、来源、笔记正文或标签" /><kbd>{entries.length}</kbd></label>{tags.length > 0 && <><label className="notes-tag-search"><Search size={14} /><input value={tagQuery} onChange={(event) => setTagQuery(event.target.value)} placeholder={`查找 ${tags.length} 个已存标签`} /></label><div className="notes-tag-filter"><button className={!activeTag ? "active" : ""} onClick={() => setActiveTag("")}>全部</button>{visibleTags.map((tag) => <button key={tag} className={activeTag === tag ? "active" : ""} onClick={() => setActiveTag(tag)}>#{tag}</button>)}</div></>}<div className="notes-list">{entries.length ? entries.map((question) => { const markdown = notes[question.id] ?? ""; return <button key={question.id} onClick={() => onOpen(question.id)}><NotebookPen size={17} /><div><strong>{question.stem}</strong><small><FileText size={12} />{parseNoteSource(markdown, question)}</small>{parseNoteTags(markdown).length > 0 && <div className="notes-entry-tags">{parseNoteTags(markdown).map((tag) => <span key={tag}>#{tag}</span>)}</div>}<p>{markdownSummary(markdown)}</p></div><ChevronRight size={17} /></button>; }) : <div className="search-empty"><NotebookPen /><p>{allEntries.length ? "没有找到匹配的笔记，请更换关键词或标签。" : "还没有笔记。答题时写下判断依据，或把 AI 整理快速写入，会自动汇总到这里。"}</p></div>}</div></section></div>;
 }
 
 function SuccessToast({ message, onClose }: { message: string; onClose: () => void }) {

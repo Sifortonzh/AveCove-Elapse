@@ -531,7 +531,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.1.6");
+  assert.equal(JSON.parse(manifest).version, "2.2.0");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1193,7 +1193,7 @@ test("ships blind review and answer-first memorization only in practice settings
   assert.match(page, /sessionStudyMode === "standard" && settings\.autoNext/);
   assert.match(page, /背题模式不会计入对错记录/);
   assert.match(page, /className="blind-check-action"/);
-  assert.match(page, /answerSelections=\{answerSelections\}/);
+  assert.match(page, /answerSelections=\{displayedAnswerSelections\}/);
   assert.match(styles, /\.study-mode-grid/);
   assert.match(styles, /\.blind-check-action/);
   assert.match(styles, /\.number-grid button\.done/);
@@ -1250,7 +1250,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.1\.6"/);
+  assert.match(packageJson, /"version": "2\.2\.0"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1575,7 +1575,7 @@ test("keeps text and image option annotations backward compatible", async () => 
   assert.deepEqual(readOptionAnnotation(note, "B"), { text: "易混点", images: [] });
 });
 
-test("builds a print-ready note export from wrong, featured, annotated, and AI-explained questions", async () => {
+test("builds a compact print-ready export from featured and annotated questions only", async () => {
   const { buildNotePdfHtml, collectNoteExportSections } = await loadNotePdfExport();
   const questions = [
     { id: "wrong", sourceNumber: "1", category: "感染", stem: "错题", options: [{ label: "A", text: "甲" }], answer: ["A"], multiple: false },
@@ -1585,11 +1585,12 @@ test("builds a print-ready note export from wrong, featured, annotated, and AI-e
   ];
   const notes = { annotated: "> 选项 A 批注：注意鉴别" };
   const sections = collectNoteExportSections(questions, { wrong: "wrong" }, ["featured"], notes);
-  assert.deepEqual(sections.map((section) => [section.title, section.questions.length]), [["错题复现", 1], ["精选温习", 1], ["批注与 AI 原题解析", 2]]);
+  assert.deepEqual(sections.map((section) => [section.title, section.questions.length]), [["精选题", 1], ["批注题", 2]]);
   const html = buildNotePdfHtml("传染病题库", sections, notes);
-  assert.match(html, /AVECOVE ELAPSE · v2\.1\.2/);
+  assert.doesNotMatch(html, /AVECOVE ELAPSE · v/);
   assert.match(html, /注意鉴别/);
-  assert.match(html, /题目、选项和选项批注均保留/);
+  assert.match(html, /仅收录精选题与带批注题/);
+  assert.match(html, /columns:2/);
 });
 
 test("exposes the complete v2.1.1 workflow in the practice UI", async () => {
@@ -1648,7 +1649,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.1.6");
+  assert.equal(JSON.parse(manifest).version, "2.2.0");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1682,4 +1683,23 @@ test("ships the v2.1.6 registered-user public Pavilion", async () => {
   assert.match(route, /ON CONFLICT \(user_id, source_bank_id\)/);
   assert.match(route, /DELETE FROM pavilion_question_banks WHERE id = \$1 AND user_id = \$2/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS pavilion_question_banks/);
+});
+
+test("ships the v2.2.0 isolated wrong-review workflow and study refinements", async () => {
+  const [page, styles, exportSource] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/globals.css"),
+    text("app/lib/note-pdf-export.ts"),
+  ]);
+  assert.match(page, /const sourceQuestions = questions/);
+  assert.match(page, /active\.questionOrder === "random" \|\| active\.scope === "wrong"/);
+  assert.match(page, /sessionScope === "wrong" \? reviewProgress : progress/);
+  assert.match(page, /setReviewProgress\(\{\}\)/);
+  assert.match(page, /shouldUnfavorite = sessionScope === "wrong" && result === "correct"/);
+  assert.match(page, /AI 解析存档/);
+  assert.match(page, /removeNoteTag\(note, tag\)/);
+  assert.match(page, /查找 \$\{tags\.length\} 个已存标签/);
+  assert.match(styles, /#ff8a00!important/);
+  assert.doesNotMatch(exportSource, /错题复现/);
+  assert.match(exportSource, /columns:2/);
 });
