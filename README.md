@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.2.0" src="https://img.shields.io/badge/version-2.2.0-b43d35" />
+    <img alt="Version 2.2.1" src="https://img.shields.io/badge/version-2.2.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.2.0.** Wrong-answer review now runs as an isolated current-bank session: first-attempt traces are hidden, order is randomized, and progress is recalculated for the new run. Correct retries leave Featured while repeated misses enter it automatically; explanation provenance, tags, compact PDF export, and answer-card highlighting were also refined.
+> **Current release: v2.2.1.** Featured practice now follows the isolated wrong-review flow without changing overall accuracy. Every Featured question keeps at least one star: a repeated miss adds a star and a correct retry removes one, with the level synchronized across devices.
 
 ## Product map
 
@@ -221,6 +221,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v2.2.1** — Added isolated Featured practice and adaptive Featured star levels while keeping global accuracy and first-attempt scoring untouched.
 - **v2.2.0** — Rebuilt wrong-answer review as an isolated current-bank session with fresh statistics, automatic Featured mastery handling, explicit AI/source explanation provenance, removable/searchable tags, compact PDF output, and stronger answer-card focus.
 - **v2.1.6** — Moved the Pavilion from browser-local storage to the Elapse database so every registered user sees the same public catalog, while keeping uploads authenticated and removal owner-only.
 - **v2.1.5** — Aligned answer repair with answer-sheet numbering and added curriculum-aware Pavilion groups for Years 1–5, postgraduate exams, licensing, attending, associate chief, and other banks.

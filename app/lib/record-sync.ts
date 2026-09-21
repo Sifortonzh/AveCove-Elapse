@@ -9,6 +9,7 @@ export type RecordLedgerEntry = {
   progress?: TimedValue<ProgressValue | null>;
   firstProgress?: TimedValue<ProgressValue | null>;
   favorite?: TimedValue<boolean>;
+  favoriteStars?: TimedValue<number>;
   note?: TimedValue<string | null>;
   killed?: TimedValue<boolean>;
 };
@@ -19,6 +20,7 @@ export type LearningRecords = {
   progress: Record<string, ProgressValue>;
   firstProgress: Record<string, ProgressValue>;
   favorites: string[];
+  favoriteStars: Record<string, number>;
   notes: Record<string, string>;
   killed: string[];
   ledger: RecordLedger;
@@ -28,6 +30,7 @@ export type LearningRecordsInput = {
   progress?: unknown;
   firstProgress?: unknown;
   favorites?: unknown;
+  favoriteStars?: unknown;
   notes?: unknown;
   killed?: unknown;
   ledger?: unknown;
@@ -60,10 +63,12 @@ function normalizeLedger(value: unknown): RecordLedger {
     const firstProgress = normalizeTimedValue(entry.firstProgress, (candidate): candidate is ProgressValue | null =>
       candidate === "correct" || candidate === "wrong" || candidate === null);
     const favorite = normalizeTimedValue(entry.favorite, (candidate): candidate is boolean => typeof candidate === "boolean");
+    const favoriteStars = normalizeTimedValue(entry.favoriteStars, (candidate): candidate is number =>
+      typeof candidate === "number" && Number.isInteger(candidate) && candidate >= 0 && candidate <= 99);
     const note = normalizeTimedValue(entry.note, (candidate): candidate is string | null =>
       candidate === null || typeof candidate === "string");
     const killed = normalizeTimedValue(entry.killed, (candidate): candidate is boolean => typeof candidate === "boolean");
-    if (progress || firstProgress || favorite || note || killed) result[questionId] = { progress, firstProgress, favorite, note, killed };
+    if (progress || firstProgress || favorite || favoriteStars || note || killed) result[questionId] = { progress, firstProgress, favorite, favoriteStars, note, killed };
   }
   return result;
 }
@@ -84,6 +89,12 @@ function normalizeLegacyRecords(input: LearningRecordsInput) {
   const favorites = Array.isArray(input.favorites)
     ? [...new Set(input.favorites.filter((item): item is string => typeof item === "string" && Boolean(item)))]
     : [];
+  const favoriteStars: Record<string, number> = {};
+  if (input.favoriteStars && typeof input.favoriteStars === "object" && !Array.isArray(input.favoriteStars)) {
+    for (const [questionId, value] of Object.entries(input.favoriteStars)) {
+      if (typeof value === "number" && Number.isFinite(value) && value > 0) favoriteStars[questionId] = Math.min(99, Math.max(1, Math.round(value)));
+    }
+  }
   const notes: Record<string, string> = {};
   if (input.notes && typeof input.notes === "object" && !Array.isArray(input.notes)) {
     for (const [questionId, value] of Object.entries(input.notes)) {
@@ -93,7 +104,7 @@ function normalizeLegacyRecords(input: LearningRecordsInput) {
   const killed = Array.isArray(input.killed)
     ? [...new Set(input.killed.filter((item): item is string => typeof item === "string" && Boolean(item)))]
     : [];
-  return { progress, firstProgress, favorites, notes, killed };
+  return { progress, firstProgress, favorites, favoriteStars, notes, killed };
 }
 
 function chooseTimedValue<T>(
@@ -131,16 +142,20 @@ function materializeLedger(ledger: RecordLedger): LearningRecords {
   const progress: Record<string, ProgressValue> = {};
   const firstProgress: Record<string, ProgressValue> = {};
   const favorites: string[] = [];
+  const favoriteStars: Record<string, number> = {};
   const notes: Record<string, string> = {};
   const killed: string[] = [];
   for (const [questionId, entry] of Object.entries(ledger)) {
     if (entry.progress?.value === "correct" || entry.progress?.value === "wrong") progress[questionId] = entry.progress.value;
     if (entry.firstProgress?.value === "correct" || entry.firstProgress?.value === "wrong") firstProgress[questionId] = entry.firstProgress.value;
-    if (entry.favorite?.value) favorites.push(questionId);
+    if (entry.favorite?.value) {
+      favorites.push(questionId);
+      favoriteStars[questionId] = Math.max(1, entry.favoriteStars?.value ?? 1);
+    }
     if (typeof entry.note?.value === "string" && entry.note.value) notes[questionId] = entry.note.value;
     if (entry.killed?.value) killed.push(questionId);
   }
-  return { progress, firstProgress, favorites, notes, killed, ledger };
+  return { progress, firstProgress, favorites, favoriteStars, notes, killed, ledger };
 }
 
 export function normalizeLearningRecords(input: LearningRecordsInput): LearningRecords {
@@ -168,6 +183,7 @@ export function normalizeLearningRecords(input: LearningRecordsInput): LearningR
     ledger[questionId] = {
       ...ledger[questionId],
       favorite: ledger[questionId]?.favorite ?? { value: true, updatedAt: LEGACY_TIMESTAMP },
+      favoriteStars: ledger[questionId]?.favoriteStars ?? { value: legacy.favoriteStars[questionId] ?? 1, updatedAt: LEGACY_TIMESTAMP },
     };
   }
   for (const [questionId, value] of Object.entries(legacy.notes)) {
@@ -198,13 +214,15 @@ export function mergeLearningRecords(leftInput: LearningRecordsInput, rightInput
     const firstProgress = chooseFirstProgress(leftEntry?.firstProgress, rightEntry?.firstProgress);
     const favorite = chooseTimedValue(leftEntry?.favorite, rightEntry?.favorite, (leftValue, rightValue) =>
       leftValue || rightValue);
+    const favoriteStars = chooseTimedValue(leftEntry?.favoriteStars, rightEntry?.favoriteStars, (leftValue, rightValue) =>
+      Math.max(leftValue, rightValue));
     const note = chooseTimedValue(leftEntry?.note, rightEntry?.note, (leftValue, rightValue) => {
       if (leftValue === null) return rightValue;
       if (rightValue === null) return leftValue;
       return rightValue.length >= leftValue.length ? rightValue : leftValue;
     });
     const killed = chooseTimedValue(leftEntry?.killed, rightEntry?.killed, (leftValue, rightValue) => leftValue || rightValue);
-    ledger[questionId] = { progress, firstProgress, favorite, note, killed };
+    ledger[questionId] = { progress, firstProgress, favorite, favoriteStars, note, killed };
   }
   return materializeLedger(ledger);
 }
@@ -219,7 +237,7 @@ export function learningRecordsEqual(leftInput: LearningRecordsInput, rightInput
     const leftEntry = left[questionId];
     const rightEntry = right[questionId];
     if (!rightEntry) return false;
-    return (["progress", "firstProgress", "favorite", "note", "killed"] as const).every((field) => {
+    return (["progress", "firstProgress", "favorite", "favoriteStars", "note", "killed"] as const).every((field) => {
       const leftValue = leftEntry[field];
       const rightValue = rightEntry[field];
       return leftValue?.value === rightValue?.value && leftValue?.updatedAt === rightValue?.updatedAt;
@@ -230,7 +248,7 @@ export function learningRecordsEqual(leftInput: LearningRecordsInput, rightInput
 export function stampLearningRecord(
   ledger: RecordLedger,
   questionId: string,
-  patch: { progress?: ProgressValue | null; firstProgress?: ProgressValue | null; favorite?: boolean; note?: string | null; killed?: boolean },
+  patch: { progress?: ProgressValue | null; firstProgress?: ProgressValue | null; favorite?: boolean; favoriteStars?: number; note?: string | null; killed?: boolean },
   updatedAt = Date.now(),
 ): RecordLedger {
   const next = { ...ledger };
@@ -243,6 +261,9 @@ export function stampLearningRecord(
     entry.firstProgress = { value: patch.firstProgress ?? null, updatedAt };
   }
   if (Object.prototype.hasOwnProperty.call(patch, "favorite")) entry.favorite = { value: Boolean(patch.favorite), updatedAt };
+  if (Object.prototype.hasOwnProperty.call(patch, "favoriteStars")) {
+    entry.favoriteStars = { value: Math.min(99, Math.max(0, Math.round(patch.favoriteStars ?? 0))), updatedAt };
+  }
   if (Object.prototype.hasOwnProperty.call(patch, "note")) entry.note = { value: patch.note ?? null, updatedAt };
   if (Object.prototype.hasOwnProperty.call(patch, "killed")) entry.killed = { value: Boolean(patch.killed), updatedAt };
   next[questionId] = entry;

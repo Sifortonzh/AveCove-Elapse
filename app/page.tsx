@@ -343,6 +343,7 @@ export default function HomePage() {
   const [firstProgress, setFirstProgress] = useState<Progress>({});
   const [answerSelections, setAnswerSelections] = useState<Record<string, string[]>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [favoriteStars, setFavoriteStars] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [killedQuestions, setKilledQuestions] = useState<string[]>([]);
   const [recordLedger, setRecordLedger] = useState<RecordLedger>({});
@@ -402,6 +403,7 @@ export default function HomePage() {
           progress: JSON.parse(localStorage.getItem("hongdou-progress") ?? localStorage.getItem("medquiz-progress") ?? "{}"),
           firstProgress: JSON.parse(localStorage.getItem("hongdou-first-progress") ?? "{}"),
           favorites: JSON.parse(localStorage.getItem("hongdou-favorites") ?? "[]"),
+          favoriteStars: JSON.parse(localStorage.getItem("hongdou-favorite-stars") ?? "{}"),
           notes: JSON.parse(localStorage.getItem("hongdou-notes") ?? "{}"),
           killed: JSON.parse(localStorage.getItem("hongdou-killed-questions") ?? "[]"),
           ledger: JSON.parse(localStorage.getItem("hongdou-record-ledger") ?? "{}"),
@@ -508,7 +510,7 @@ export default function HomePage() {
     const timer = window.setTimeout(() => { void pushRemoteState(); }, 1_200);
     return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, favorites, firstProgress, killedQuestions, nickname, notes, progress, recordLedger, settings, syncReady, syncRevision]);
+  }, [account, favoriteStars, favorites, firstProgress, killedQuestions, nickname, notes, progress, recordLedger, settings, syncReady, syncRevision]);
 
   const current = sessionQuestions[currentIndex];
   const currentDiscussionId = current ? commentThreadId(activeBankId, current.id) : "";
@@ -526,8 +528,9 @@ export default function HomePage() {
   }, [account, currentDiscussionId]);
 
   const killedIds = useMemo(() => new Set(killedQuestions), [killedQuestions]);
-  const displayedProgress = sessionScope === "wrong" ? reviewProgress : progress;
-  const displayedAnswerSelections = sessionScope === "wrong" ? reviewSelections : answerSelections;
+  const isolatedReviewSession = sessionScope === "wrong" || sessionScope === "favorite";
+  const displayedProgress = isolatedReviewSession ? reviewProgress : progress;
+  const displayedAnswerSelections = isolatedReviewSession ? reviewSelections : answerSelections;
   const answered = Object.keys(progress).filter((id) => !killedIds.has(id) && questions.some((question) => question.id === id)).length;
   const correct = questions.filter((question) => !killedIds.has(question.id) && progress[question.id] === "correct").length;
   const wrong = questions.filter((question) => !killedIds.has(question.id) && progress[question.id] === "wrong").length;
@@ -535,7 +538,7 @@ export default function HomePage() {
   const examScore = questions.some((question) => question.examProfile === "western-medicine-306")
     ? western306Score(questions.filter((question) => !killedIds.has(question.id)), progress, firstProgress)
     : undefined;
-  const sessionExamScore = sessionScope !== "wrong" && sessionQuestions.some((question) => question.examProfile === "western-medicine-306")
+  const sessionExamScore = !isolatedReviewSession && sessionQuestions.some((question) => question.examProfile === "western-medicine-306")
     ? western306Score(sessionQuestions.filter((question) => !killedIds.has(question.id)), progress, firstProgress)
     : undefined;
   const sessionAnswered = sessionQuestions.filter((question) => !killedIds.has(question.id) && Boolean(displayedProgress[question.id])).length;
@@ -545,6 +548,7 @@ export default function HomePage() {
   const sessionCorrect = sessionQuestions.filter((question) => !killedIds.has(question.id) && displayedProgress[question.id] === "correct").length;
   const sessionAccuracy = sessionAnswered ? (sessionCorrect / sessionAnswered) * 100 : 0;
   const isFavorite = current ? favorites.includes(current.id) : false;
+  const currentFavoriteStars = current && isFavorite ? Math.max(1, favoriteStars[current.id] ?? 1) : 0;
   const currentGroupKey = current?.sharedStemGroup || current?.sharedOptionGroup || "";
   const currentGroupQuestions = currentGroupKey
     ? sessionQuestions.filter((question) => (question.sharedStemGroup || question.sharedOptionGroup) === currentGroupKey)
@@ -650,12 +654,14 @@ export default function HomePage() {
     setProgress(normalized.progress);
     setFirstProgress(normalized.firstProgress);
     setFavorites(normalized.favorites);
+    setFavoriteStars(normalized.favoriteStars);
     setNotes(normalized.notes);
     setKilledQuestions(normalized.killed);
     setRecordLedger(normalized.ledger);
     localStorage.setItem("hongdou-progress", JSON.stringify(normalized.progress));
     localStorage.setItem("hongdou-first-progress", JSON.stringify(normalized.firstProgress));
     localStorage.setItem("hongdou-favorites", JSON.stringify(normalized.favorites));
+    localStorage.setItem("hongdou-favorite-stars", JSON.stringify(normalized.favoriteStars));
     localStorage.setItem("hongdou-notes", JSON.stringify(normalized.notes));
     localStorage.setItem("hongdou-killed-questions", JSON.stringify(normalized.killed));
     localStorage.setItem("hongdou-record-ledger", JSON.stringify(normalized.ledger));
@@ -666,11 +672,12 @@ export default function HomePage() {
       exportQuestionBankSyncBundle(),
       exportEnglishTestSyncBundle(),
     ]);
-    const records = normalizeLearningRecords({ progress, firstProgress, favorites, notes, killed: killedQuestions, ledger: recordLedger });
+    const records = normalizeLearningRecords({ progress, firstProgress, favorites, favoriteStars, notes, killed: killedQuestions, ledger: recordLedger });
     return {
       progress: records.progress,
       firstProgress: records.firstProgress,
       favorites: records.favorites,
+      favoriteStars: records.favoriteStars,
       notes: records.notes,
       killedQuestions: records.killed,
       recordLedger: records.ledger,
@@ -682,10 +689,10 @@ export default function HomePage() {
   }
 
   async function applyLearningState(state: Record<string, unknown>) {
-    const localRecords = normalizeLearningRecords({ progress, firstProgress, favorites, notes, killed: killedQuestions, ledger: recordLedger });
+    const localRecords = normalizeLearningRecords({ progress, firstProgress, favorites, favoriteStars, notes, killed: killedQuestions, ledger: recordLedger });
     const mergedRecords = mergeLearningRecords(
       localRecords,
-      { progress: state.progress, firstProgress: state.firstProgress, favorites: state.favorites, notes: state.notes, killed: state.killedQuestions, ledger: state.recordLedger },
+      { progress: state.progress, firstProgress: state.firstProgress, favorites: state.favorites, favoriteStars: state.favoriteStars, notes: state.notes, killed: state.killedQuestions, ledger: state.recordLedger },
     );
     if (!learningRecordsEqual(localRecords, mergedRecords)) persistLearningRecords(mergedRecords);
     if (state.settings && typeof state.settings === "object" && !Array.isArray(state.settings)) {
@@ -815,7 +822,7 @@ export default function HomePage() {
       if (active.scope === "favorite") return favorites.includes(question.id);
       return true;
     });
-    if (active.questionOrder === "random" || active.scope === "wrong") pool = shuffle(pool);
+    if (active.questionOrder === "random" || active.scope === "wrong" || active.scope === "favorite") pool = shuffle(pool);
     if (limit && limit > 0) pool = pool.slice(0, limit);
     if (active.shuffleOptions) pool = pool.map((question) => ({ ...question, options: shuffle(question.options) }));
     const firstQuestion = pool[0];
@@ -854,10 +861,10 @@ export default function HomePage() {
       sessionStudyMode === "standard"
       && revealAnswer
       && target
-      && (displayedProgress[target.id] || (sessionScope !== "wrong" && target.draftAnswer?.length))
+      && (displayedProgress[target.id] || (!isolatedReviewSession && target.draftAnswer?.length))
       && target.answer.length,
     );
-    const restoredSelection = target ? [...(displayedAnswerSelections[target.id] ?? (sessionScope === "wrong" ? [] : target.draftAnswer ?? []))] : [];
+    const restoredSelection = target ? [...(displayedAnswerSelections[target.id] ?? (isolatedReviewSession ? [] : target.draftAnswer ?? []))] : [];
     setCurrentIndex(boundedIndex);
     setSelected(memorizing ? [...(target?.answer ?? [])] : restoredSelection);
     setSubmitted(memorizing || blindRevealed || shouldRevealPrevious);
@@ -929,7 +936,7 @@ export default function HomePage() {
       ? selected.includes(label) ? selected.filter((item) => item !== label) : [...selected, label]
       : selected.includes(label) ? [] : [label];
     setSelected(next);
-    if (sessionScope === "wrong") setReviewSelections((answers) => ({ ...answers, [current.id]: next }));
+    if (isolatedReviewSession) setReviewSelections((answers) => ({ ...answers, [current.id]: next }));
     else setAnswerSelections((answers) => ({ ...answers, [current.id]: next }));
   }
 
@@ -940,7 +947,7 @@ export default function HomePage() {
       ...answers,
       [current.id]: (answers[current.id] ?? []).filter((item) => item !== label),
     });
-    if (sessionScope === "wrong") setReviewSelections(removeSelection);
+    if (isolatedReviewSession) setReviewSelections(removeSelection);
     else setAnswerSelections(removeSelection);
     setExcludedOptions((value) => {
       const currentExcluded = value[current.id] ?? [];
@@ -953,7 +960,7 @@ export default function HomePage() {
 
   function submitAnswer() {
     if (!current || !selected.length) return;
-    if (sessionScope === "wrong") setReviewSelections((value) => ({ ...value, [current.id]: [...selected] }));
+    if (isolatedReviewSession) setReviewSelections((value) => ({ ...value, [current.id]: [...selected] }));
     else setAnswerSelections((value) => ({ ...value, [current.id]: [...selected] }));
     if (sessionStudyMode === "blind") {
       setRevealedAnswers((value) => value.includes(current.id) ? value : [...value, current.id]);
@@ -975,8 +982,19 @@ export default function HomePage() {
       return;
     }
     const result = [...selected].sort().join("") === [...current.answer].sort().join("") ? "correct" : "wrong";
+    if (isolatedReviewSession) setReviewProgress((value) => ({ ...value, [current.id]: result as "correct" | "wrong" }));
+    if (sessionScope === "favorite") {
+      const previousStars = Math.max(1, favoriteStars[current.id] ?? 1);
+      const nextStars = result === "wrong" ? Math.min(99, previousStars + 1) : Math.max(1, previousStars - 1);
+      const nextFavorites = favorites.includes(current.id) ? favorites : [...favorites, current.id];
+      const nextLedger = stampLearningRecord(recordLedger, current.id, { favorite: true, favoriteStars: nextStars });
+      persistLearningRecords({ progress, firstProgress, favorites: nextFavorites, favoriteStars: { ...favoriteStars, [current.id]: nextStars }, notes, ledger: nextLedger });
+      setSubmitted(true);
+      setToast(result === "wrong" ? `本题精选星级升至 ${nextStars} 星 ★` : `本题精选星级降至 ${nextStars} 星，仍保留精选 ★`);
+      if (sessionStudyMode === "standard" && settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
+      return;
+    }
     const nextProgress = { ...progress, [current.id]: result as "correct" | "wrong" };
-    if (sessionScope === "wrong") setReviewProgress((value) => ({ ...value, [current.id]: result as "correct" | "wrong" }));
     const nextFirstProgress = firstProgress[current.id]
       ? firstProgress
       : { ...firstProgress, [current.id]: result as "correct" | "wrong" };
@@ -990,7 +1008,7 @@ export default function HomePage() {
       ...(!firstProgress[current.id] ? { firstProgress: result } : {}),
       ...(shouldFavorite ? { favorite: true } : shouldUnfavorite ? { favorite: false } : {}),
     });
-    persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites: nextFavorites, notes, ledger: nextLedger });
+    persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites: nextFavorites, favoriteStars, notes, ledger: nextLedger });
     setSubmitted(true);
     if (sessionStudyMode === "standard" && settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
   }
@@ -998,8 +1016,12 @@ export default function HomePage() {
   function toggleFavorite() {
     if (!current) return;
     const next = isFavorite ? favorites.filter((id) => id !== current.id) : [...favorites, current.id];
-    const nextLedger = stampLearningRecord(recordLedger, current.id, { favorite: !isFavorite });
-    persistLearningRecords({ progress, firstProgress, favorites: next, notes, ledger: nextLedger });
+    const nextStars = isFavorite ? 0 : 1;
+    const nextFavoriteStars = { ...favoriteStars };
+    if (isFavorite) delete nextFavoriteStars[current.id];
+    else nextFavoriteStars[current.id] = 1;
+    const nextLedger = stampLearningRecord(recordLedger, current.id, { favorite: !isFavorite, favoriteStars: nextStars });
+    persistLearningRecords({ progress, firstProgress, favorites: next, favoriteStars: nextFavoriteStars, notes, ledger: nextLedger });
   }
 
   function updateNote(value: string) {
@@ -1710,6 +1732,7 @@ export default function HomePage() {
         progress: { value: null, updatedAt: resetAt },
         firstProgress: { value: null, updatedAt: resetAt },
         favorite: { value: false, updatedAt: resetAt },
+        favoriteStars: { value: 0, updatedAt: resetAt },
         note: { value: null, updatedAt: resetAt },
         killed: { value: false, updatedAt: resetAt },
       };
@@ -1808,6 +1831,7 @@ export default function HomePage() {
           relatedQuestions={currentGroupQuestions}
           relatedProgress={displayedProgress}
           favorite={isFavorite}
+          favoriteStars={currentFavoriteStars}
           note={notes[current.id] ?? ""}
           aiMode={aiMode}
           aiTexts={aiTexts}
@@ -1852,7 +1876,7 @@ export default function HomePage() {
         <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} western306SubjectCounts={western306SubjectCounts} showWestern306Subjects={hasModernWestern306} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
-        <AnswerSheet questions={sessionQuestions} progress={displayedProgress} favorites={favorites} notes={notes} killed={killedQuestions} answerSelections={displayedAnswerSelections} currentIndex={currentIndex} onBatchAnswers={saveBatchAnswerEntries} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
+        <AnswerSheet questions={sessionQuestions} progress={displayedProgress} favorites={favorites} favoriteStars={favoriteStars} notes={notes} killed={killedQuestions} answerSelections={displayedAnswerSelections} currentIndex={currentIndex} onBatchAnswers={saveBatchAnswerEntries} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
       )}
       {showImport && (
         <ImportModal
@@ -2572,7 +2596,7 @@ function QuizView(props: {
   bankName: string; bankQuestions: QuizQuestion[]; onOpenQuestion: (id: string) => void; onSearchNotes: () => void;
   current: QuizQuestion; currentIndex: number; total: number; completed: number; accuracy: number; selected: string[]; excluded: string[]; submitted: boolean; studyMode: StudyMode;
   examScore?: { earned: number; answeredMaximum: number; total: number };
-  result?: "correct" | "wrong"; favorite: boolean; note: string; aiMode: AiMode;
+  result?: "correct" | "wrong"; favorite: boolean; favoriteStars: number; note: string; aiMode: AiMode;
   killed: boolean; relatedQuestions: QuizQuestion[]; relatedProgress: Progress;
   aiTexts: Partial<Record<AiMode, string>>; aiLoading: boolean; mobilePanel: boolean;
   account: AccountSession | null;
@@ -2599,7 +2623,7 @@ function QuizView(props: {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [showChapters, setShowChapters] = useState(false);
-  const { current, total, selected, excluded, submitted, studyMode, result, favorite, note, aiMode, aiTexts, aiLoading, examScore } = props;
+  const { current, total, selected, excluded, submitted, studyMode, result, favorite, favoriteStars, note, aiMode, aiTexts, aiLoading, examScore } = props;
   const progress = Math.min(100, (props.completed / Math.max(total, 1)) * 100);
   const progressLabel = progress.toFixed(2);
   const answerAvailable = current.answer.length > 0;
@@ -2629,7 +2653,7 @@ function QuizView(props: {
     <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b title={`已完成 ${props.completed}/${total} · 学习进度 ${progressLabel}% · 正确率 ${props.accuracy.toFixed(2)}%`}>进度 {progressLabel}% · 正确率 {props.accuracy.toFixed(2)}% · 已完成 {props.completed}/{total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
-        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题" aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题" aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} title="纠错编辑" aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} title="搜索题目" aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题" aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? "已精选" : "精选"}</button></div></div>
+        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题" aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题" aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} title="纠错编辑" aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} title="搜索题目" aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题" aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? `精选 ★${favoriteStars}` : "精选"}</button></div></div>
         {props.killed && <div className="killed-question-banner"><Scissors size={18} /><div><strong>本题已斩</strong><span>会被后续练习跳过，不计入正确率；可随时恢复。</span></div><button onClick={() => props.onUpdateKilled([current.id], false)}>恢复本题</button></div>}
         {current.sharedStem && <section className="shared-medical-stem"><span>{current.medicalQuestionType === "A4" ? "递进病例" : "共用题干"}</span><p><MathText text={current.sharedStem} /></p></section>}
         {props.relatedQuestions.length > 1 && <section className="linked-question-group"><header><div><strong>同组题目</strong><span>{props.relatedQuestions.length} 题共用{current.medicalQuestionType === "B1" ? "备选答案" : "题干"}，可直接切换</span></div></header><div>{props.relatedQuestions.map((question) => <button key={question.id} className={`${question.id === current.id ? "active" : ""} ${props.relatedProgress[question.id] ?? ""}`} onClick={() => props.onOpenRelated(question.id)}><b>{question.sourceNumber}</b><span>{question.stem}</span>{props.relatedProgress[question.id] === "correct" ? <Check size={14} /> : props.relatedProgress[question.id] === "wrong" ? <X size={14} /> : null}</button>)}</div></section>}
@@ -2898,7 +2922,7 @@ function SwitchRow({ label, detail, value, onChange }: { label: string; detail: 
   return <button className="switch-row" onClick={() => onChange(!value)}><div><strong>{label}</strong><span>{detail}</span></div><i className={value ? "on" : ""}><b /></i></button>;
 }
 
-function AnswerSheet({ questions, progress, favorites, notes, killed, answerSelections, currentIndex, onBatchAnswers, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; favorites: string[]; notes: Record<string, string>; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onBatchAnswers: (entries: BatchAnswerEntry[]) => Promise<void>; onJump: (index: number) => void; onClose: () => void }) {
+function AnswerSheet({ questions, progress, favorites, favoriteStars, notes, killed, answerSelections, currentIndex, onBatchAnswers, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; favorites: string[]; favoriteStars: Record<string, number>; notes: Record<string, string>; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onBatchAnswers: (entries: BatchAnswerEntry[]) => Promise<void>; onJump: (index: number) => void; onClose: () => void }) {
   const favoriteIds = new Set(favorites);
   const killedIds = new Set(killed);
   const [batchOpen, setBatchOpen] = useState(false);
@@ -2908,7 +2932,7 @@ function AnswerSheet({ questions, progress, favorites, notes, killed, answerSele
     const frame = window.requestAnimationFrame(() => currentButtonRef.current?.scrollIntoView({ block: "center", inline: "center" }));
     return () => window.cancelAnimationFrame(frame);
   }, [currentIndex]);
-  return <><div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><div className="answer-sheet-actions">{pendingCount > 0 && <button className="batch-answer-trigger" onClick={() => setBatchOpen(true)}><Plus size={16} />批量补答案 <em>{pendingCount}</em></button>}<button onClick={onClose} aria-label="关闭答题卡"><X /></button></div></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = hasOptionAnnotation(notes[question.id] ?? ""); return <button ref={index === currentIndex ? currentButtonRef : undefined} aria-current={index === currentIndex ? "true" : undefined} key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? "，精选" : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★</span>}</button>; })}</div></section></div>{batchOpen && <BatchAnswerModal questions={questions} onSave={onBatchAnswers} onClose={() => setBatchOpen(false)} />}</>;
+  return <><div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><div className="answer-sheet-actions">{pendingCount > 0 && <button className="batch-answer-trigger" onClick={() => setBatchOpen(true)}><Plus size={16} />批量补答案 <em>{pendingCount}</em></button>}<button onClick={onClose} aria-label="关闭答题卡"><X /></button></div></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选星级</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = hasOptionAnnotation(notes[question.id] ?? ""); return <button ref={index === currentIndex ? currentButtonRef : undefined} aria-current={index === currentIndex ? "true" : undefined} key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? `，精选 ${favoriteStars[question.id] ?? 1} 星` : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★{favoriteStars[question.id] ?? 1}</span>}</button>; })}</div></section></div>{batchOpen && <BatchAnswerModal questions={questions} onSave={onBatchAnswers} onClose={() => setBatchOpen(false)} />}</>;
 }
 
 function BatchAnswerModal({ questions, onSave, onClose }: { questions: QuizQuestion[]; onSave: (entries: BatchAnswerEntry[]) => Promise<void>; onClose: () => void }) {

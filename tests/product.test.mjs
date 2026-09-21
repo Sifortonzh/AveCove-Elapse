@@ -531,7 +531,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.2.0");
+  assert.equal(JSON.parse(manifest).version, "2.2.1");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1116,7 +1116,7 @@ test("keeps imported explanations separate and upgrades AI-assisted notes to sea
 
 test("merges per-question practice records across devices without stale overwrites", async () => {
   const { learningRecordsEqual, mergeLearningRecords, stampLearningRecord } = await loadRecordSync();
-  const ipadLedger = stampLearningRecord({}, "q-ipad", { progress: "wrong", favorite: true, note: "复盘重点", killed: true }, 200);
+  const ipadLedger = stampLearningRecord({}, "q-ipad", { progress: "wrong", favorite: true, favoriteStars: 3, note: "复盘重点", killed: true }, 200);
   const macLedger = stampLearningRecord({}, "q-mac", { progress: "correct" }, 300);
   const merged = mergeLearningRecords(
     { progress: { "q-ipad": "wrong" }, favorites: ["q-ipad"], notes: { "q-ipad": "复盘重点" }, ledger: ipadLedger },
@@ -1125,14 +1125,16 @@ test("merges per-question practice records across devices without stale overwrit
 
   assert.deepEqual(merged.progress, { "q-ipad": "wrong", "q-mac": "correct" });
   assert.deepEqual(merged.favorites, ["q-ipad"]);
+  assert.deepEqual(merged.favoriteStars, { "q-ipad": 3 });
   assert.deepEqual(merged.notes, { "q-ipad": "复盘重点" });
   assert.deepEqual(merged.killed, ["q-ipad"]);
   assert.equal(learningRecordsEqual(merged, { ...merged, favorites: [...merged.favorites].reverse() }), true);
 
-  const resetLedger = stampLearningRecord(merged.ledger, "q-ipad", { progress: null, favorite: false, note: null, killed: false }, 500);
+  const resetLedger = stampLearningRecord(merged.ledger, "q-ipad", { progress: null, favorite: false, favoriteStars: 0, note: null, killed: false }, 500);
   const afterReset = mergeLearningRecords(merged, { ledger: resetLedger });
   assert.deepEqual(afterReset.progress, { "q-mac": "correct" });
   assert.deepEqual(afterReset.favorites, []);
+  assert.deepEqual(afterReset.favoriteStars, {});
   assert.deepEqual(afterReset.notes, {});
   assert.deepEqual(afterReset.killed, []);
   assert.equal(learningRecordsEqual(merged, afterReset), false);
@@ -1250,7 +1252,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.2\.0"/);
+  assert.match(packageJson, /"version": "2\.2\.1"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1649,7 +1651,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.2.0");
+  assert.equal(JSON.parse(manifest).version, "2.2.1");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1692,8 +1694,8 @@ test("ships the v2.2.0 isolated wrong-review workflow and study refinements", as
     text("app/lib/note-pdf-export.ts"),
   ]);
   assert.match(page, /const sourceQuestions = questions/);
-  assert.match(page, /active\.questionOrder === "random" \|\| active\.scope === "wrong"/);
-  assert.match(page, /sessionScope === "wrong" \? reviewProgress : progress/);
+  assert.match(page, /active\.questionOrder === "random" \|\| active\.scope === "wrong" \|\| active\.scope === "favorite"/);
+  assert.match(page, /isolatedReviewSession \? reviewProgress : progress/);
   assert.match(page, /setReviewProgress\(\{\}\)/);
   assert.match(page, /shouldUnfavorite = sessionScope === "wrong" && result === "correct"/);
   assert.match(page, /AI 解析存档/);
@@ -1702,4 +1704,21 @@ test("ships the v2.2.0 isolated wrong-review workflow and study refinements", as
   assert.match(styles, /#ff8a00!important/);
   assert.doesNotMatch(exportSource, /错题复现/);
   assert.match(exportSource, /columns:2/);
+});
+
+test("ships the v2.2.1 isolated Featured session with adaptive star levels", async () => {
+  const [page, records, manifest] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/lib/record-sync.ts"),
+    text("package.json"),
+  ]);
+  assert.equal(JSON.parse(manifest).version, "2.2.1");
+  assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
+  assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
+  assert.match(page, /if \(sessionScope === "favorite"\)/);
+  assert.match(page, /Math\.min\(99, previousStars \+ 1\)/);
+  assert.match(page, /Math\.max\(1, previousStars - 1\)/);
+  assert.match(page, /精选 ★\$\{favoriteStars\}/);
+  assert.match(records, /favoriteStars\?: TimedValue<number>/);
+  assert.match(records, /favoriteStars: Record<string, number>/);
 });
