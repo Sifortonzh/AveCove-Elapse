@@ -58,6 +58,12 @@ export type MedicalAnswerReconciliation = {
   oneToOneVerified: boolean;
 };
 
+export type Western306CompanionMerge = {
+  questions: QuizQuestion[];
+  matchedAnswers: number;
+  matchedExplanations: number;
+};
+
 export type Western306LocalStandardization = {
   usable: boolean;
   questions: QuizQuestion[];
@@ -74,6 +80,7 @@ export type Western306LocalStandardization = {
     missingSourceNumbers: string[];
     duplicateSourceNumbers: string[];
     reconciledAnswerCount: number;
+    reconciledExplanationCount?: number;
     oneToOneVerified: boolean;
     suggestedGroupName: string;
     warnings: string[];
@@ -241,6 +248,49 @@ export function parseModernWestern306Questions(text: string, category = "西医�
     if (!current || quality > currentQuality || (number >= 116 && number <= 135 && question.questionType === "B")) selected.set(sourceNumber, question);
   });
   return [...selected.values()].sort((left, right) => Number(left.sourceNumber) - Number(right.sourceNumber));
+}
+
+export function mergeWestern306CompanionQuestions(
+  sourceQuestions: QuizQuestion[],
+  companionQuestions: QuizQuestion[],
+  blueprint: Western306Blueprint,
+): Western306CompanionMerge {
+  const companionByNumber = new Map(companionQuestions.flatMap((question) => {
+    const number = Number.parseInt(question.sourceNumber.match(/\d+/)?.[0] ?? "", 10);
+    return Number.isFinite(number) && number >= 1 && number <= 165 ? [[String(number), question] as const] : [];
+  }));
+  let matchedAnswers = 0;
+  let matchedExplanations = 0;
+  const questions = sourceQuestions.map((question) => {
+    const number = String(Number.parseInt(question.sourceNumber.match(/\d+/)?.[0] ?? "", 10));
+    const companion = companionByNumber.get(number);
+    if (!companion) return question;
+    const metadata = western306Metadata(number, blueprint);
+    const validLabels = new Set(question.options.map((option) => option.label.toUpperCase()).filter((label) => /^[A-D]$/.test(label)));
+    const companionAnswer = [...new Set(companion.answer.map((label) => label.toUpperCase()))].filter((label) => validLabels.has(label));
+    const answer = companionAnswer.length ? companionAnswer : question.answer;
+    const explanation = companion.explanation?.trim() || question.explanation;
+    if (companionAnswer.length) matchedAnswers += 1;
+    if (companion.explanation?.trim()) matchedExplanations += 1;
+    const source = companion.answerSource?.trim() || "红豆 306 答案解析包";
+    return {
+      ...question,
+      sourceNumber: number,
+      examProfile: "western-medicine-306" as const,
+      examYear: blueprint.year,
+      examFormat: blueprint.format,
+      questionType: metadata.questionType,
+      medicalQuestionType: metadata.questionType === "B" ? "B1" as const : metadata.questionType === "X" ? "X" as const : "A1" as const,
+      points: metadata.points,
+      multiple: metadata.questionType === "X",
+      answer,
+      answerPending: answer.length === 0,
+      answerSource: companionAnswer.length ? source : question.answerSource,
+      explanation,
+      explanationSource: companion.explanation?.trim() ? (companion.explanationSource?.trim() || source) : question.explanationSource,
+    };
+  });
+  return { questions, matchedAnswers, matchedExplanations };
 }
 
 export function standardizeParsedWestern306Questions(

@@ -311,6 +311,40 @@ A.戊 B.己 C.庚 D.辛
   assert.deepEqual(questions.slice(0, 2).map((question) => question.sharedOptionGroup), ["modern-306-b-116-117", "modern-306-b-116-117"]);
 });
 
+test("merges a structured 2017 answer-and-explanation companion into its 306 paper", async () => {
+  const { detectWestern306Blueprint, mergeWestern306CompanionQuestions } = await loadMedicalAiImport();
+  const source = [{
+    id: "paper-1",
+    sourceNumber: "1",
+    category: "2017 西综真题",
+    stem: "维持血糖稳定的主要激素是",
+    options: ["A", "B", "C", "D"].map((label) => ({ label, text: `${label} 选项正文` })),
+    answer: [],
+    multiple: false,
+  }];
+  const companion = [{
+    id: "answer-1",
+    sourceNumber: "1",
+    category: "2017 西综真题解析",
+    stem: "",
+    options: ["A", "B", "C", "D"].map((label) => ({ label, text: "" })),
+    answer: ["D"],
+    multiple: false,
+    explanation: "原题解析正文",
+    answerSource: "《2017年考研西医综合真题解析》绿色标注答案及原题解析",
+  }];
+  const blueprint = detectWestern306Blueprint("2017年考研西医综合真题.pdf", "2017 306 西医综合 165题");
+  const result = mergeWestern306CompanionQuestions(source, companion, blueprint);
+
+  assert.equal(result.matchedAnswers, 1);
+  assert.equal(result.matchedExplanations, 1);
+  assert.equal(result.questions[0].stem, source[0].stem);
+  assert.equal(result.questions[0].options[3].text, "D 选项正文");
+  assert.deepEqual(result.questions[0].answer, ["D"]);
+  assert.equal(result.questions[0].explanation, "原题解析正文");
+  assert.match(result.questions[0].explanationSource, /2017年考研西医综合真题解析/);
+});
+
 test("imports inline-answer Word banks and chapter-scoped medical answer tables", async () => {
   const { parseQuestionText } = await loadQuestionParser();
   const inlineWord = parseQuestionText(`一、单选题
@@ -531,7 +565,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.2.1");
+  assert.equal(JSON.parse(manifest).version, "2.3.0");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1252,7 +1286,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.2\.1"/);
+  assert.match(packageJson, /"version": "2\.3\.0"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1651,7 +1685,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.2.1");
+  assert.equal(JSON.parse(manifest).version, "2.3.0");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1712,7 +1746,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.2.1");
+  assert.equal(JSON.parse(manifest).version, "2.3.0");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -1721,4 +1755,23 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
   assert.match(page, /精选 ★\$\{favoriteStars\}/);
   assert.match(records, /favoriteStars\?: TimedValue<number>/);
   assert.match(records, /favoriteStars: Record<string, number>/);
+});
+
+test("ships the full-page note library and structured 306 companion import", async () => {
+  const [page, styles, medical, manifest] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/globals.css"),
+    text("app/lib/medical-ai-import.ts"),
+    text("package.json"),
+  ]);
+  assert.equal(JSON.parse(manifest).version, "2.3.0");
+  assert.match(page, /function NotesPage/);
+  assert.match(page, /const \[activeTags, setActiveTags\]/);
+  assert.match(page, /同时包含/);
+  assert.match(page, /任一标签/);
+  assert.match(styles, /\.notes-dashboard/);
+  assert.match(page, /\.json,application\/msword,application\/json/);
+  assert.match(page, /这是 306 答案解析包/);
+  assert.match(medical, /mergeWestern306CompanionQuestions/);
+  assert.match(page, /reconciledExplanationCount/);
 });

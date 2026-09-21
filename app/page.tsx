@@ -32,7 +32,7 @@ import { type MedicalQuestionType, type QuizQuestion } from "./lib/question-pars
 import { isMineruHybridJson, parseMineruHybridQuestionBank, type MinerUQuestionBank } from "./lib/mineru-import";
 import {
   detectWestern306Blueprint, parseModernWestern306Questions, reconcileMedicalQuestionsWithSourceAnswers,
-  standardizeParsedWestern306Questions, WESTERN_306_SUBJECTS, western306Score,
+  mergeWestern306CompanionQuestions, standardizeParsedWestern306Questions, WESTERN_306_SUBJECTS, western306Score,
   western306SubjectForQuestion, type Western306Subject,
 } from "./lib/medical-ai-import";
 import { suggestQuestionBankGroup } from "./lib/bank-grouping";
@@ -50,7 +50,7 @@ type Western306SubjectScope = "all" | Western306Subject;
 type ThemeMode = "system" | "light" | "dark";
 type StudyMode = "standard" | "blind" | "memorize";
 type AiMode = "summary" | "pitfall" | "companion";
-type View = "home" | "quiz" | "banks" | "bank-requests" | "copyright";
+type View = "home" | "quiz" | "banks" | "bank-requests" | "notes" | "copyright";
 type AccountSession = { nickname: string; email?: string; expiresAt: number };
 type SharedComment = { id: string; nickname: string; text: string; createdAt: string; status?: string; likes: number; own?: boolean };
 type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "cancelled" | "ai-ready"; detail: string };
@@ -77,6 +77,7 @@ type Western306ImportReport = {
   missingSourceNumbers?: string[];
   duplicateSourceNumbers?: string[];
   reconciledAnswerCount?: number;
+  reconciledExplanationCount?: number;
   oneToOneVerified?: boolean;
   suggestedGroupName?: string;
   warnings?: string[];
@@ -1213,6 +1214,13 @@ export default function HomePage() {
           const imported = isMineruHybridJson(rawJson)
             ? parseMineruHybridQuestionBank(rawJson, file.name)
             : parseSharedQuestionBankPackage(rawJson);
+          const answerOnly306Companion = !isMineruHybridJson(rawJson)
+            && imported.questions.length >= 100
+            && imported.questions.every((question) => !question.stem.trim())
+            && imported.questions.some((question) => question.answer.length > 0 || question.explanation?.trim());
+          if (answerOnly306Companion) {
+            throw new Error("这是 306 答案解析包：请打开“西综 306 标准化工作台”，将真题原卷放在左侧、此 JSON 放在右侧，系统会按原题号合并题干、答案与解析。");
+          }
           importedName = imported.name;
           importedId = "id" in imported && typeof imported.id === "string" ? imported.id : undefined;
           importedDescription = imported.description ?? "";
@@ -1776,7 +1784,7 @@ export default function HomePage() {
           onImport={() => setShowImport(true)}
           onBanks={() => setView("banks")}
           onSearch={() => setShowSearch(true)}
-          onNotes={() => setShowNotes(true)}
+          onNotes={() => setView("notes")}
           onCopyright={() => setView("copyright")}
           onToggleTheme={() => saveSettings({ ...settings, themeMode: resolvedDark ? "light" : "dark", darkMode: !resolvedDark })}
           darkMode={resolvedDark}
@@ -1808,6 +1816,11 @@ export default function HomePage() {
         />
       ) : view === "bank-requests" ? (
         <QuestionBankVaultPage banks={questionBanks} account={account} onRequireLogin={() => setShowAccount(true)} onBack={() => setView("banks")} />
+      ) : view === "notes" ? (
+        <NotesPage banks={searchableBanks} progress={progress} favorites={favorites} notes={notes} onBack={() => setView("home")} onOpen={async (bank, questionId) => {
+          if (bank.id === "__demo__") openQuestion(questionId);
+          else await openSavedQuestion(bank, questionId);
+        }} />
       ) : view === "copyright" ? (
         <CopyrightPage bankName={bankName} onHome={() => setView("home")} onRestoreDemo={restoreDemoBank} />
       ) : current ? (
@@ -3030,14 +3043,28 @@ function Western306Workbench({ onClose, onSave }: {
       const blueprint = detectWestern306Blueprint(sourceFile.name, source.text);
       if (blueprint.format !== "modern-165") throw new Error("306 工作台仅处理 2017 年及以后固定 165 题的新卷（A/B/X 型、A-D 四选项）；更早试卷请使用普通导入。");
       let answerText = "";
+      let companionQuestions: QuizQuestion[] = [];
       if (answerFile) {
-        const answer = await extractQuestionFileText(answerFile, (update) => setState({ ...update, detail: `答案 · ${update.detail}` }), controller.signal);
-        answerText = answer.text;
+        if (/\.json$/i.test(answerFile.name)) {
+          setState({ phase: "读取答案解析包", progress: 46, detail: `答案 · ${answerFile.name}` });
+          const payload = JSON.parse(await answerFile.text()) as unknown;
+          companionQuestions = parseSharedQuestionBankPackage(payload).questions;
+        } else {
+          const answer = await extractQuestionFileText(answerFile, (update) => setState({ ...update, detail: `答案 · ${update.detail}` }), controller.signal);
+          answerText = answer.text;
+        }
       }
       setState({ phase: "本地结构校验", progress: 68, detail: "正在检查原题号、选项与题后明确答案；标准卷无需重复交给 AI" });
       const locallyParsed = parseModernWestern306Questions(source.text, sourceFile.name.replace(/\.(doc|docx|pdf)$/i, ""));
       let localStandardization = standardizeParsedWestern306Questions(sourceFile.name, source.text, locallyParsed);
-      if (answerText) {
+      if (companionQuestions.length) {
+        const merged = mergeWestern306CompanionQuestions(localStandardization.questions, companionQuestions, blueprint);
+        localStandardization = standardizeParsedWestern306Questions(sourceFile.name, source.text, merged.questions);
+        localStandardization.report.reconciledAnswerCount = merged.matchedAnswers;
+        localStandardization.report.reconciledExplanationCount = merged.matchedExplanations;
+        localStandardization.report.oneToOneVerified = localStandardization.report.missingSourceNumbers.length < 10
+          && localStandardization.report.pendingAnswerCount === 0;
+      } else if (answerText) {
         const reconciliation = reconcileMedicalQuestionsWithSourceAnswers(localStandardization.questions, `${source.text}\n${answerText}`, 165);
         localStandardization = standardizeParsedWestern306Questions(sourceFile.name, source.text, reconciliation.questions);
         localStandardization.report.reconciledAnswerCount = reconciliation.reconciledCount;
@@ -3067,12 +3094,15 @@ function Western306Workbench({ onClose, onSave }: {
       });
       const result = await readImportApiPayload<{ questions?: QuizQuestion[]; report?: Western306ImportReport; error?: string }>(response);
       if (!response.ok || !result.questions?.length || !result.report) throw new Error(result.error || "没有生成可保存的 306 标准题库");
-      setQuestions(result.questions);
-      setReport(result.report);
+      const merged = companionQuestions.length ? mergeWestern306CompanionQuestions(result.questions, companionQuestions, blueprint) : null;
+      const finalQuestions = merged?.questions ?? result.questions;
+      const finalReport = merged ? { ...result.report, reconciledAnswerCount: merged.matchedAnswers, reconciledExplanationCount: merged.matchedExplanations } : result.report;
+      setQuestions(finalQuestions);
+      setReport(finalReport);
       setState({
         phase: "标准化完成",
         progress: 100,
-        detail: `识别 ${result.questions.length}${result.report.expectedQuestionCount ? ` / ${result.report.expectedQuestionCount}` : ""} 题 · 已有答案 ${result.report.answeredCount ?? 0} 题`,
+        detail: `识别 ${finalQuestions.length}${finalReport.expectedQuestionCount ? ` / ${finalReport.expectedQuestionCount}` : ""} 题 · 已有答案 ${finalQuestions.filter((question) => question.answer.length).length} 题`,
       });
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") setError("本次标准化已取消，未保存半成品。");
@@ -3106,7 +3136,20 @@ function Western306Workbench({ onClose, onSave }: {
 
   const counts = report?.typeCounts ?? {};
   const missing = report?.missingSourceNumbers ?? [];
-  return <div className="modal-layer western306-layer" onMouseDown={() => !busy && onClose()}><section className="western306-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>WESTERN MEDICINE 306 · STANDARDIZER</span><h2>西综 306 标准化工作台</h2><p>仅处理 2017 年及以后固定 165 题 / 300 分结构：A、B、X 型，每题 A-D 四个选项。</p></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="western306-file-grid"><button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button><button onClick={() => answerRef.current?.click()} className={answerFile ? "selected" : ""} disabled={busy}><ListChecks /><span><strong>{answerFile?.name || "选择答案或解析（可选）"}</strong><small>空白卷可先测试；答案卷可一起做题号关联</small></span><input ref={answerRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setAnswerFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button></div><div className="western306-rules"><ShieldCheck /><div><strong>跨页接缝 + 双层校验</strong><p>优先在本地按题号、选项与原文答案确定性整理；只有不满足标准结构时才进入 AI 分区。AI 只做结构化，答案仍只能来自文件原文。</p></div></div>{(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={() => controllerRef.current?.abort()}><X />取消本次标准化</button>}</div>}{report && <div className="western306-report"><div className="western306-report-head"><span><strong>{report.examYear || "年份待核对"}</strong><small>现代 165 题结构</small></span><span><strong>{questions.length}{report.expectedQuestionCount ? ` / ${report.expectedQuestionCount}` : ""}</strong><small>有效题目</small></span><span><strong>{report.totalPoints ? `${report.totalPoints} 分` : "依原卷"}</strong><small>总分规则</small></span></div><div className="western306-type-counts">{["A", "B", "X"].map((type) => <span key={type}><b>{type}</b>{counts[type] ?? 0} 题</span>)}</div>{report.recognitionMode === "deterministic" && <p className="complete">题干、选项与题后答案已在本机一一核对，本次未调用 AI，也不会因网关超时中断。</p>}<p className={missing.length ? "warning" : "complete"}>{missing.length ? `原文件缺少 ${missing.length} 个完整原题号：${missing.slice(0, 30).join("、")}${missing.length > 30 ? "…" : ""}。系统不会凭空补题。` : "题号连续性检查通过，可以开始抽查题干与答案。"}</p>{report.oneToOneVerified && <p className="complete">原题与答案已完成一一对应校验；即使原卷少于标准题数 10 题以内，也会按普通模式保存。</p>}{(report.reconciledAnswerCount ?? 0) > 0 && <p className="complete">已从原卷明确答案中二次补回 {report.reconciledAnswerCount} 题。</p>}{(report.warnings?.length ?? 0) > 0 && <p className="warning">{report.warnings?.length} 个片段未完成，已保留其他有效题，建议补传缺题页。</p>}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : "取消"}</button>{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer></section></div>;
+  return <div className="modal-layer western306-layer" onMouseDown={() => !busy && onClose()}>
+    <section className="western306-modal" onMouseDown={(event) => event.stopPropagation()}>
+      <header><div><span>WESTERN MEDICINE 306 · STANDARDIZER</span><h2>西综 306 标准化工作台</h2><p>仅处理 2017 年及以后固定 165 题 / 300 分结构：A、B、X 型，每题 A-D 四个选项。</p></div><button onClick={onClose} disabled={busy}><X /></button></header>
+      <div className="western306-file-grid">
+        <button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button>
+        <button onClick={() => answerRef.current?.click()} className={answerFile ? "selected" : ""} disabled={busy}><ListChecks /><span><strong>{answerFile?.name || "选择答案或解析（可选）"}</strong><small>PDF / DOCX / 红豆 JSON；按原题号关联答案与解析</small></span><input ref={answerRef} hidden type="file" accept=".doc,.docx,.pdf,.json,application/msword,application/json" onChange={(event) => { setAnswerFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button>
+      </div>
+      <div className="western306-rules"><ShieldCheck /><div><strong>跨页接缝 + 双层校验</strong><p>优先在本地按题号、选项与原文答案确定性整理；只有不满足标准结构时才进入 AI 分区。AI 只做结构化，答案仍只能来自文件原文。</p></div></div>
+      {(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={() => controllerRef.current?.abort()}><X />取消本次标准化</button>}</div>}
+      {report && <div className="western306-report"><div className="western306-report-head"><span><strong>{report.examYear || "年份待核对"}</strong><small>现代 165 题结构</small></span><span><strong>{questions.length}{report.expectedQuestionCount ? ` / ${report.expectedQuestionCount}` : ""}</strong><small>有效题目</small></span><span><strong>{report.totalPoints ? `${report.totalPoints} 分` : "依原卷"}</strong><small>总分规则</small></span></div><div className="western306-type-counts">{["A", "B", "X"].map((type) => <span key={type}><b>{type}</b>{counts[type] ?? 0} 题</span>)}</div>{report.recognitionMode === "deterministic" && <p className="complete">题干、选项与题后答案已在本机一一核对，本次未调用 AI，也不会因网关超时中断。</p>}<p className={missing.length ? "warning" : "complete"}>{missing.length ? `原文件缺少 ${missing.length} 个完整原题号：${missing.slice(0, 30).join("、")}${missing.length > 30 ? "…" : ""}。系统不会凭空补题。` : "题号连续性检查通过，可以开始抽查题干与答案。"}</p>{report.oneToOneVerified && <p className="complete">原题与答案已完成一一对应校验；即使原卷少于标准题数 10 题以内，也会按普通模式保存。</p>}{(report.reconciledAnswerCount ?? 0) > 0 && <p className="complete">已按原题号关联 {report.reconciledAnswerCount} 题答案。</p>}{(report.reconciledExplanationCount ?? 0) > 0 && <p className="complete">已保留 {report.reconciledExplanationCount} 题原题解析与来源。</p>}{(report.warnings?.length ?? 0) > 0 && <p className="warning">{report.warnings?.length} 个片段未完成，已保留其他有效题，建议补传缺题页。</p>}</div>}
+      {error && <div className="import-error"><AlertCircle />{error}</div>}
+      <footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : "取消"}</button>{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer>
+    </section>
+  </div>;
 }
 
 function AiImportFallbackModal({ files, onRecognize, onClose }: { files: AiFallbackFile[]; onRecognize: (file: AiFallbackFile) => Promise<number>; onClose: () => void }) {
@@ -3220,6 +3263,65 @@ function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: 
   const [query, setQuery] = useState("");
   const results = useMemo(() => query.trim() ? searchQuestionBanks(banks, query, 60) : [], [banks, query]);
   return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>跨题库检索 · 按相关度排序</span><h2>搜索全部题库</h2></div><button onClick={onClose} aria-label={returnToQuiz ? "关闭搜索并返回当前题目" : "关闭搜索"}><X /></button></header>{returnToQuiz && <button className="search-return-strip" onClick={onClose}><ChevronLeft size={16} /><span><strong>当前练习已为你保留</strong><small>关闭搜索即可回到刚才的题目与已选答案</small></span></button>}<label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="题库名、疾病、症状或知识点；多个词用空格分隔" /><kbd>{results.length}</kbd></label><div className="search-results">{query.trim() ? results.length ? results.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => void onOpen(bank, question.id)}><span>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b> · {question.category} · 原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight size={17} /></button>) : <div className="search-empty"><CircleHelp /><p>没有找到同时匹配这些关键词的题目。可减少一个词，或改用疾病、症状及题库名称。</p></div> : <div className="search-empty search-guide"><Search /><p>输入关键词后，会同时检索所有题库，并优先显示题库名、分类和题干中的精准命中。</p></div>}</div></section></div>;
+}
+
+function NotesPage({ banks, progress, favorites, notes, onOpen, onBack }: {
+  banks: SavedQuestionBank[];
+  progress: Progress;
+  favorites: string[];
+  notes: Record<string, string>;
+  onOpen: (bank: SavedQuestionBank, questionId: string) => Promise<void> | void;
+  onBack: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [matchAllTags, setMatchAllTags] = useState(true);
+  const [tagQuery, setTagQuery] = useState("");
+  const [exportMessage, setExportMessage] = useState("");
+  const allEntries = useMemo(() => banks.flatMap((bank) => bank.questions.flatMap((question) => {
+    const markdown = notes[question.id]?.trim() ?? "";
+    return markdown ? [{ bank, question, markdown, tags: parseNoteTags(markdown) }] : [];
+  })), [banks, notes]);
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    allEntries.forEach((entry) => entry.tags.forEach((tag) => counts.set(tag, (counts.get(tag) ?? 0) + 1)));
+    return [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "zh-CN"));
+  }, [allEntries]);
+  const visibleTags = useMemo(() => tagCounts.filter(([tag]) => tag.toLocaleLowerCase().includes(tagQuery.trim().toLocaleLowerCase())), [tagCounts, tagQuery]);
+  const entries = useMemo(() => {
+    const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    return allEntries.filter((entry) => {
+      const tagMatch = !activeTags.length || (matchAllTags
+        ? activeTags.every((tag) => entry.tags.includes(tag))
+        : activeTags.some((tag) => entry.tags.includes(tag)));
+      if (!tagMatch) return false;
+      const searchable = `${entry.bank.name} ${entry.question.stem} ${parseNoteSource(entry.markdown, entry.question)} ${entry.markdown}`.toLocaleLowerCase();
+      return terms.every((term) => searchable.includes(term));
+    });
+  }, [activeTags, allEntries, matchAllTags, query]);
+  const allQuestions = useMemo(() => banks.flatMap((bank) => bank.questions), [banks]);
+  const exportSections = useMemo(() => collectNoteExportSections(allQuestions, progress, favorites, notes), [allQuestions, favorites, notes, progress]);
+  const exportCount = exportSections.reduce((sum, section) => sum + section.questions.length, 0);
+  const wrongNotes = allEntries.filter((entry) => progress[entry.question.id] === "wrong").length;
+  const featuredNotes = allEntries.filter((entry) => favorites.includes(entry.question.id)).length;
+  const toggleTag = (tag: string) => setActiveTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]);
+  const exportPdf = () => {
+    setExportMessage("");
+    try {
+      if (!exportCount) throw new Error("还没有可导出的精选题或带批注题");
+      printNotePdf("全部题库", exportSections, notes);
+      setExportMessage("已打开打印版，请在系统打印面板选择“存储为 PDF”");
+    } catch (caught) { setExportMessage(caught instanceof Error ? caught.message : "暂时无法导出 PDF"); }
+  };
+  return <div className="notes-page">
+    <header className="notes-page-header"><button className="icon-button" onClick={onBack} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div><span>PERSONAL KNOWLEDGE BASE</span><h1>我的笔记</h1><p>把题目、解析、批注与标签整理成可检索的个人知识库。</p></div><button className="notes-pdf-export" onClick={exportPdf} disabled={!exportCount}><Download size={16} />导出 PDF <em>{exportCount}</em></button></header>
+    {exportMessage && <p className="notes-export-message notes-page-message">{exportMessage}</p>}
+    <section className="notes-dashboard" aria-label="笔记概览"><article><NotebookPen /><div><strong>{allEntries.length}</strong><span>笔记</span></div></article><article><Link2 /><div><strong>{tagCounts.length}</strong><span>标签</span></div></article><article><AlertCircle /><div><strong>{wrongNotes}</strong><span>错题笔记</span></div></article><article><Star /><div><strong>{featuredNotes}</strong><span>精选笔记</span></div></article></section>
+    <div className="notes-page-workspace">
+      <aside className="notes-tag-library"><div className="notes-tag-library-heading"><div><span>标签组合</span><strong>{activeTags.length ? `已选 ${activeTags.length} 个` : "全部标签"}</strong></div>{activeTags.length > 0 && <button onClick={() => setActiveTags([])}>清空</button>}</div><label><Search size={14} /><input value={tagQuery} onChange={(event) => setTagQuery(event.target.value)} placeholder={`查找 ${tagCounts.length} 个标签`} /></label>{activeTags.length > 1 && <div className="notes-tag-logic"><button className={matchAllTags ? "active" : ""} onClick={() => setMatchAllTags(true)}>同时包含</button><button className={!matchAllTags ? "active" : ""} onClick={() => setMatchAllTags(false)}>任一标签</button></div>}<div className="notes-tag-cloud">{visibleTags.map(([tag, count]) => <button key={tag} className={activeTags.includes(tag) ? "active" : ""} onClick={() => toggleTag(tag)}><span>#{tag}</span><em>{count}</em></button>)}</div></aside>
+      <main className="notes-library-main"><label className="notes-page-search"><Search size={19} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库、题目、笔记正文、来源或标签" /><kbd>{entries.length}</kbd></label>{activeTags.length > 0 && <div className="notes-active-tags"><span>{matchAllTags ? "同时包含" : "包含任一"}</span>{activeTags.map((tag) => <button key={tag} onClick={() => toggleTag(tag)}>#{tag}<X size={12} /></button>)}</div>}<div className="notes-card-grid">{entries.length ? entries.map(({ bank, question, markdown, tags }) => <article className="notes-library-card" key={`${bank.id}-${question.id}`}><header><span>{question.medicalQuestionType || (question.multiple ? "多选" : "单选")}</span><small>{bank.name} · 原题号 {question.sourceNumber}</small></header><button className="notes-card-open" onClick={() => void onOpen(bank, question.id)}><strong>{question.stem || `原题号 ${question.sourceNumber}`}</strong><p>{markdownSummary(markdown)}</p></button>{tags.length > 0 && <footer>{tags.map((tag) => <button key={tag} className={activeTags.includes(tag) ? "active" : ""} onClick={() => toggleTag(tag)}>#{tag}</button>)}</footer>}</article>) : <div className="notes-page-empty"><NotebookPen /><h3>{allEntries.length ? "没有匹配的笔记" : "这里还没有笔记"}</h3><p>{allEntries.length ? "减少关键词或取消一个叠加标签，再试一次。" : "答题时记录判断依据、添加标签，或把 AI 解析写入笔记后会自动汇总到这里。"}</p></div>}</div></main>
+    </div>
+  </div>;
 }
 
 function NotesModal({ bankName, questions, progress, favorites, notes, onOpen, onClose }: { bankName: string; questions: QuizQuestion[]; progress: Progress; favorites: string[]; notes: Record<string, string>; onOpen: (id: string) => void; onClose: () => void }) {
