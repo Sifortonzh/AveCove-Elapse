@@ -565,7 +565,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.0");
+  assert.equal(JSON.parse(manifest).version, "2.3.3");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -776,7 +776,7 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /copyrightNotice: bank\.copyrightNotice/);
   assert.match(localBank, /hongdou-question-bank/);
   assert.match(localBank, /avecove-western-306/);
-  assert.match(localBank, /multiple: question\.questionType === "X" \|\| answer\.length > 1/);
+  assert.match(localBank, /multiple: questionType === "X" \|\| answer\.length > 1/);
   assert.match(localBank, /Transparently migrate the single-bank format/);
   assert.match(localBank, /export async function loadQuestionBankGroupOrder/);
   assert.match(localBank, /export async function saveQuestionBankGroupOrder/);
@@ -1286,7 +1286,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.3\.0"/);
+  assert.match(packageJson, /"version": "2\.3\.3"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1685,7 +1685,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.0");
+  assert.equal(JSON.parse(manifest).version, "2.3.3");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1746,7 +1746,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.0");
+  assert.equal(JSON.parse(manifest).version, "2.3.3");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -1764,7 +1764,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.0");
+  assert.equal(JSON.parse(manifest).version, "2.3.3");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -1774,4 +1774,21 @@ test("ships the full-page note library and structured 306 companion import", asy
   assert.match(page, /这是 306 答案解析包/);
   assert.match(medical, /mergeWestern306CompanionQuestions/);
   assert.match(page, /reconciledExplanationCount/);
+});
+
+test("ships v2.3.3 chapter auto-location and JSON type normalization", async () => {
+  const [page, extras, localBank, styles, manifest] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/components/PracticeExtras.tsx"),
+    text("app/lib/local-bank.ts"),
+    text("app/globals.css"),
+    text("package.json"),
+  ]);
+  assert.equal(JSON.parse(manifest).version, "2.3.3");
+  assert.match(page, /currentQuestionId=\{current\.id\}/);
+  assert.match(extras, /open=\{containsCurrent\}/);
+  assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
+  assert.match(styles, /button\.current/);
+  assert.match(localBank, /rawQuestionType === "多" \|\| rawQuestionType === "多选"/);
+  assert.match(localBank, /rawQuestionType === "单" \|\| rawQuestionType === "单选"/);
 });

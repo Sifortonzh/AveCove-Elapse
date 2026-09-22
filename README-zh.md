@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.3.0" src="https://img.shields.io/badge/version-2.3.0-b43d35" />
+    <img alt="版本 2.3.3" src="https://img.shields.io/badge/version-2.3.3-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.3.0。** “我的笔记”已重构为完整的个人知识库页面，支持概览、全文检索和多个标签的交集/并集筛选；西综 306 工作台支持把 2017 年后的真题原卷与红豆答案解析包按原题号确定性合并，并完整保留解析及来源。
+> **当前版本：v2.3.3。** 章节目录会自动展开当前题所在章节并定位到当前题；普通红豆 JSON 导入时会把“单”规范为 A1 型、把“多”规范为 X 型。
 
 ## 产品地图
 
@@ -221,6 +221,7 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 <details>
 <summary><strong>版本记录</strong></summary>
 
+- **v2.3.3** — 章节目录自动展开并定位当前题；普通 JSON 的“单/多”题型自动规范为 A1/X。
 - **v2.3.0** — 重构“我的笔记”为可检索、可叠加标签的完整知识库页面；306 工作台新增红豆答案解析包按原题号合并与解析来源保留。
 - **v2.2.1** — 新增独立精选练习与自适应星级；精选作答不影响总体正确率和首次评分，星级可跨设备同步。
 - **v2.2.0** — 重做当前文件的独立错题训练会话，隐藏首答痕迹并重新统计本轮进度；错题做对自动移出精选、再错自动精选，并完善解析来源标识、标签删除/检索、紧凑 PDF 与答题卡高亮。

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.3.0" src="https://img.shields.io/badge/version-2.3.0-b43d35" />
+    <img alt="Version 2.3.3" src="https://img.shields.io/badge/version-2.3.3-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.0.** My Notes is now a full personal knowledge-base page with search, statistics, and composable AND/OR tag filters. The Western Medicine 306 workbench can pair a post-2017 paper with a structured Hongdou answer companion by source number while preserving every supplied explanation and provenance field.
+> **Current release: v2.3.3.** Chapter navigation now opens the current section and scrolls directly to the active question. General Hongdou JSON imports also normalize `单` to A1 and `多` to X automatically.
 
 ## Product map
 
@@ -221,6 +221,7 @@ Known limitations:
 <details>
 <summary><strong>Release history</strong></summary>
 
+- **v2.3.3** — Auto-expands and locates the active question in chapter navigation; normalizes `单`/`多` JSON question types to A1/X.
 - **v2.3.0** — Rebuilt My Notes as a searchable full-page knowledge base with stacked tags, and added deterministic source-number merging for 306 Hongdou answer/explanation companions.
 - **v2.2.1** — Added isolated Featured practice and adaptive Featured star levels while keeping global accuracy and first-attempt scoring untouched.
 - **v2.2.0** — Rebuilt wrong-answer review as an isolated current-bank session with fresh statistics, automatic Featured mastery handling, explicit AI/source explanation provenance, removable/searchable tags, compact PDF output, and stronger answer-card focus.

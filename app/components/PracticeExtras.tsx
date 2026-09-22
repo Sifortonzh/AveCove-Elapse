@@ -29,10 +29,15 @@ export function AnnotatedOption({ label, note, submitted, onNote, children }: { 
   </div>;
 }
 
-export function ChapterDirectory({ questions, onOpen, onClose }: { questions: QuizQuestion[]; onOpen: (id: string) => void; onClose: () => void }) {
+export function ChapterDirectory({ questions, currentQuestionId, onOpen, onClose }: { questions: QuizQuestion[]; currentQuestionId: string; onOpen: (id: string) => void; onClose: () => void }) {
+  const currentButton = useRef<HTMLButtonElement | null>(null);
   const groups = new Map<string, QuizQuestion[]>();
   for (const question of questions) { const name = question.category || "未分类"; groups.set(name, [...(groups.get(name) ?? []), question]); }
-  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal chapter-directory" role="dialog" aria-modal="true" aria-label="章节目录" onMouseDown={(e) => e.stopPropagation()}><header><h2>章节目录 · {questions.length} 题</h2><button aria-label="关闭章节目录" onClick={onClose}>×</button></header><p>按题库已有分类显示；展开章节可直接定位题目。</p>{[...groups].map(([name, items]) => <details key={name}><summary>{name}<span>{items.length} 题 · {((items.length / questions.length) * 100).toFixed(1)}%</span></summary>{items.map((q) => <button key={q.id} onClick={() => { onOpen(q.id); onClose(); }}><b>{q.sourceNumber}</b><span>{q.stem}</span></button>)}</details>)}</section></div>;
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => currentButton.current?.scrollIntoView({ block: "center", behavior: "smooth" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentQuestionId]);
+  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal chapter-directory" role="dialog" aria-modal="true" aria-label="章节目录" onMouseDown={(e) => e.stopPropagation()}><header><h2>章节目录 · {questions.length} 题</h2><button aria-label="关闭章节目录" onClick={onClose}>×</button></header><p>已自动展开并定位当前题所在章节；也可展开其他章节跳转。</p>{[...groups].map(([name, items]) => { const containsCurrent = items.some((question) => question.id === currentQuestionId); return <details key={name} open={containsCurrent}><summary>{name}<span>{items.length} 题 · {((items.length / questions.length) * 100).toFixed(1)}%</span></summary>{items.map((q) => <button ref={q.id === currentQuestionId ? currentButton : undefined} className={q.id === currentQuestionId ? "current" : ""} aria-current={q.id === currentQuestionId ? "true" : undefined} key={q.id} onClick={() => { onOpen(q.id); onClose(); }}><b>{q.sourceNumber}</b><span>{q.stem}</span></button>)}</details>; })}</section></div>;
 }
 
 export function AiDialogue({ question, onSave }: { question: QuizQuestion; onSave: (text: string) => void }) {

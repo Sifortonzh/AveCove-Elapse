@@ -155,11 +155,25 @@ function notifySyncChange() {
 
 function normalizeQuestion(question: QuizQuestion, fallbackId: string): QuizQuestion {
   const answer = [...new Set((question.answer ?? []).map((item) => String(item).toUpperCase()))];
+  const rawQuestionType = String(question.questionType ?? "").trim().toUpperCase();
+  const rawMedicalType = String(question.medicalQuestionType ?? "").trim().toUpperCase();
+  const questionType = (rawQuestionType === "多" || rawQuestionType === "多选"
+    ? "X"
+    : rawQuestionType === "单" || rawQuestionType === "单选"
+      ? "A"
+      : ["A", "B", "C", "X"].includes(rawQuestionType) ? rawQuestionType : undefined) as QuizQuestion["questionType"];
+  const medicalQuestionType = (questionType === "X"
+    ? "X"
+    : rawQuestionType === "单" || rawQuestionType === "单选"
+      ? "A1"
+      : ["A1", "A2", "A3", "A4", "B1", "C", "X"].includes(rawMedicalType) ? rawMedicalType : undefined) as QuizQuestion["medicalQuestionType"];
   return {
     ...question,
     id: question.id || fallbackId,
     answer,
-    multiple: question.questionType === "X" || answer.length > 1,
+    questionType: questionType ?? (answer.length > 1 ? "X" : "A"),
+    medicalQuestionType: medicalQuestionType ?? (answer.length > 1 ? "X" : "A1"),
+    multiple: questionType === "X" || answer.length > 1,
   };
 }
 
