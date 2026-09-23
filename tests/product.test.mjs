@@ -651,7 +651,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /进度 \{progressLabel\}% · 正确率/);
   assert.match(page, /分享之前，请先确认版权与隐私边界/);
   assert.match(page, /仅做单选/);
-  assert.match(page, /单选＋多选/);
+  assert.match(page, /单选＋X 型/);
   assert.match(page, /active\.questionTypes === "single" && question\.multiple/);
   assert.match(page, /multiple accept="\.doc,\.docx,\.pdf,\.json,application\/msword,application\/json"/);
   assert.match(page, /function AiImportFallbackModal/);
