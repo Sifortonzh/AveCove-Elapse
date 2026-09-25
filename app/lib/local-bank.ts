@@ -128,6 +128,8 @@ const DELETED_BANKS_KEY = "question-bank-deletions";
 const PREFERENCES_UPDATED_AT_KEY = "question-bank-preferences-updated-at";
 const BANK_KEY_PREFIX = "bank:";
 const PAVILION_KEY_PREFIX = "pavilion:";
+const LEARNING_RECORDS_KEY = "learning-records:v1";
+const ANSWER_SELECTIONS_KEY = "answer-selections:v1";
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -227,6 +229,30 @@ async function writeValues(entries: Array<[IDBValidKey, unknown]>, notify = true
     };
     transaction.onerror = () => reject(transaction.error ?? new Error("保存题库设置失败"));
   });
+}
+
+// Keep growing practice records in IndexedDB, alongside question banks. Unlike
+// localStorage, this does not impose the tiny per-origin string quota on users.
+let learningWriteQueue: Promise<void> = Promise.resolve();
+
+export function loadLocalLearningRecords<T>(): Promise<T | undefined> {
+  return readValue<T>(LEARNING_RECORDS_KEY);
+}
+
+export function loadLocalAnswerSelections<T>(): Promise<T | undefined> {
+  return readValue<T>(ANSWER_SELECTIONS_KEY);
+}
+
+export function saveLocalLearningRecords(records: unknown): Promise<void> {
+  const write = learningWriteQueue.catch(() => undefined).then(() => writeValues([[LEARNING_RECORDS_KEY, records]], false));
+  learningWriteQueue = write;
+  return write;
+}
+
+export function saveLocalAnswerSelections(selections: unknown): Promise<void> {
+  const write = learningWriteQueue.catch(() => undefined).then(() => writeValues([[ANSWER_SELECTIONS_KEY, selections]], false));
+  learningWriteQueue = write;
+  return write;
 }
 
 function normalizeBankOrder(value: unknown): string[] {

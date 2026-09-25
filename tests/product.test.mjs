@@ -1831,3 +1831,18 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
   assert.match(localBank, /rawQuestionType === "多" \|\| rawQuestionType === "多选"/);
   assert.match(localBank, /rawQuestionType === "单" \|\| rawQuestionType === "单选"/);
 });
+
+test("reveals answer feedback before persistence and stores growing practice data in IndexedDB", async () => {
+  const [page, localBank] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/lib/local-bank.ts"),
+  ]);
+  const submission = page.slice(page.indexOf("function submitAnswer()"), page.indexOf("function toggleFavorite()"));
+  assert.ok(submission.indexOf("setSubmitted(true);") < submission.indexOf("persistLearningRecords({ progress: nextProgress"));
+  assert.match(page, /loadLocalLearningRecords<LearningRecordsInput>/);
+  assert.match(page, /saveLocalLearningRecords\(normalized\)/);
+  assert.match(page, /saveLocalAnswerSelections\(answerSelections\)/);
+  assert.doesNotMatch(page, /localStorage\.setItem\("hongdou-record-ledger"/);
+  assert.match(localBank, /const LEARNING_RECORDS_KEY = "learning-records:v1"/);
+  assert.match(localBank, /learningWriteQueue\.catch\(\(\) => undefined\)/);
+});

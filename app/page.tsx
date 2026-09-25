@@ -19,16 +19,16 @@ import { extractQuestionFileText, importQuestionFile, QuestionRecognitionError, 
 import { AI_SOURCE_CONVERSION_PROMPT, downloadAiSourcePackage } from "./lib/ai-source-export";
 import {
   activateQuestionBank, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
-  exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, loadQuestionBankGroupOrder, loadQuestionBankOrder,
+  exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, loadLocalAnswerSelections, loadLocalLearningRecords, loadQuestionBankGroupOrder, loadQuestionBankOrder,
   loadQuestionBankSortMode, mergeQuestionBankSyncBundle, parseSharedQuestionBankPackage, saveActiveBank,
-  saveQuestionBank, saveQuestionBankGroupOrder, saveQuestionBankOrder, saveQuestionBankSortMode,
+  saveQuestionBank, saveQuestionBankGroupOrder, saveQuestionBankOrder, saveQuestionBankSortMode, saveLocalAnswerSelections, saveLocalLearningRecords,
   updateQuestionBankDetails, PAVILION_STUDY_STAGES, type PavilionQuestionBank, type PavilionStudyStage, type QuestionBankInput, type QuestionBankSortMode, type SavedQuestionBank,
 } from "./lib/local-bank";
 import { exportEnglishTestSyncBundle, mergeEnglishTestSyncBundle } from "./lib/english-test";
 import { exportEnglishPracticeSyncBundle, mergeEnglishPracticeSyncBundle } from "./lib/english-practice";
 import {
   learningRecordsEqual, mergeLearningRecords, normalizeLearningRecords, stampLearningRecord,
-  type RecordLedger,
+  type LearningRecordsInput, type RecordLedger,
 } from "./lib/record-sync";
 import { type MedicalQuestionType, type QuizQuestion } from "./lib/question-parser";
 import { isMineruHybridJson, parseMineruHybridQuestionBank, type MinerUQuestionBank } from "./lib/mineru-import";
@@ -392,7 +392,9 @@ export default function HomePage() {
       try {
         const savedLearningMode = localStorage.getItem("avecove-learning-mode");
         if (savedLearningMode === "english" || savedLearningMode === "medical") setLearningMode(savedLearningMode);
-        persistLearningRecords(normalizeLearningRecords({
+        const storedRecords = await loadLocalLearningRecords<LearningRecordsInput>().catch(() => undefined);
+        if (!active) return;
+        const legacyRecords: LearningRecordsInput = storedRecords ? {} : {
           progress: JSON.parse(localStorage.getItem("hongdou-progress") ?? localStorage.getItem("medquiz-progress") ?? "{}"),
           firstProgress: JSON.parse(localStorage.getItem("hongdou-first-progress") ?? "{}"),
           favorites: JSON.parse(localStorage.getItem("hongdou-favorites") ?? "[]"),
@@ -400,9 +402,11 @@ export default function HomePage() {
           notes: JSON.parse(localStorage.getItem("hongdou-notes") ?? "{}"),
           killed: JSON.parse(localStorage.getItem("hongdou-killed-questions") ?? "[]"),
           ledger: JSON.parse(localStorage.getItem("hongdou-record-ledger") ?? "{}"),
-        }));
+        };
+        persistLearningRecords(normalizeLearningRecords(storedRecords ?? legacyRecords));
         setSettings(normalizeSettings(JSON.parse(localStorage.getItem("hongdou-settings") ?? "{}")));
-        const savedSelections = JSON.parse(localStorage.getItem("hongdou-answer-selections") ?? "{}");
+        const savedSelections = await loadLocalAnswerSelections<Record<string, string[]>>().catch(() => undefined)
+          ?? JSON.parse(localStorage.getItem("hongdou-answer-selections") ?? "{}");
         if (savedSelections && typeof savedSelections === "object" && !Array.isArray(savedSelections)) {
           setAnswerSelections(Object.fromEntries(Object.entries(savedSelections).filter((entry): entry is [string, string[]] => Array.isArray(entry[1]) && entry[1].every((label) => typeof label === "string" && /^[A-G]$/.test(label)))));
         }
@@ -430,7 +434,9 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (localReady) localStorage.setItem("hongdou-answer-selections", JSON.stringify(answerSelections));
+    if (localReady) void saveLocalAnswerSelections(answerSelections)
+      .then(() => localStorage.removeItem("hongdou-answer-selections"))
+      .catch(() => setSyncStatus("浏览器本地存储不足；请先导出备份并检查可用空间"));
   }, [answerSelections, localReady]);
 
   useEffect(() => {
@@ -651,13 +657,11 @@ export default function HomePage() {
     setNotes(normalized.notes);
     setKilledQuestions(normalized.killed);
     setRecordLedger(normalized.ledger);
-    localStorage.setItem("hongdou-progress", JSON.stringify(normalized.progress));
-    localStorage.setItem("hongdou-first-progress", JSON.stringify(normalized.firstProgress));
-    localStorage.setItem("hongdou-favorites", JSON.stringify(normalized.favorites));
-    localStorage.setItem("hongdou-favorite-stars", JSON.stringify(normalized.favoriteStars));
-    localStorage.setItem("hongdou-notes", JSON.stringify(normalized.notes));
-    localStorage.setItem("hongdou-killed-questions", JSON.stringify(normalized.killed));
-    localStorage.setItem("hongdou-record-ledger", JSON.stringify(normalized.ledger));
+    void saveLocalLearningRecords(normalized).then(() => {
+      for (const key of ["hongdou-progress", "hongdou-first-progress", "hongdou-favorites", "hongdou-favorite-stars", "hongdou-notes", "hongdou-killed-questions", "hongdou-record-ledger"]) {
+        localStorage.removeItem(key);
+      }
+    }).catch(() => setSyncStatus("浏览器本地存储不足；本次作答仍可查看，请先导出备份"));
   }
 
   async function collectLearningState() {
@@ -975,6 +979,9 @@ export default function HomePage() {
       return;
     }
     const result = [...selected].sort().join("") === [...current.answer].sort().join("") ? "correct" : "wrong";
+    // Reveal feedback immediately; durable storage is asynchronous and must
+    // never block the current question's correct/wrong state.
+    setSubmitted(true);
     if (isolatedReviewSession) setReviewProgress((value) => ({ ...value, [current.id]: result as "correct" | "wrong" }));
     if (sessionScope === "favorite") {
       const previousStars = Math.max(1, favoriteStars[current.id] ?? 1);
@@ -982,7 +989,6 @@ export default function HomePage() {
       const nextFavorites = favorites.includes(current.id) ? favorites : [...favorites, current.id];
       const nextLedger = stampLearningRecord(recordLedger, current.id, { favorite: true, favoriteStars: nextStars });
       persistLearningRecords({ progress, firstProgress, favorites: nextFavorites, favoriteStars: { ...favoriteStars, [current.id]: nextStars }, notes, ledger: nextLedger });
-      setSubmitted(true);
       setToast(result === "wrong" ? `本题精选星级升至 ${nextStars} 星 ★` : `本题精选星级降至 ${nextStars} 星，仍保留精选 ★`);
       if (sessionStudyMode === "standard" && settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
       return;
@@ -1002,7 +1008,6 @@ export default function HomePage() {
       ...(shouldFavorite ? { favorite: true } : shouldUnfavorite ? { favorite: false } : {}),
     });
     persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites: nextFavorites, favoriteStars, notes, ledger: nextLedger });
-    setSubmitted(true);
     if (sessionStudyMode === "standard" && settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
   }
 
