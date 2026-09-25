@@ -4,6 +4,7 @@ import { query, withTransaction } from "@/app/lib/server/db";
 import { mergeLearningRecords } from "@/app/lib/record-sync";
 
 type StateRow = { payload: Record<string, unknown>; version: number; updated_at: Date };
+const MAX_SYNC_BYTES = 64_000_000;
 
 type SyncBank = { id: string; updatedAt?: string; [key: string]: unknown };
 type BankBundle = {
@@ -74,7 +75,7 @@ export async function PUT(request: Request) {
   const session = readSession(request);
   if (!session) return NextResponse.json({ error: "请先登录。" }, { status: 401 });
   const raw = await request.text();
-  if (Buffer.byteLength(raw, "utf8") > 12_000_000) return NextResponse.json({ error: "同步内容超过 12 MB，请拆分过大的题库后重试。" }, { status: 413 });
+  if (Buffer.byteLength(raw, "utf8") > MAX_SYNC_BYTES) return NextResponse.json({ error: "同步内容超过 64 MB，请先导出备份并联系管理员处理。" }, { status: 413 });
   let body: { state?: Record<string, unknown> };
   try {
     body = JSON.parse(raw) as { state?: Record<string, unknown> };
