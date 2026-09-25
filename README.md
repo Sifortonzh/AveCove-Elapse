@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.3.** Chapter navigation now opens the current section and scrolls directly to the active question. General Hongdou JSON imports also normalize `单` to A1 and `多` to X automatically.
+> **Current release: v2.3.3.1.** The Western Medicine 306 workbench accepts Hongdou JSON as the source paper. Small updates use a four-part release tag; the npm package remains at its compatible three-part version.
 
 ## Product map
 

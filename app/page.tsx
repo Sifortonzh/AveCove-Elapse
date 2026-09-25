@@ -3000,8 +3000,13 @@ function Western306Workbench({ onClose, onSave }: {
     setReport(null);
     setSourceForAi("");
     try {
-      const source = await extractQuestionFileText(sourceFile, (update) => setState({ ...update, detail: `原卷 · ${update.detail}` }), controller.signal);
-      setSourceForAi(source.text);
+      const sourceIsJson = /\.json$/i.test(sourceFile.name);
+      const sourceJson = sourceIsJson ? await sourceFile.text() : "";
+      const sourceQuestions = sourceIsJson ? parseSharedQuestionBankPackage(JSON.parse(sourceJson) as unknown).questions : null;
+      const source = sourceIsJson
+        ? { text: `${sourceFile.name}\n共165题 满分300` }
+        : await extractQuestionFileText(sourceFile, (update) => setState({ ...update, detail: `原卷 · ${update.detail}` }), controller.signal);
+      setSourceForAi(sourceJson || source.text);
       const blueprint = detectWestern306Blueprint(sourceFile.name, source.text);
       if (blueprint.format !== "modern-165") throw new Error("306 工作台仅处理 2017 年及以后固定 165 题的新卷（A/B/X 型、A-D 四选项）；更早试卷请使用普通导入。");
       let answerText = "";
@@ -3014,11 +3019,11 @@ function Western306Workbench({ onClose, onSave }: {
         } else {
           const answer = await extractQuestionFileText(answerFile, (update) => setState({ ...update, detail: `答案 · ${update.detail}` }), controller.signal);
           answerText = answer.text;
-          setSourceForAi(`${source.text}\n\n参考答案文件：\n${answerText}`);
+          setSourceForAi(`${sourceJson || source.text}\n\n参考答案文件：\n${answerText}`);
         }
       }
       setState({ phase: "本地结构校验", progress: 68, detail: "正在检查原题号、选项与题后明确答案；标准卷无需重复交给 AI" });
-      const locallyParsed = parseModernWestern306Questions(source.text, sourceFile.name.replace(/\.(doc|docx|pdf)$/i, ""));
+      const locallyParsed = sourceQuestions ?? parseModernWestern306Questions(source.text, sourceFile.name.replace(/\.(doc|docx|pdf|json)$/i, ""));
       let localStandardization = standardizeParsedWestern306Questions(sourceFile.name, source.text, locallyParsed);
       if (companionQuestions.length) {
         const merged = mergeWestern306CompanionQuestions(localStandardization.questions, companionQuestions, blueprint);
@@ -3081,14 +3086,14 @@ function Western306Workbench({ onClose, onSave }: {
     <section className="western306-modal" onMouseDown={(event) => event.stopPropagation()}>
       <header><div><span>WESTERN MEDICINE 306 · STANDARDIZER</span><h2>西综 306 标准化工作台</h2><p>仅处理 2017 年及以后固定 165 题 / 300 分结构：A、B、X 型，每题 A-D 四个选项。</p></div><button onClick={onClose} disabled={busy}><X /></button></header>
       <div className="western306-file-grid">
-        <button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); setSourceForAi(""); }} /></button>
+        <button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>红豆 JSON / PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,.json,application/msword,application/json" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); setSourceForAi(""); }} /></button>
         <button onClick={() => answerRef.current?.click()} className={answerFile ? "selected" : ""} disabled={busy}><ListChecks /><span><strong>{answerFile?.name || "选择答案或解析（可选）"}</strong><small>PDF / DOCX / 红豆 JSON；按原题号关联答案与解析</small></span><input ref={answerRef} hidden type="file" accept=".doc,.docx,.pdf,.json,application/msword,application/json" onChange={(event) => { setAnswerFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button>
       </div>
       <div className="western306-rules"><ShieldCheck /><div><strong>跨页接缝 + 双层校验</strong><p>在本地按题号、选项与原文答案确定性整理；未达保存标准时导出源 JSON，交给自选 AI 整理后再导入，不在网页内自动调用 AI。</p></div></div>
       {(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={() => controllerRef.current?.abort()}><X />取消本次标准化</button>}</div>}
       {report && <div className="western306-report"><div className="western306-report-head"><span><strong>{report.examYear || "年份待核对"}</strong><small>现代 165 题结构</small></span><span><strong>{questions.length}{report.expectedQuestionCount ? ` / ${report.expectedQuestionCount}` : ""}</strong><small>有效题目</small></span><span><strong>{report.totalPoints ? `${report.totalPoints} 分` : "依原卷"}</strong><small>总分规则</small></span></div><div className="western306-type-counts">{["A", "B", "X"].map((type) => <span key={type}><b>{type}</b>{counts[type] ?? 0} 题</span>)}</div>{report.recognitionMode === "deterministic" && <p className="complete">题干、选项与题后答案已在本机一一核对，本次未调用 AI，也不会因网关超时中断。</p>}<p className={missing.length ? "warning" : "complete"}>{missing.length ? `原文件缺少 ${missing.length} 个完整原题号：${missing.slice(0, 30).join("、")}${missing.length > 30 ? "…" : ""}。系统不会凭空补题。` : "题号连续性检查通过，可以开始抽查题干与答案。"}</p>{report.oneToOneVerified && <p className="complete">原题与答案已完成一一对应校验；即使原卷少于标准题数 10 题以内，也会按普通模式保存。</p>}{(report.reconciledAnswerCount ?? 0) > 0 && <p className="complete">已按原题号关联 {report.reconciledAnswerCount} 题答案。</p>}{(report.reconciledExplanationCount ?? 0) > 0 && <p className="complete">已保留 {report.reconciledExplanationCount} 题原题解析与来源。</p>}{(report.warnings?.length ?? 0) > 0 && <p className="warning">{report.warnings?.length} 个片段未完成，已保留其他有效题，建议补传缺题页。</p>}</div>}
       {error && <div className="import-error"><AlertCircle />{error}</div>}
-      <footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : sourceForAi && sourceFile ? () => downloadAiSourcePackage(sourceFile.name, sourceForAi) : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : sourceForAi ? <><Download />下载源 JSON 给 AI</> : "取消"}</button>{sourceForAi && !questions.length && <button className="ghost-action" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(AI_SOURCE_CONVERSION_PROMPT); setPromptCopied(true); } catch { setError("无法自动复制，请从普通导入页查看并手动复制提示词。"); } }}>{promptCopied ? "提示词已复制" : "复制 AI 提示词"}</button>}{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer>
+      <footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : sourceForAi && sourceFile ? () => downloadAiSourcePackage(sourceFile.name, sourceForAi) : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : sourceForAi ? <><Download />下载源 JSON 给 AI</> : "取消"}</button>{sourceForAi && !questions.length && <button className="ghost-action" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(AI_SOURCE_CONVERSION_PROMPT); setPromptCopied(true); } catch { setError("无法自动复制，请从普通导入页查看并手动复制提示词。"); } }}>{promptCopied ? "提示词已复制" : "复制 AI 提示词"}</button>}{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf|json)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer>
     </section>
   </div>;
 }

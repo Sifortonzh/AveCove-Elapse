@@ -723,6 +723,7 @@ test("supports legacy Word, batch imports, timeouts, and separate answer recogni
   assert.match(page, /西综 306 标准化工作台/);
   assert.match(page, /本地确定性识别/);
   assert.match(page, /下载源 JSON 给 AI/);
+  assert.match(page, /sourceIsJson \? parseSharedQuestionBankPackage\(JSON\.parse\(sourceJson\)/);
   assert.doesNotMatch(page, /fetch\("\/api\/import-ai"/);
   assert.match(page, /固定 165 题 \/ 300 分结构/);
   assert.match(aiImportRoute, /Promise\.allSettled/);
