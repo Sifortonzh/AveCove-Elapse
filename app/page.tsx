@@ -13,8 +13,10 @@ import questionBank from "./questions.json";
 import { AnnotatedOption, AiDialogue, ChapterDirectory, InkNote, NoteImages } from "./components/PracticeExtras";
 import EnglishLearningView from "./components/EnglishLearningView";
 import MinerUWorkbench from "./components/MinerUWorkbench";
+import DocumentImportWorkbench from "./components/DocumentImportWorkbench";
 import { MathText } from "./components/MathText";
 import { extractQuestionFileText, importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
+import { AI_SOURCE_CONVERSION_PROMPT, downloadAiSourcePackage } from "./lib/ai-source-export";
 import {
   activateQuestionBank, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
   exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, loadQuestionBankGroupOrder, loadQuestionBankOrder,
@@ -111,23 +113,6 @@ type BankRequest = {
   updatedAt: string;
 };
 
-async function readImportApiPayload<T>(response: Response): Promise<T> {
-  const raw = await response.text();
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    if (response.status === 504 || /<title>\s*504|gateway time-?out/i.test(raw)) {
-      throw new Error("AI 标准化超过了网页网关的等待时间。原文件没有损坏，请稍后重试或联系站点管理员延长 AI 导入超时。");
-    }
-    if (response.status === 502 || /<title>\s*502|bad gateway/i.test(raw)) {
-      throw new Error("AI 标准化期间上游服务暂时断开。原文件没有损坏，请检查 AI 厂商状态后重试。");
-    }
-    if (response.status === 413) {
-      throw new Error("提取出的文件内容超过了服务器接收上限，请拆分文件后重试。");
-    }
-    throw new Error(`服务器没有返回有效的题库数据${response.status ? `（HTTP ${response.status}）` : ""}，请稍后重试。`);
-  }
-}
 type MarkdownLineKind = "heading1" | "heading2" | "heading3" | "quote" | "list" | "paragraph" | "space";
 type Settings = {
   scope: Scope;
@@ -360,6 +345,8 @@ export default function HomePage() {
   const [showImport, setShowImport] = useState(false);
   const [showMineruWorkbench, setShowMineruWorkbench] = useState(false);
   const [show306Workbench, setShow306Workbench] = useState(false);
+  const [showDocumentWorkbench, setShowDocumentWorkbench] = useState(false);
+  const [documentInitialFile, setDocumentInitialFile] = useState<File | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
@@ -368,7 +355,6 @@ export default function HomePage() {
   const [importBusy, setImportBusy] = useState(false);
   const [importReports, setImportReports] = useState<ImportReport[]>([]);
   const [aiFallbackFiles, setAiFallbackFiles] = useState<AiFallbackFile[]>([]);
-  const [showAiImport, setShowAiImport] = useState(false);
   const [answerTargetBank, setAnswerTargetBank] = useState<SavedQuestionBank | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [aiMode, setAiMode] = useState<AiMode>("summary");
@@ -1180,6 +1166,7 @@ export default function HomePage() {
     setImportBusy(true);
     setImportError("");
     setImportReports(initialReports);
+    setAiFallbackFiles([]);
     setImportState({ phase: "准备批量导入", progress: 2, detail: `共 ${files.length} 个文件` });
     const fallbackFiles: AiFallbackFile[] = [];
     let successCount = 0;
@@ -1283,7 +1270,7 @@ export default function HomePage() {
           break;
         } else if (error instanceof QuestionRecognitionError && error.extractedText.trim()) {
           fallbackFiles.push({ id, fileName: error.fileName, extractedText: error.extractedText });
-          updateImportReport(id, { status: "ai-ready", detail: "普通模式未识别，可尝试 AI 快速整理" });
+          updateImportReport(id, { status: "ai-ready", detail: "未识别出完整题目；请下载提取文字 JSON，交给 AI 整理后再导入" });
         } else {
           failureCount += 1;
           updateImportReport(id, { status: "failed", detail: error instanceof Error ? error.message : "导入失败，请检查文件" });
@@ -1300,67 +1287,28 @@ export default function HomePage() {
     setQuestionBanks(await listQuestionBanks().catch(() => questionBanks));
     setImportState(cancelled
       ? { phase: "导入已取消", progress: 100, detail: `已保留成功导入的 ${successCount} 个文件，其余文件未继续处理` }
-      : { phase: "批量导入完成", progress: 100, detail: `成功 ${successCount} 个 · 待 AI ${fallbackFiles.length} 个 · 失败 ${failureCount} 个` });
+      : { phase: "批量导入完成", progress: 100, detail: `成功 ${successCount} 个 · 待整理 ${fallbackFiles.length} 个 · 失败 ${failureCount} 个` });
     setImportError(cancelled ? "本次导入已安全取消；当前正在处理的文件没有写入题库。" : failureCount ? `${failureCount} 个文件导入失败或超时，请查看下方明细后重试。` : "");
     setImportBusy(false);
     importAbortRef.current = null;
     if (successCount) {
       setToast(`${successCount} 份题库已就位 🎉 此刻就是新起点，题海有岸，胜利正在装进口袋 🫘📚🏆✨`);
     }
-    if (fallbackFiles.length && !cancelled) {
-      setAiFallbackFiles(fallbackFiles);
-      setShowImport(false);
-      setShowAiImport(true);
-    }
+    if (fallbackFiles.length && !cancelled) setAiFallbackFiles(fallbackFiles);
   }
 
-  async function recognizeFileWithAi(file: AiFallbackFile) {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 12 * 60_000);
-    try {
-      const response = await fetch("/api/import-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({ fileName: file.fileName, text: file.extractedText.slice(0, 480_000), personalAi: readPersonalAiConfig() ?? undefined }),
-      });
-      const result = await response.json() as {
-        questions?: QuizQuestion[];
-        error?: string;
-        report?: Western306ImportReport & { chunks?: number; successfulChunks?: number };
-      };
-      if (!response.ok || !result.questions?.length) throw new Error(result.error || "AI 没有返回可用题目");
-      const isWestern306 = result.report?.profile === "western-medicine-306";
-      const description = isWestern306
-        ? `西医综合 306 专项题库：按现代 A、B、X 型题与 A-D 四选项整理。已识别 ${result.questions.length} 题，已关联答案 ${result.report?.answeredCount ?? 0} 题，待导入答案 ${result.report?.pendingAnswerCount ?? 0} 题。请抽查原题号、共用选项与答案。`
-        : "";
-      const importedName = file.fileName.replace(/\.(doc|docx|pdf)$/i, "");
-      const saved = await saveActiveBank({
-        name: importedName,
-        description,
-        groupName: result.report?.suggestedGroupName || suggestQuestionBankGroup(importedName, result.questions),
-        questions: result.questions,
-        importedAt: new Date().toISOString(),
-      });
-      setQuestions(saved.questions);
-      setBankName(saved.name);
-      setActiveBankId(saved.id);
-      setQuestionBanks(await listQuestionBanks());
-      if ((result.report?.pendingAnswerCount ?? 0) > 0) setAnswerTargetBank(saved);
-      if (result.report?.warnings?.length) {
-        setToast(`已保留 ${saved.questions.length} 道有效题；${result.report.warnings.length} 个片段未完成，可稍后拆分原文件补充。`);
-      } else if ((result.report?.pendingAnswerCount ?? 0) > 0) {
-        setToast(`已进入测试模式：${result.report?.pendingAnswerCount} 道题等待答案，可现在导入答案文件。`);
-      } else if (result.report?.oneToOneVerified) {
-        setToast(`原题与答案已完成一一对应校验，${saved.questions.length} 道题按普通模式保存 ✨`);
-      }
-      return saved.questions.length;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") throw new Error("AI 识别超过 12 分钟，已停止等待；可拆分文件后重试");
-      throw error;
-    } finally {
-      window.clearTimeout(timer);
-    }
+  function downloadAiSource(file: AiFallbackFile) {
+    downloadAiSourcePackage(file.fileName, file.extractedText);
+  }
+
+  async function saveDocumentWorkbenchResult(fileName: string, questions: QuizQuestion[]) {
+    const name = fileName.replace(/\.(doc|docx|pdf)$/i, "");
+    const saved = await saveImportedBank({ name, groupName: suggestQuestionBankGroup(name, questions), questions, importedAt: new Date().toISOString() });
+    setQuestions(saved.questions);
+    setBankName(saved.name);
+    setActiveBankId(saved.id);
+    setQuestionBanks(await listQuestionBanks());
+    setToast(`${saved.questions.length} 道题已保存，请抽查题干、选项与答案。`);
   }
 
   async function saveMineruWorkbenchResult(bank: MinerUQuestionBank) {
@@ -1727,7 +1675,7 @@ export default function HomePage() {
     setQuestionBanks((banks) => banks.filter((bank) => bank.id !== id));
     if (activeBankId === id) await restoreDemoBank();
     if (account) await pushRemoteState();
-    setToast(account ? "题库已删除，并会同步从其他设备移除 ☁️" : "题库已从本机移除，其他学习记录不受影响");
+    setToast(account ? "我的题库已删除并同步到其他设备；藏经阁公开副本不受影响 ☁️" : "我的题库已从本机移除；藏经阁公开副本不受影响");
   }
 
   async function resetSavedBankProgress(bank: SavedQuestionBank) {
@@ -1909,13 +1857,16 @@ export default function HomePage() {
           onFiles={handleFiles}
           onCancel={cancelImport}
           onDrag={setDragActive}
+          aiSourceFiles={aiFallbackFiles}
+          onExportAiSource={downloadAiSource}
+          onDocuments={(file) => { setDocumentInitialFile(file ?? null); setShowImport(false); setShowDocumentWorkbench(true); }}
           onMineru={() => { setShowImport(false); setShowMineruWorkbench(true); }}
           on306={() => { setShowImport(false); setShow306Workbench(true); }}
         />
       )}
       {showMineruWorkbench && <MinerUWorkbench onClose={() => setShowMineruWorkbench(false)} onSave={saveMineruWorkbenchResult} />}
+      {showDocumentWorkbench && <DocumentImportWorkbench initialFile={documentInitialFile} onClose={() => { setShowDocumentWorkbench(false); setDocumentInitialFile(null); }} onSave={saveDocumentWorkbenchResult} />}
       {show306Workbench && <Western306Workbench onClose={() => setShow306Workbench(false)} onSave={save306WorkbenchResult} />}
-      {showAiImport && <AiImportFallbackModal files={aiFallbackFiles} onRecognize={recognizeFileWithAi} onClose={() => { setShowAiImport(false); setAiFallbackFiles([]); }} />}
       {answerTargetBank && <AnswerImportModal bank={answerTargetBank} onMerge={mergeAnswerFile} onClose={() => setAnswerTargetBank(null)} />}
       {showSearch && <SearchModal banks={searchableBanks} returnToQuiz={view === "quiz" && Boolean(current)} onOpen={async (bank, questionId) => { if (bank.id === "__demo__") openQuestion(questionId); else { await openSavedQuestion(bank, questionId); setShowSearch(false); } }} onClose={() => setShowSearch(false)} />}
       {showNotes && <NotesModal bankName={bankName} questions={questions} progress={progress} favorites={favorites} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
@@ -2255,7 +2206,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
             <div className="bank-card-progress" aria-label={`已完成 ${completedCount} 道，共 ${bank.questions.length} 道，进度 ${completionLabel}%`}><div><span>学习进度 · {completedCount}/{bank.questions.length}</span><b>{completionLabel}%</b></div><i><b style={{ width: `${completion}%` }} /></i></div>
           </>}
           <div className="bank-card-meta"><span>导入于 {new Date(bank.importedAt).toLocaleDateString("zh-CN")}</span><span>仅存本机</span></div>
-          {isDeleting ? <div className="bank-delete-confirm"><p>确认从本机移除这份题库？此操作无法撤销。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="导出题库复习笔记" title={noteExportCount ? `导出 ${noteExportCount} 道精选或批注题为 PDF` : "暂无可导出的精选或批注题"} disabled={!noteExportCount} onClick={() => exportBankNotes(bank)}><Download /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
+          {isDeleting ? <div className="bank-delete-confirm"><p>确认删除“我的题库”中的这份文件？同步设备上的私人副本也会移除；藏经阁已发布的公开副本保持独立，不会一起删除。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="导出题库复习笔记" title={noteExportCount ? `导出 ${noteExportCount} 道精选或批注题为 PDF` : "暂无可导出的精选或批注题"} disabled={!noteExportCount} onClick={() => exportBankNotes(bank)}><Download /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
         </article>;
       })}</div>{group.banks.length > groupVisibleLimit && <button type="button" className={`bank-group-toggle ${groupExpanded ? "expanded" : ""}`} aria-expanded={groupExpanded} onClick={() => toggleGroup(group.name)}>{groupExpanded ? "收起题库" : `展开其余 ${hiddenCount} 份题库`}<ChevronRight /></button>}</section>;
       })}</div></div> : <div className="bank-empty">{keyword ? <CircleHelp /> : <Database />}<h2>{keyword ? "没有找到匹配的题库" : "题库书架还是空的"}</h2><p>{keyword ? "这里只搜索题库名称、分组、简介和来源；刷题时仍可使用“搜题”检索题目内容。" : "导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。"}</p>{keyword ? <button className="ghost-action" onClick={() => setQuery("")}><X size={17} />清除搜索</button> : <button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button>}</div>}</section>
@@ -3007,16 +2958,17 @@ function BankReplacementModal({ prompt, onChoose }: { prompt: BankReplacementPro
   return <div className="modal-layer bank-replacement-layer"><section className="bank-replacement-modal" role="dialog" aria-modal="true" aria-label="选择同主键题库的更新方式"><header><div><span>SAME QUESTION BANK KEY</span><h2>检测到同一份题库</h2></div><button onClick={() => onChoose("cancel")} aria-label="取消导入"><X /></button></header><div className="bank-replacement-summary"><Database /><div><strong>{prompt.existing.name}</strong><p>现有 {prompt.existing.questions.length} 题 · 新版 {prompt.incoming.questions.length} 题</p></div></div><p>请选择新版题库的写入方式。保留记录时会按原题号沿用进度、首次评分、精选和笔记；完全替换会清空旧题对应的学习记录。</p><footer><button className="ghost-action" onClick={() => onChoose("cancel")}>取消导入</button><button className="replacement-danger" onClick={() => onChoose("replace")}><RotateCcw />完全替换</button><button className="primary-action" onClick={() => onChoose("preserve")}><ShieldCheck />保留刷题记录</button></footer></section></div>;
 }
 
-function ImportModal({ state, busy, error, dragActive, reports, fileRef, onClose, onFiles, onCancel, onDrag, onMineru, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; onMineru: () => void; on306: () => void }) {
+function ImportModal({ state, busy, error, dragActive, reports, fileRef, aiSourceFiles, onExportAiSource, onClose, onFiles, onCancel, onDrag, onDocuments, onMineru, on306 }: { state: ImportUpdate; busy: boolean; error: string; dragActive: boolean; reports: ImportReport[]; fileRef: React.RefObject<HTMLInputElement | null>; aiSourceFiles: AiFallbackFile[]; onExportAiSource: (file: AiFallbackFile) => void; onClose: () => void; onFiles: (files: File[]) => void; onCancel: () => void; onDrag: (value: boolean) => void; onDocuments: (file?: File) => void; onMineru: () => void; on306: () => void }) {
+  const [promptCopied, setPromptCopied] = useState(false);
   const importStage = state.progress >= 90 ? 4 : state.progress >= 58 ? 3 : state.progress > 0 ? 2 : 1;
   const stages = ["文件准备", "本地提取", "结构识别", "审校保存"];
-  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal spatial-import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>IMPORT WORKBENCH · 文件默认在本机处理</span><h2>把资料整理成可练习的题库</h2><p>一次导入多份文件；系统会先提取文字，再识别题型、答案与章节结构。</p></div><button onClick={onClose} disabled={busy} aria-label="关闭导入工作台"><X /></button></header>
+  return <div className="modal-layer" onMouseDown={() => !busy && onClose()}><section className="import-modal spatial-import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>IMPORT WORKBENCH · JSON FIRST</span><h2>选择最快的题库导入方式</h2><p>红豆题库 JSON 可直接快速导入；Word / PDF 先进入识别工作台预览。导入过程不自动调用 AI。</p></div><button onClick={onClose} disabled={busy} aria-label="关闭导入工作台"><X /></button></header>
     <ol className="import-stage-strip" aria-label="导入流程">{stages.map((label, index) => { const number = index + 1; return <li className={number < importStage ? "done" : number === importStage ? "active" : ""} key={label}><i>{number < importStage ? <Check size={14} /> : number}</i><span>{label}</span></li>; })}</ol>
     <div className="import-workbench-grid">
-      <div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>拖入一个或多个文件</strong><p>支持旧版 .doc、.docx、文字/扫描 PDF、MinerU Hybrid JSON 与红豆题库 .json</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个处理…" : "选择多个文件"}</button><input ref={fileRef} type="file" multiple accept=".doc,.docx,.pdf,.json,application/msword,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div>
-      <aside className="import-capability-panel"><span className="overline">SPECIALIZED FLOW</span><button type="button" className="mineru-entry" onClick={onMineru} disabled={busy}><ScanText /><span><strong>MinerU 题库工作台</strong><small>多份 Hybrid JSON 合并、重复页清理、公式排版与一键入库</small></span><ArrowRight /></button><button type="button" className="western306-entry" onClick={on306} disabled={busy}><Target /><span><strong>西综 306 标准化工作台</strong><small>2017 年起 165 题、A/B/X 型、A-D 四选项与答案配套校验</small></span><ArrowRight /></button><div className="format-row"><div><FileText /><span><b>Word / 分享文件</b><small>题干末尾答案、章节答案表与历年回忆题</small></span></div><div><ScanText /><span><b>PDF + OCR</b><small>单选、多选与判断；自动跳过填空和问答</small></span></div></div></aside>
+      <div className={`drop-zone ${dragActive ? "drag" : ""}`} onDragOver={(event) => { event.preventDefault(); onDrag(true); }} onDragLeave={() => onDrag(false)} onDrop={(event) => { event.preventDefault(); onDrag(false); const files = Array.from(event.dataTransfer.files); if (files.some((file) => /\.(doc|docx|pdf)$/i.test(file.name))) onDocuments(files.find((file) => /\.(doc|docx|pdf)$/i.test(file.name))); else if (files.length) onFiles(files); }}><span className="upload-art"><Upload /></span><strong>拖入红豆题库 JSON</strong><p>支持多份 .json；Word / PDF 请点击右侧识别工作台。其他文件先交给 AI 整理成标准 JSON。</p><button onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "正在逐个导入…" : "选择 JSON 文件"}</button><input ref={fileRef} type="file" multiple accept=".json,application/json" hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) onFiles(files); event.currentTarget.value = ""; }} /></div>
+      <aside className="import-capability-panel"><span className="overline">RECOGNITION WORKBENCHES</span><button type="button" className="mineru-entry" onClick={onMineru} disabled={busy}><ScanText /><span><strong>MinerU 题库工作台</strong><small>多份 Hybrid JSON 合并、重复页清理、公式排版与一键入库</small></span><ArrowRight /></button><button type="button" className="western306-entry" onClick={on306} disabled={busy}><Target /><span><strong>西综 306 标准化工作台</strong><small>2017 年起 165 题、A/B/X 型、A-D 四选项与答案配套校验</small></span><ArrowRight /></button><button type="button" className="document-entry" onClick={() => onDocuments()} disabled={busy}><FileText /><span><strong>Word / PDF 识别工作台</strong><small>Word 优先；PDF 仅文字提取与 OCR，预览确认后入库</small></span><ArrowRight /></button></aside>
     </div>
-    {(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={onCancel}><X />取消当前导入</button>}</div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "cancelled" ? <X /> : report.status === "ai-ready" ? <BrainCircuit /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span></div>)}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<p className="privacy-note">.docx 与 PDF 默认在浏览器本地处理；由于旧版 .doc 是二进制格式，选择后会临时发送到你部署的本站服务器内存提取文字，不落盘、不保留原文件。普通识别失败时仍会先征求同意，再决定是否交给 AI 整理。</p></section></div>;
+    {(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={onCancel}><X />取消当前导入</button>}</div>}{reports.length > 0 && <div className="import-report-list">{reports.map((report) => { const source = aiSourceFiles.find((file) => file.id === report.id); return <div className={report.status} key={report.id}>{report.status === "success" ? <CheckCircle2 /> : report.status === "failed" ? <AlertCircle /> : report.status === "cancelled" ? <X /> : report.status === "ai-ready" ? <FileText /> : <Clock3 />}<span><strong>{report.name}</strong><small>{report.detail}</small></span>{source && <button type="button" onClick={() => onExportAiSource(source)}><Download size={16} />下载 JSON</button>}</div>; })}</div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<div className="ai-json-guide"><div><strong>让外部 AI 规范题库 JSON</strong><p>把工作台导出的“供 AI 整理.json”和以下提示词一起交给 AI，取回标准 JSON 后再导入。</p></div><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(AI_SOURCE_CONVERSION_PROMPT); setPromptCopied(true); } catch { setPromptCopied(false); } }}>{promptCopied ? "已复制" : "复制提示词"}</button><details><summary>查看并手动复制完整提示词</summary><p className="ai-json-prompt-text">{AI_SOURCE_CONVERSION_PROMPT}</p></details></div><p className="privacy-note">JSON 在浏览器本地解析，不会自动调用 AI。Word / PDF 请进入识别工作台；.docx 与 PDF 默认本地提取，旧版 .doc 会临时发送本站服务器内存处理。PDF OCR 效果不佳时，请先制作红豆题库 JSON 再导入。</p></section></div>;
 }
 
 function Western306Workbench({ onClose, onSave }: {
@@ -3033,6 +2985,8 @@ function Western306Workbench({ onClose, onSave }: {
   const [busy, setBusy] = useState(false);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [report, setReport] = useState<Western306ImportReport | null>(null);
+  const [sourceForAi, setSourceForAi] = useState("");
+  const [promptCopied, setPromptCopied] = useState(false);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
@@ -3044,8 +2998,10 @@ function Western306Workbench({ onClose, onSave }: {
     setError("");
     setQuestions([]);
     setReport(null);
+    setSourceForAi("");
     try {
       const source = await extractQuestionFileText(sourceFile, (update) => setState({ ...update, detail: `原卷 · ${update.detail}` }), controller.signal);
+      setSourceForAi(source.text);
       const blueprint = detectWestern306Blueprint(sourceFile.name, source.text);
       if (blueprint.format !== "modern-165") throw new Error("306 工作台仅处理 2017 年及以后固定 165 题的新卷（A/B/X 型、A-D 四选项）；更早试卷请使用普通导入。");
       let answerText = "";
@@ -3058,6 +3014,7 @@ function Western306Workbench({ onClose, onSave }: {
         } else {
           const answer = await extractQuestionFileText(answerFile, (update) => setState({ ...update, detail: `答案 · ${update.detail}` }), controller.signal);
           answerText = answer.text;
+          setSourceForAi(`${source.text}\n\n参考答案文件：\n${answerText}`);
         }
       }
       setState({ phase: "本地结构校验", progress: 68, detail: "正在检查原题号、选项与题后明确答案；标准卷无需重复交给 AI" });
@@ -3086,30 +3043,8 @@ function Western306Workbench({ onClose, onSave }: {
         });
         return;
       }
-      setState({ phase: "AI 分区与校对", progress: 76, detail: "正在按 A/B/X 分区、A-D 四选项和原题号逐段整理；不会凭医学知识猜答案" });
-      const response = await fetch("/api/import-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          fileName: sourceFile.name,
-          text: source.text.slice(0, 480_000),
-          answerText: answerText.slice(0, 240_000),
-          personalAi: readPersonalAiConfig() ?? undefined,
-        }),
-      });
-      const result = await readImportApiPayload<{ questions?: QuizQuestion[]; report?: Western306ImportReport; error?: string }>(response);
-      if (!response.ok || !result.questions?.length || !result.report) throw new Error(result.error || "没有生成可保存的 306 标准题库");
-      const merged = companionQuestions.length ? mergeWestern306CompanionQuestions(result.questions, companionQuestions, blueprint) : null;
-      const finalQuestions = merged?.questions ?? result.questions;
-      const finalReport = merged ? { ...result.report, reconciledAnswerCount: merged.matchedAnswers, reconciledExplanationCount: merged.matchedExplanations } : result.report;
-      setQuestions(finalQuestions);
-      setReport(finalReport);
-      setState({
-        phase: "标准化完成",
-        progress: 100,
-        detail: `识别 ${finalQuestions.length}${finalReport.expectedQuestionCount ? ` / ${finalReport.expectedQuestionCount}` : ""} 题 · 已有答案 ${finalQuestions.filter((question) => question.answer.length).length} 题`,
-      });
+      setState({ phase: "本地识别未达保存标准", progress: 100, detail: `识别 ${localStandardization.questions.length} 题；请下载提取文字 JSON 交给 AI 整理，再导入生成的红豆题库 JSON` });
+      setError("本地识别未达到 306 的保存标准。请下载源 JSON 交给 AI 整理，再导入生成的红豆题库 JSON；不会在网页内自动调用 AI。");
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") setError("本次标准化已取消，未保存半成品。");
       else setError(caught instanceof Error ? caught.message : "306 标准化失败，请检查文件后重试。");
@@ -3146,41 +3081,16 @@ function Western306Workbench({ onClose, onSave }: {
     <section className="western306-modal" onMouseDown={(event) => event.stopPropagation()}>
       <header><div><span>WESTERN MEDICINE 306 · STANDARDIZER</span><h2>西综 306 标准化工作台</h2><p>仅处理 2017 年及以后固定 165 题 / 300 分结构：A、B、X 型，每题 A-D 四个选项。</p></div><button onClick={onClose} disabled={busy}><X /></button></header>
       <div className="western306-file-grid">
-        <button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button>
+        <button onClick={() => sourceRef.current?.click()} className={sourceFile ? "selected" : ""} disabled={busy}><FileText /><span><strong>{sourceFile?.name || "选择题目原卷（必选）"}</strong><small>PDF / DOCX / DOC；扫描 PDF 会先 OCR</small></span><input ref={sourceRef} hidden type="file" accept=".doc,.docx,.pdf,application/msword" onChange={(event) => { setSourceFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); setSourceForAi(""); }} /></button>
         <button onClick={() => answerRef.current?.click()} className={answerFile ? "selected" : ""} disabled={busy}><ListChecks /><span><strong>{answerFile?.name || "选择答案或解析（可选）"}</strong><small>PDF / DOCX / 红豆 JSON；按原题号关联答案与解析</small></span><input ref={answerRef} hidden type="file" accept=".doc,.docx,.pdf,.json,application/msword,application/json" onChange={(event) => { setAnswerFile(event.target.files?.[0] ?? null); setQuestions([]); setReport(null); }} /></button>
       </div>
-      <div className="western306-rules"><ShieldCheck /><div><strong>跨页接缝 + 双层校验</strong><p>优先在本地按题号、选项与原文答案确定性整理；只有不满足标准结构时才进入 AI 分区。AI 只做结构化，答案仍只能来自文件原文。</p></div></div>
+      <div className="western306-rules"><ShieldCheck /><div><strong>跨页接缝 + 双层校验</strong><p>在本地按题号、选项与原文答案确定性整理；未达保存标准时导出源 JSON，交给自选 AI 整理后再导入，不在网页内自动调用 AI。</p></div></div>
       {(busy || state.progress > 0) && <div className="import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p>{busy && <button type="button" className="import-cancel" onClick={() => controllerRef.current?.abort()}><X />取消本次标准化</button>}</div>}
       {report && <div className="western306-report"><div className="western306-report-head"><span><strong>{report.examYear || "年份待核对"}</strong><small>现代 165 题结构</small></span><span><strong>{questions.length}{report.expectedQuestionCount ? ` / ${report.expectedQuestionCount}` : ""}</strong><small>有效题目</small></span><span><strong>{report.totalPoints ? `${report.totalPoints} 分` : "依原卷"}</strong><small>总分规则</small></span></div><div className="western306-type-counts">{["A", "B", "X"].map((type) => <span key={type}><b>{type}</b>{counts[type] ?? 0} 题</span>)}</div>{report.recognitionMode === "deterministic" && <p className="complete">题干、选项与题后答案已在本机一一核对，本次未调用 AI，也不会因网关超时中断。</p>}<p className={missing.length ? "warning" : "complete"}>{missing.length ? `原文件缺少 ${missing.length} 个完整原题号：${missing.slice(0, 30).join("、")}${missing.length > 30 ? "…" : ""}。系统不会凭空补题。` : "题号连续性检查通过，可以开始抽查题干与答案。"}</p>{report.oneToOneVerified && <p className="complete">原题与答案已完成一一对应校验；即使原卷少于标准题数 10 题以内，也会按普通模式保存。</p>}{(report.reconciledAnswerCount ?? 0) > 0 && <p className="complete">已按原题号关联 {report.reconciledAnswerCount} 题答案。</p>}{(report.reconciledExplanationCount ?? 0) > 0 && <p className="complete">已保留 {report.reconciledExplanationCount} 题原题解析与来源。</p>}{(report.warnings?.length ?? 0) > 0 && <p className="warning">{report.warnings?.length} 个片段未完成，已保留其他有效题，建议补传缺题页。</p>}</div>}
       {error && <div className="import-error"><AlertCircle />{error}</div>}
-      <footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : "取消"}</button>{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer>
+      <footer><button className="ghost-action" onClick={questions.length ? exportStandardFile : sourceForAi && sourceFile ? () => downloadAiSourcePackage(sourceFile.name, sourceForAi) : onClose} disabled={busy}>{questions.length ? <><Download />导出标准 JSON</> : sourceForAi ? <><Download />下载源 JSON 给 AI</> : "取消"}</button>{sourceForAi && !questions.length && <button className="ghost-action" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(AI_SOURCE_CONVERSION_PROMPT); setPromptCopied(true); } catch { setError("无法自动复制，请从普通导入页查看并手动复制提示词。"); } }}>{promptCopied ? "提示词已复制" : "复制 AI 提示词"}</button>}{questions.length && report ? <button className="primary-action" onClick={() => void onSave(sourceFile?.name.replace(/\.(doc|docx|pdf)$/i, "") || "西医综合 306", questions, report)}><CheckCircle2 />保存为我的题库</button> : <button className="primary-action" onClick={() => void standardize()} disabled={!sourceFile || busy}><Sparkles />{busy ? "正在标准化…" : "开始标准化"}</button>}</footer>
     </section>
   </div>;
-}
-
-function AiImportFallbackModal({ files, onRecognize, onClose }: { files: AiFallbackFile[]; onRecognize: (file: AiFallbackFile) => Promise<number>; onClose: () => void }) {
-  const [rows, setRows] = useState(() => files.map((file) => ({ ...file, status: "waiting" as "waiting" | "processing" | "success" | "failed", detail: "等待你的确认" })));
-  const [busy, setBusy] = useState(false);
-
-  async function startRecognition() {
-    setBusy(true);
-    for (const file of files) {
-      const completed = rows.find((row) => row.id === file.id)?.status === "success";
-      if (completed) continue;
-      setRows((value) => value.map((row) => row.id === file.id ? { ...row, status: "processing", detail: "AI 正在关联题目与文件答案区…" } : row));
-      try {
-        const count = await onRecognize(file);
-        setRows((value) => value.map((row) => row.id === file.id ? { ...row, status: "success", detail: `已整理 ${count} 道题，请在练习中复核答案` } : row));
-      } catch (error) {
-        setRows((value) => value.map((row) => row.id === file.id ? { ...row, status: "failed", detail: error instanceof Error ? error.message : "AI 识别失败，请稍后重试" } : row));
-      }
-    }
-    setBusy(false);
-  }
-
-  const hasProcessed = rows.some((row) => row.status === "success" || row.status === "failed");
-  const hasRetry = rows.some((row) => row.status === "failed");
-  return <div className="modal-layer ai-import-layer" onMouseDown={() => !busy && onClose()}><section className="ai-import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>OPTIONAL AI RECOGNITION</span><h2>普通模式没有认出答案结构</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="ai-import-intro"><BrainCircuit /><div><strong>是否用 AI 快速整理文件中的答案部分？</strong><p>AI 会尝试把末尾答案表、非标准答案标记与题号关联，不再要求固定使用“题目＋答案：A”的格式。</p></div></div><div className="ai-import-warning"><ShieldCheck /><p>继续后，仅把浏览器已提取的文字发送给你配置的 AI 厂商，不发送原始文件；可能消耗接口额度。AI 可能识别错误，导入后请抽查答案，并确认文件不含患者或其他敏感信息。</p></div><div className="ai-import-files">{rows.map((row) => <div className={row.status} key={row.id}>{row.status === "success" ? <CheckCircle2 /> : row.status === "failed" ? <AlertCircle /> : row.status === "processing" ? <RefreshCw className="spin" /> : <FileText />}<span><strong>{row.fileName}</strong><small>{row.detail}</small></span></div>)}</div><footer><button className="ghost-action" onClick={onClose} disabled={busy}>{hasProcessed ? "完成并关闭" : "暂不使用 AI"}</button><button className="primary-action" onClick={() => void startRecognition()} disabled={busy || (!hasRetry && rows.every((row) => row.status === "success"))}><Sparkles />{busy ? "AI 正在识别…" : hasRetry ? "重试失败文件" : "同意并用 AI 识别"}</button></footer></section></div>;
 }
 
 function AnswerImportModal({ bank, onMerge, onClose }: {
@@ -3399,7 +3309,7 @@ function CopyrightPage({ bankName, onHome, onRestoreDemo }: { bankName: string; 
           <article><b>01</b><h2>产品与品牌</h2><p>产品名称、界面设计、蛇杖红豆标识及相关视觉资产由本项目保留。未经书面许可，不得冒用品牌、移除权利标识，或复制成同名、近似且足以造成混淆的产品。</p></article>
           <article><b>02</b><h2>题库内容</h2><p>演示题仅用于功能展示。用户导入或分享的 Word、PDF、JSON、教材与课程内容版权归原权利人所有；你应在操作前确认拥有合法的学习、整理、复制与传播权限。</p></article>
           <article><b>03</b><h2>医学与 AI 声明</h2><p>题目答案、AI 总结与讨论内容可能存在错误、遗漏或时效差异，仅用于学习辅助，不构成医疗服务，不能替代现行教材、指南、执业判断、诊断或治疗建议。</p></article>
-          <article><b>04</b><h2>隐私与数据</h2><p>原始学号只用于生成不可逆同步标识。原始题库文件默认在浏览器处理；普通识别失败时，仅在你明确同意后，提取文字才会发送至所选 AI 厂商。严禁导入可识别患者身份的资料。</p></article>
+          <article><b>04</b><h2>隐私与数据</h2><p>原始学号只用于生成不可逆同步标识。普通题库导入不自动调用 AI；识别失败时，可自行下载提取文字 JSON 并决定是否交给外部 AI。严禁导入可识别患者身份的资料。</p></article>
         </section>
 
         <section className="terms-section" aria-labelledby="terms-title">

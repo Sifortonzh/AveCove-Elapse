@@ -37,10 +37,11 @@
 | **Practice** | Standard, Blind Review, and Answer-first Memorization; answer sheet, wrong-answer review, Slash Skip, corrections, notes, and source explanations | Stable |
 | **Medical formats** | Single/multiple choice, true/false, and A1/A2/A3/A4/B1/C/X structures with shared stems or option pools | Active focus |
 | **Western Medicine 306** | Fixed post-2017 165-question / 300-point audit, A/B/X sections, strict A-D options, first-attempt scoring, and five-subject practice | Active focus |
-| **AI assistance** | Personal or site-wide OpenAI-compatible providers, import structuring, explanations, follow-up, and note writing | Optional |
+| **AI assistance** | Personal or site-wide OpenAI-compatible providers for explanations, follow-up, and note writing; ordinary imports never auto-call AI | Optional |
 | **Cross-device sync** | Parsed banks, progress, wrong answers, featured items, notes, settings, groups, and deletion tombstones | Optional |
 | **English Lab** | Interactive demos for cloze, reading, listening, matching, translation, and writing | Preview |
 | **MinerU Workbench** | In-app multi-JSON merge, duplicate-page removal, answer/formula report, structure preview, and one-click library save | Stable in v2.1 |
+| **Word / PDF Workbench** | Local extraction or OCR, question counts, a three-question preview, and explicit save; failed recognition can export source JSON for external AI conversion | Stable |
 | **Elapse Forge** | Isolated source-preserving review service with page coordinates, audit history, and Elapse export | Advanced foundation |
 
 ## Why Elapse
@@ -196,6 +197,8 @@ The student ID is converted into an irreversible sync identifier; the original v
 
 Elapse v2.1 adds a browser-local MinerU Workbench to the normal Import dialog. It accepts one or multiple completed Hybrid JSON exports, joins them in natural file-name order, removes byte-identical duplicate pages, preserves MinerU equations as LaTeX, previews the question structure, and saves directly into the active library without AI calls.
 
+For ordinary imports, use Hongdou JSON for the fastest path. Word and PDF files now enter a lightweight recognition workbench; PDF uses text extraction and OCR only. If recognition fails, download an extracted-source JSON, copy the built-in conversion prompt to your chosen AI, and import its finished `hongdou-question-bank` JSON. Uploading a file no longer starts AI recognition automatically. A public Pavilion upload stores a separate JSON snapshot, so deleting a private bank does not delete its published copy.
+
 The separate `/forge` route remains the advanced source-preserving workflow. It can ingest the original file together with an already completed official MinerU Hybrid JSON result and optional Markdown, preserving page references, coordinates, tables, and image evidence without spending OCR again.
 
 Forge is deliberately separate from the stable practice application. Foundation `0.2.0` improves chapter-scoped numbering, split options, cross-page seams, and answer-table association, but it is **not a zero-error OCR product**. Keep the original document for visual review and verify every generated bank before study.
@@ -207,7 +210,7 @@ Start with [Forge README](forge/README.md), [architecture](docs/FORGE_ARCHITECTU
 | Status | Work |
 | --- | --- |
 | **Available now** | Stable medical practice, multi-bank library, corrections, notes, optional sync, portable sharing, 306 audit/scoring, and Docker deployment |
-| **Current priority** | Better deterministic and AI-assisted imports for chapter-based medical workbooks, cross-page questions, and end-of-book answer registries |
+| **Current priority** | Better deterministic Word/JSON imports for chapter-based medical workbooks, cross-page questions, and end-of-book answer registries |
 | **Next** | Stronger post-import review tools, faster large-document processing, and broader curriculum profiles |
 | **Paused preview** | Full English exam import; the existing English Lab interactions remain available for demonstration |
 

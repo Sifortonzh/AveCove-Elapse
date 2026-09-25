@@ -654,8 +654,10 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /单选＋X 型/);
   assert.match(page, /active\.questionTypes === "single" && isXQuestion\(question\)/);
   assert.match(page, /question\.medicalQuestionType === "X"/);
-  assert.match(page, /multiple accept="\.doc,\.docx,\.pdf,\.json,application\/msword,application\/json"/);
-  assert.match(page, /function AiImportFallbackModal/);
+  assert.match(page, /multiple accept="\.json,application\/json"/);
+  assert.match(page, /DocumentImportWorkbench/);
+  assert.match(page, /下载提取文字 JSON/);
+  assert.doesNotMatch(page, /function AiImportFallbackModal/);
   assert.match(page, /答对后 0\.7 秒进入下一题/);
   assert.match(styles, /Independent desktop scroll regions/);
   assert.match(styles, /\.home-sidebar\{[^}]*overflow-y:auto/);
@@ -671,7 +673,7 @@ test("includes the requested product flows and copy", async () => {
   assert.doesNotMatch(auth, /studentId.*INSERT/i);
 });
 
-test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recognition", async () => {
+test("supports legacy Word, batch imports, timeouts, and separate answer recognition", async () => {
   const [page, english, englishStore, fileImport, docRoute, search, aiImportRoute, medicalAiImport, emailRoute, styles] = await Promise.all([
     text("app/page.tsx"),
     text("app/components/EnglishLearningView.tsx"),
@@ -720,7 +722,8 @@ test("supports legacy Word, batch imports, timeouts, and opt-in AI answer recogn
   assert.match(medicalAiImport, /C 型题的 A\/B 是两条来源陈述/);
   assert.match(page, /西综 306 标准化工作台/);
   assert.match(page, /本地确定性识别/);
-  assert.match(page, /AI 标准化超过了网页网关的等待时间/);
+  assert.match(page, /下载源 JSON 给 AI/);
+  assert.doesNotMatch(page, /fetch\("\/api\/import-ai"/);
   assert.match(page, /固定 165 题 \/ 300 分结构/);
   assert.match(aiImportRoute, /Promise\.allSettled/);
   assert.match(aiImportRoute, /480_000/);
@@ -1080,7 +1083,7 @@ test("syncs imported libraries and practice records with system theme and iPad-s
   assert.match(page, /matchMedia\("\(prefers-color-scheme: dark\)"\)/);
   assert.match(page, /themeMode: "system"/);
   assert.match(route, /"questionBanks", "englishTests", "englishPractice"/);
-  assert.match(route, /12_000_000/);
+  assert.match(route, /24_000_000/);
   assert.match(localBank, /exportQuestionBankSyncBundle/);
   assert.match(localBank, /mergeQuestionBankSyncBundle/);
   assert.match(englishStore, /exportEnglishTestSyncBundle/);
@@ -1091,6 +1094,40 @@ test("syncs imported libraries and practice records with system theme and iPad-s
   assert.match(styles, /\.annotation-layer\.active\{touch-action:pan-y pinch-zoom/);
   assert.match(styles, /\.top-actions \.profile\{display:grid!important/);
   assert.match(styles, /\.english-product\.dark/);
+});
+
+test("keeps published Pavilion snapshots when a private bank is deleted", async () => {
+  const [page, localBank, pavilionRoute, documentWorkbench, aiSource] = await Promise.all([
+    text("app/page.tsx"),
+    text("app/lib/local-bank.ts"),
+    text("app/api/pavilion/route.ts"),
+    text("app/components/DocumentImportWorkbench.tsx"),
+    text("app/lib/ai-source-export.ts"),
+  ]);
+  const privateDelete = localBank.slice(localBank.indexOf("export async function deleteQuestionBank"), localBank.indexOf("export async function clearActiveBank"));
+  assert.match(privateDelete, /store\.delete\(bankKey\(id\)\)/);
+  assert.doesNotMatch(privateDelete, /PAVILION_KEY_PREFIX|\/api\/pavilion/);
+  assert.match(pavilionRoute, /payload JSONB NOT NULL/);
+  assert.match(pavilionRoute, /JSON\.stringify\(payload\)/);
+  assert.match(pavilionRoute, /DELETE FROM pavilion_question_banks WHERE id = \$1 AND user_id = \$2/);
+  assert.match(page, /藏经阁已发布的公开副本保持独立/);
+  assert.match(documentWorkbench, /questions\.slice\(0, 3\)/);
+  assert.match(documentWorkbench, /downloadAiSourcePackage/);
+  assert.match(documentWorkbench, /AI_SOURCE_CONVERSION_PROMPT/);
+  assert.match(page, /复制提示词/);
+  assert.match(aiSource, /hongdou-question-bank/);
+});
+
+test("exports an external-AI source package without pretending it is already an importable bank", async () => {
+  const source = await text("app/lib/ai-source-export.ts");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { createAiSourcePackage } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const packageData = createAiSourcePackage("习题.docx", "1. 题干\nA. 甲\nB. 乙");
+  assert.equal(packageData.format, "elapse-ai-source");
+  assert.equal(packageData.outputTemplate.format, "hongdou-question-bank");
+  assert.equal(packageData.outputTemplate.bank.name, "习题");
+  assert.equal(packageData.extractedText, "1. 题干\nA. 甲\nB. 乙");
+  assert.deepEqual(packageData.outputTemplate.bank.questions[0].answer, []);
 });
 
 test("keeps sync quiet and gives iPhone separate answer confirmation, next navigation, and drawer closing", async () => {

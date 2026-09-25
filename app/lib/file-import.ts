@@ -38,7 +38,7 @@ export class QuestionRecognitionError extends Error {
   readonly extractedText: string;
 
   constructor(fileName: string, extractedText: string) {
-    super("普通识别没有找到完整题目与答案，可以尝试用 AI 快速整理答案区");
+    super("未识别出完整题目；请导出提取文字 JSON，交给 AI 整理为红豆题库 JSON 后重新导入");
     this.name = "QuestionRecognitionError";
     this.fileName = fileName;
     this.extractedText = extractedText;
