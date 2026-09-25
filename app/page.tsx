@@ -46,6 +46,12 @@ import { collectNoteExportSections, printNotePdf } from "./lib/note-pdf-export";
 type Progress = Record<string, "correct" | "wrong">;
 type Scope = "all" | "unanswered" | "wrong" | "favorite";
 type QuestionTypeScope = "single" | "all";
+// Older imported banks can carry an X label while their `multiple` flag is false.
+function isXQuestion(question: QuizQuestion): boolean {
+  const type = String(question.questionType ?? "").trim().toUpperCase();
+  return question.multiple || type === "X" || type === "多" || type === "多选"
+    || question.medicalQuestionType === "X" || question.answer.length > 1;
+}
 type Western306SubjectScope = "all" | Western306Subject;
 type ThemeMode = "system" | "light" | "dark";
 type StudyMode = "standard" | "blind" | "memorize";
@@ -570,13 +576,13 @@ export default function HomePage() {
     ]),
   ]) as Record<Western306SubjectScope, number>, [questions]);
   const typeCounts = useMemo(() => ({
-    single: subjectFilteredQuestions.filter((question) => !question.multiple).length,
-    multiple: subjectFilteredQuestions.filter((question) => question.multiple).length,
+    single: subjectFilteredQuestions.filter((question) => !isXQuestion(question)).length,
+    multiple: subjectFilteredQuestions.filter(isXQuestion).length,
     all: subjectFilteredQuestions.length,
   }), [subjectFilteredQuestions]);
   const scopeCounts = useMemo(() => {
     const availableSubjectQuestions = subjectFilteredQuestions.filter((question) => !killedIds.has(question.id));
-    const typedQuestions = settings.questionTypes === "single" ? availableSubjectQuestions.filter((question) => !question.multiple) : availableSubjectQuestions;
+    const typedQuestions = settings.questionTypes === "single" ? availableSubjectQuestions.filter((question) => !isXQuestion(question)) : availableSubjectQuestions;
     return {
       all: typedQuestions.length,
       unanswered: typedQuestions.filter((question) => !progress[question.id]).length,
@@ -817,7 +823,7 @@ export default function HomePage() {
       : sourceQuestions;
     let pool = subjectQuestions.filter((question) => {
       if (killedIds.has(question.id)) return false;
-      if (active.questionTypes === "single" && question.multiple) return false;
+      if (active.questionTypes === "single" && isXQuestion(question)) return false;
       if (active.scope === "unanswered") return !progress[question.id];
       if (active.scope === "wrong") return progress[question.id] === "wrong";
       if (active.scope === "favorite") return favorites.includes(question.id);

@@ -652,7 +652,8 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /分享之前，请先确认版权与隐私边界/);
   assert.match(page, /仅做单选/);
   assert.match(page, /单选＋X 型/);
-  assert.match(page, /active\.questionTypes === "single" && question\.multiple/);
+  assert.match(page, /active\.questionTypes === "single" && isXQuestion\(question\)/);
+  assert.match(page, /question\.medicalQuestionType === "X"/);
   assert.match(page, /multiple accept="\.doc,\.docx,\.pdf,\.json,application\/msword,application\/json"/);
   assert.match(page, /function AiImportFallbackModal/);
   assert.match(page, /答对后 0\.7 秒进入下一题/);
