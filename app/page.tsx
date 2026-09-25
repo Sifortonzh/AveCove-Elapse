@@ -2037,6 +2037,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
       if (sortMode === "custom") return (bankRank.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (bankRank.get(right.id) ?? Number.MAX_SAFE_INTEGER);
       if (sortMode === "imported-asc") return left.importedAt.localeCompare(right.importedAt);
       if (sortMode === "name-asc") return left.name.localeCompare(right.name, "zh-CN");
+      if (sortMode === "name-desc") return right.name.localeCompare(left.name, "zh-CN");
       return right.importedAt.localeCompare(left.importedAt);
     });
     return [...groups.entries()]
@@ -2054,7 +2055,8 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
       return filteredBanks.filter((bank) => bank.featured).sort((left, right) => sortMode === "custom"
         ? (rank.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(right.id) ?? Number.MAX_SAFE_INTEGER)
         : sortMode === "imported-asc" ? left.importedAt.localeCompare(right.importedAt)
-          : sortMode === "name-asc" ? left.name.localeCompare(right.name, "zh-CN") : right.importedAt.localeCompare(left.importedAt));
+          : sortMode === "name-asc" ? left.name.localeCompare(right.name, "zh-CN")
+            : sortMode === "name-desc" ? right.name.localeCompare(left.name, "zh-CN") : right.importedAt.localeCompare(left.importedAt));
     },
     [bankOrder, filteredBanks, sortMode],
   );
@@ -2165,7 +2167,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
     <header className="bank-page-header"><button className="icon-button" onClick={onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><button className="request-bank-action" onClick={onRequests}><Library size={17} />藏经阁</button><button className="primary-action" onClick={onImport}><Import size={17} />导入题库</button></header>
     <main>
       <label className="bank-global-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库名称、分组、简介或来源" /><span>{keyword ? `${filteredBanks.length} 份题库` : "搜索全部题库"}</span></label>
-      <section className="bank-library-section"><div className="bank-section-title compact"><div><span>LOCAL COLLECTION</span><h2>{keyword ? "题库搜索结果" : "全部题库"} <em>{keyword ? `${filteredBanks.length}/${banks.length}` : banks.length}</em></h2></div><div className="bank-section-controls">{keyword && <button className="bank-search-clear" onClick={() => setQuery("")}><X size={16} />清除搜索</button>}<div className="bank-sort-control"><label htmlFor="bank-sort-mode">题库排序</label><select id="bank-sort-mode" value={sortMode} onChange={(event) => changeSortMode(event.target.value as QuestionBankSortMode)}><option value="imported-desc">最近导入</option><option value="imported-asc">最早导入</option><option value="name-asc">名称排序</option><option value="custom">自定义排序</option></select></div></div></div>{filteredBanks.length ? <div className="bank-library-content"><section className="featured-bank-section" aria-labelledby="featured-bank-title"><header><div><span className="featured-bank-mark"><Sparkles /></span><span><small>CURATED PAPERS</small><h2 id="featured-bank-title">精选试卷</h2><p>把近期重点、经典真题或高频复习卷固定在这里，可直接切换使用。</p></span></div><em>{featuredBanks.length} 份精选</em></header>{featuredBanks.length ? <div className="featured-bank-grid">{featuredBanks.map((bank) => {
+      <section className="bank-library-section"><div className="bank-section-title compact"><div><span>LOCAL COLLECTION</span><h2>{keyword ? "题库搜索结果" : "全部题库"} <em>{keyword ? `${filteredBanks.length}/${banks.length}` : banks.length}</em></h2></div><div className="bank-section-controls">{keyword && <button className="bank-search-clear" onClick={() => setQuery("")}><X size={16} />清除搜索</button>}<div className="bank-sort-control"><label htmlFor="bank-sort-mode">题库排序</label><select id="bank-sort-mode" value={sortMode} onChange={(event) => changeSortMode(event.target.value as QuestionBankSortMode)}><option value="imported-desc">最近导入</option><option value="imported-asc">最早导入</option><option value="name-asc">名称 A-Z</option><option value="name-desc">名称 Z-A</option><option value="custom">自定义排序</option></select></div></div></div>{filteredBanks.length ? <div className="bank-library-content"><section className="featured-bank-section" aria-labelledby="featured-bank-title"><header><div><span className="featured-bank-mark"><Sparkles /></span><span><small>CURATED PAPERS</small><h2 id="featured-bank-title">精选试卷</h2><p>把近期重点、经典真题或高频复习卷固定在这里，可直接切换使用。</p></span></div><em>{featuredBanks.length} 份精选</em></header>{featuredBanks.length ? <div className="featured-bank-grid">{featuredBanks.map((bank) => {
         const completed = bank.questions.filter((question) => Boolean(progress[question.id])).length;
         const completion = bank.questions.length ? (completed / bank.questions.length) * 100 : 0;
         const completionLabel = completion.toFixed(2);

@@ -115,7 +115,7 @@ export type QuestionBankSyncBundle = {
   preferencesUpdatedAt?: string;
 };
 
-export type QuestionBankSortMode = "custom" | "imported-desc" | "imported-asc" | "name-asc";
+export type QuestionBankSortMode = "custom" | "imported-desc" | "imported-asc" | "name-asc" | "name-desc";
 
 const DB_NAME = "hongdou-local-data";
 const STORE_NAME = "question-banks";
@@ -235,7 +235,7 @@ function normalizeBankOrder(value: unknown): string[] {
 }
 
 function normalizeSortMode(value: unknown): QuestionBankSortMode {
-  return value === "custom" || value === "imported-asc" || value === "name-asc" ? value : "imported-desc";
+  return value === "custom" || value === "imported-asc" || value === "name-asc" || value === "name-desc" ? value : "imported-desc";
 }
 
 function normalizeDeletedBanks(value: unknown): Record<string, string> {

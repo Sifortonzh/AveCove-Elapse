@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.3.1.** The Western Medicine 306 workbench accepts Hongdou JSON as the source paper. Small updates use a four-part release tag; the npm package remains at its compatible three-part version.
+> **Current release: v2.3.3.2.** The Western Medicine 306 workbench accepts Hongdou JSON as the source paper. Small updates use a four-part release tag; the npm package remains at its compatible three-part version.
 
 ## Product map
 
