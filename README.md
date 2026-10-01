@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.3.3.** Answer feedback now appears immediately, while growing local practice records use IndexedDB instead of the small `localStorage` quota. Small updates use a four-part release tag; the npm package remains at its compatible three-part version.
+> **Current release: v2.3.3.4.** Imported question and option images display during practice, with responsive sizing and click-to-enlarge viewing. Embedded images remain portable when banks are edited, exported, shared, or synchronized.
+
+Question images can be embedded as `sourceImages: [{ "name": "figure.png", "dataUrl": "data:image/png;base64,..." }]`. The same field is supported on options; `images` is an alias. `sharedStemImages` and `explanationImages` attach images to shared cases and explanations. HTTPS image URLs are also supported. Embedded data URLs are recommended for portable, offline-ready banks.
 
 ## Product map
 

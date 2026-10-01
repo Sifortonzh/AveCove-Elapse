@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.3.3.3。** 确认答案后立即显示正误；持续增长的本地刷题记录改存 IndexedDB，不再受 `localStorage` 小容量限制。小更新采用四段式发布标签，npm 包版本仍保留兼容的三段式。
+> **当前版本：v2.3.3.4。** 刷题支持显示题干、选项的图片，适配屏幕并可点击放大。编辑、导出、分享与同步题库时会保留内嵌图片。
+
+题目图片可写为 `sourceImages: [{ "name": "figure.png", "dataUrl": "data:image/png;base64,..." }]`；选项也支持同样的字段，`images` 为兼容别名。共用题干与解析的图片分别使用 `sharedStemImages`、`explanationImages`。同时支持 HTTPS 图片链接；为方便离线查看和分享，建议优先使用内嵌图片。
 
 ## 产品地图
 

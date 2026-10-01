@@ -5,6 +5,27 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("question images keep portable sources through the real importer and share exporter", async () => {
+  const compile = (source) => `data:text/javascript;base64,${Buffer.from(ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  }).outputText).toString("base64")}`;
+  const groupingUrl = compile(await text("app/lib/bank-grouping.ts"));
+  const bankSource = (await text("app/lib/local-bank.ts")).replace(/from "\.\/bank-grouping"/g, `from "${groupingUrl}"`);
+  const { parseSharedQuestionBankPackage, createSharedQuestionBankPackage } = await import(compile(bankSource));
+  const { normalizeQuestionImages } = await import(compile(await text("app/lib/question-images.ts")));
+  const image = { name: "image1.png", dataUrl: "data:image/png;base64,iVBORw0KGgo=", caption: "示意图" };
+  const question = { id: "image-question", sourceNumber: "47", category: "妇产科", stem: "如图，选择正确答案", sourceImages: [image],
+    options: [{ label: "A", text: "图 A", sourceImages: [image] }, { label: "B", text: "图 B" }], answer: ["A"], multiple: false };
+  const input = parseSharedQuestionBankPackage({ format: "hongdou-question-bank", version: 1, bank: { name: "含图题库", questions: [question] } });
+  const exported = createSharedQuestionBankPackage({ ...input, id: "bank", updatedAt: new Date().toISOString() });
+  assert.deepEqual(exported.bank.questions[0].sourceImages, [image]);
+  assert.deepEqual(exported.bank.questions[0].options[0].sourceImages, [image]);
+  assert.equal(normalizeQuestionImages([image], [image]).length, 1);
+  assert.equal(normalizeQuestionImages([{ url: "https://example.org/figure.png" }]).length, 1);
+  assert.equal(normalizeQuestionImages([{ url: "javascript:alert(1)" }, { dataUrl: "data:text/html;base64,AAAA" }, { url: "file:///private/image.png" }]).length, 0);
+  assert.equal(normalizeQuestionImages([null, "image.png", { url: 42 }]).length, 0);
+});
+
 async function text(path) {
   return readFile(new URL(path, root), "utf8");
 }

@@ -1,4 +1,5 @@
-export type QuizOption = { label: string; text: string };
+export type QuizImage = { name?: string; dataUrl?: string; url?: string; src?: string; alt?: string; caption?: string };
+export type QuizOption = { label: string; text: string; sourceImages?: QuizImage[]; images?: QuizImage[] };
 export type Western306Format = "modern-165" | "legacy-c-type" | "unknown-306";
 export type MedicalQuestionType = "A1" | "A2" | "A3" | "A4" | "B1" | "C" | "X";
 export type QuizQuestion = {
@@ -23,6 +24,12 @@ export type QuizQuestion = {
   explanation?: string;
   explanationSource?: string;
   answerSource?: string;
+  sourceImages?: QuizImage[];
+  images?: QuizImage[];
+  sharedStemImages?: QuizImage[];
+  explanationImages?: QuizImage[];
+  imagePending?: boolean;
+  imageSourceMissing?: boolean;
 };
 
 const normalizeLabel = (value: string) => value.toUpperCase().replace(/[ＡＢＣＤＥＦＧ]/g, (letter) => "ABCDEFG"["ＡＢＣＤＥＦＧ".indexOf(letter)]);
