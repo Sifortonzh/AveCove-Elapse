@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.3.4.** Imported question and option images display during practice, with responsive sizing and click-to-enlarge viewing. Embedded images remain portable when banks are edited, exported, shared, or synchronized.
+> **Current release: v2.3.3.5.** Compact question numbers save tablet space (for example, `147` or `04-117`) without changing source data or scoring. Opening the library automatically reveals and locates the active question bank, including inside a collapsed group.
 
 Question images can be embedded as `sourceImages: [{ "name": "figure.png", "dataUrl": "data:image/png;base64,..." }]`. The same field is supported on options; `images` is an alias. `sharedStemImages` and `explanationImages` attach images to shared cases and explanations. HTTPS image URLs are also supported. Embedded data URLs are recommended for portable, offline-ready banks.
 

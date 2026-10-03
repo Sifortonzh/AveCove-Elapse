@@ -41,6 +41,7 @@ import {
 import { suggestQuestionBankGroup } from "./lib/bank-grouping";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
+import { compactQuestionNumbers } from "./lib/question-number";
 import { deleteQuestionAndRenumber, insertQuestionAfter } from "./lib/question-edit";
 import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
 import { hasOptionAnnotation, noteImageMarkdown } from "./lib/note-annotations";
@@ -1992,6 +1993,9 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
   const [groupVisibleLimit, setGroupVisibleLimit] = useState(6);
   const [draggedGroup, setDraggedGroup] = useState<string | null>(null);
   const [locatedBankId, setLocatedBankId] = useState<string | null>(null);
+  const [libraryReady, setLibraryReady] = useState(false);
+  const autoLocatedBank = useRef<string | null>(null);
+  const libraryRoot = useRef<HTMLDivElement>(null);
   const keyword = query.trim();
   const filteredBanks = useMemo(() => {
     const terms = getSearchTerms(query);
@@ -2018,11 +2022,31 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
       setGroupOrder(nextGroupOrder);
       setBankOrder(nextBankOrder);
       setSortMode(savedSortMode);
+      setLibraryReady(true);
       if (JSON.stringify(nextGroupOrder) !== JSON.stringify(savedGroupOrder)) void saveQuestionBankGroupOrder(nextGroupOrder);
       if (JSON.stringify(nextBankOrder) !== JSON.stringify(savedBankOrder)) void saveQuestionBankOrder(nextBankOrder);
     });
     return () => { active = false; };
   }, [availableBankIds, availableGroupNames]);
+
+  useEffect(() => {
+    if (!libraryReady || !activeBankId || autoLocatedBank.current === activeBankId) return;
+    const bank = banks.find((entry) => entry.id === activeBankId);
+    if (!bank) return;
+    const groupName = bank.groupName || UNGROUPED_BANKS;
+    let scrollFrame = 0;
+    let timeout = 0;
+    const frame = window.requestAnimationFrame(() => {
+      setExpandedGroups((names) => names.includes(groupName) ? names : [...names, groupName]);
+      setLocatedBankId(bank.id);
+      autoLocatedBank.current = bank.id;
+      scrollFrame = window.requestAnimationFrame(() => {
+        libraryRoot.current?.querySelector<HTMLElement>(`[data-bank-id="${CSS.escape(bank.id)}"]`)?.scrollIntoView({ block: "center", behavior: "instant" });
+      });
+      timeout = window.setTimeout(() => setLocatedBankId((id) => id === bank.id ? null : id), 2_200);
+    });
+    return () => { window.cancelAnimationFrame(frame); window.cancelAnimationFrame(scrollFrame); window.clearTimeout(timeout); };
+  }, [activeBankId, banks, libraryReady]);
 
   useEffect(() => {
     const updateLimit = () => setGroupVisibleLimit(window.matchMedia("(max-width: 700px)").matches ? 3 : window.matchMedia("(max-width: 1100px)").matches ? 4 : 6);
@@ -2169,7 +2193,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, onH
     if (sections.length) printNotePdf(bank.name, sections, notes);
   }
 
-  return <div className="bank-page">
+  return <div className="bank-page" ref={libraryRoot}>
     <header className="bank-page-header"><button className="icon-button" onClick={onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><button className="request-bank-action" onClick={onRequests}><Library size={17} />藏经阁</button><button className="primary-action" onClick={onImport}><Import size={17} />导入题库</button></header>
     <main>
       <label className="bank-global-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库名称、分组、简介或来源" /><span>{keyword ? `${filteredBanks.length} 份题库` : "搜索全部题库"}</span></label>
@@ -2602,6 +2626,8 @@ function QuizView(props: {
   const [deleteError, setDeleteError] = useState("");
   const [showChapters, setShowChapters] = useState(false);
   const { current, total, selected, excluded, submitted, studyMode, result, favorite, favoriteStars, note, aiMode, aiTexts, aiLoading, examScore } = props;
+  const questionNumbers = useMemo(() => compactQuestionNumbers(props.bankQuestions, props.bankName), [props.bankQuestions, props.bankName]);
+  const currentNumber = questionNumbers.get(current.id);
   const progress = Math.min(100, (props.completed / Math.max(total, 1)) * 100);
   const progressLabel = progress.toFixed(2);
   const answerAvailable = current.answer.length > 0;
@@ -2631,7 +2657,7 @@ function QuizView(props: {
     <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b title={`已完成 ${props.completed}/${total} · 学习进度 ${progressLabel}% · 正确率 ${props.accuracy.toFixed(2)}%`}>进度 {progressLabel}% · 正确率 {props.accuracy.toFixed(2)}% · 已完成 {props.completed}/{total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
-        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span>原题号 {current.sourceNumber}{current.points ? ` · ${current.points} 分` : ""}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题" aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题" aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} title="纠错编辑" aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} title="搜索题目" aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题" aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? `精选 ★${favoriteStars}` : "精选"}</button></div></div>
+        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span className="question-number" title={currentNumber?.details ?? `原题号 ${current.sourceNumber}`} aria-label={currentNumber?.details ?? `原题号 ${current.sourceNumber}`}>{currentNumber?.label ?? current.sourceNumber}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题" aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题" aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} title="纠错编辑" aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} title="搜索题目" aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => setShowKillQuestions(true)} title="跳过本题或按原题号批量斩题" aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? `精选 ★${favoriteStars}` : "精选"}</button></div></div>
         {props.killed && <div className="killed-question-banner"><Scissors size={18} /><div><strong>本题已斩</strong><span>会被后续练习跳过，不计入正确率；可随时恢复。</span></div><button onClick={() => props.onUpdateKilled([current.id], false)}>恢复本题</button></div>}
         {current.sharedStem && <section className="shared-medical-stem"><span>{current.medicalQuestionType === "A4" ? "递进病例" : "共用题干"}</span><p><MathText text={current.sharedStem} /></p><QuestionImages images={current.sharedStemImages} label="共用题干图片" /></section>}
         {props.relatedQuestions.length > 1 && <section className="linked-question-group"><header><div><strong>同组题目</strong><span>{props.relatedQuestions.length} 题共用{current.medicalQuestionType === "B1" ? "备选答案" : "题干"}，可直接切换</span></div></header><div>{props.relatedQuestions.map((question) => <button key={question.id} className={`${question.id === current.id ? "active" : ""} ${props.relatedProgress[question.id] ?? ""}`} onClick={() => props.onOpenRelated(question.id)}><b>{question.sourceNumber}</b><span>{question.stem}</span>{props.relatedProgress[question.id] === "correct" ? <Check size={14} /> : props.relatedProgress[question.id] === "wrong" ? <X size={14} /> : null}</button>)}</div></section>}

@@ -5,6 +5,29 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("compact question labels preserve source data and distinguish merged exam years", async () => {
+  const output = ts.transpileModule(await text("app/lib/question-number.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { compactQuestionNumbers } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const questions = [
+    { id: "plain", sourceNumber: "147", points: 2, examProfile: "western-medicine-306" },
+    { id: "04", sourceNumber: "04年考题-117" },
+    { id: "05", sourceNumber: "2005年考题：第117题" },
+    { id: "a", sourceNumber: "文件甲-12" },
+    { id: "b", sourceNumber: "文件乙-12" },
+    { id: "added", sourceNumber: "147+1" },
+  ];
+  const original = structuredClone(questions);
+  const labels = compactQuestionNumbers(questions, "2025年306真题");
+  assert.equal(labels.get("plain").label, "147");
+  assert.match(labels.get("plain").details, /2 分/);
+  assert.equal(labels.get("04").label, "04-117");
+  assert.equal(labels.get("05").label, "05-117");
+  assert.notEqual(labels.get("a").label, labels.get("b").label);
+  assert.equal(labels.get("added").label, "147+1");
+  assert.equal(compactQuestionNumbers([{ id: "bank-year", sourceNumber: "117" }], "04年考题").get("bank-year").label, "04-117");
+  assert.deepEqual(questions, original);
+});
+
 test("question images keep portable sources through the real importer and share exporter", async () => {
   const compile = (source) => `data:text/javascript;base64,${Buffer.from(ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
