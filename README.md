@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.3.5.** Compact question numbers save tablet space (for example, `147` or `04-117`) without changing source data or scoring. Opening the library automatically reveals and locates the active question bank, including inside a collapsed group.
+> **Current release: v2.3.3.6.** Lossless gzip sync supports up to 96 MB of decoded account data within a 24 MB transfer envelope. Uploads and downloads are compressed, oversized merges never overwrite the existing cloud snapshot, and sync messages wrap in a readable status card with a details action. Older uncompressed clients remain supported below the transfer limit.
+
+These are request/snapshot safety limits, not device RAM or purchased storage quotas. Large embedded images may still exceed the compressed transfer limit. Bank-level incremental sync and external image storage are the next scaling steps; no images or notes are deleted or downsampled automatically.
 
 Question images can be embedded as `sourceImages: [{ "name": "figure.png", "dataUrl": "data:image/png;base64,..." }]`. The same field is supported on options; `images` is an alias. `sharedStemImages` and `explanationImages` attach images to shared cases and explanations. HTTPS image URLs are also supported. Embedded data URLs are recommended for portable, offline-ready banks.
 

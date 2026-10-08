@@ -5,6 +5,28 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("lossless compressed sync accepts libraries over the old limit and bounds decompression", async () => {
+  const compile = (source) => `data:text/javascript;base64,${Buffer.from(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText).toString("base64")}`;
+  const clientUrl = compile(await text("app/lib/sync-transfer.ts"));
+  const { encodeSyncRequest } = await import(clientUrl);
+  const serverSource = (await text("app/lib/server/sync-transfer.ts")).replace('from "../sync-transfer"', `from "${clientUrl}"`);
+  const { readSyncRequest, syncJsonResponse } = await import(compile(serverSource));
+  const { gzipSync, gunzipSync } = await import("node:zlib");
+  const state = { state: { notes: { a: "说明与图片引用保持不变" }, questionBanks: { banks: [{ id: "large", text: "x".repeat(24_100_000) }] } } };
+  const transfer = await encodeSyncRequest(state);
+  assert.ok(transfer.originalBytes > 24_000_000);
+  assert.ok(transfer.transferBytes < 100_000);
+  const request = new Request("http://localhost/api/sync", { method: "PUT", headers: transfer.headers, body: transfer.body });
+  assert.deepEqual(JSON.parse(await readSyncRequest(request)), state);
+  assert.equal(await readSyncRequest(new Request("http://localhost", { method: "PUT", body: '{"state":{}}' })), '{"state":{}}');
+  await assert.rejects(readSyncRequest(new Request("http://localhost", { method: "PUT", headers: { "X-Elapse-Sync-Encoding": "gzip" }, body: new Uint8Array(gzipSync("x".repeat(4000))) }), 1000, 500), (error) => error.status === 413);
+  await assert.rejects(readSyncRequest(new Request("http://localhost", { method: "PUT", headers: { "X-Elapse-Sync-Encoding": "gzip" }, body: "bad gzip" })), (error) => error.status === 400);
+  await assert.rejects(readSyncRequest(new Request("http://localhost", { method: "PUT", body: "x".repeat(101) }), 100), (error) => error.status === 413);
+  const response = await syncJsonResponse({ ok: true, notes: "原文" }, new Request("http://localhost", { headers: { "X-Elapse-Sync-Accept": "gzip" } }));
+  assert.equal(response.headers.get("content-encoding"), "gzip");
+  assert.deepEqual(JSON.parse(gunzipSync(Buffer.from(await response.arrayBuffer())).toString()), { ok: true, notes: "原文" });
+});
+
 test("compact question labels preserve source data and distinguish merged exam years", async () => {
   const output = ts.transpileModule(await text("app/lib/question-number.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   const { compactQuestionNumbers } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
@@ -1128,7 +1150,7 @@ test("syncs imported libraries and practice records with system theme and iPad-s
   assert.match(page, /matchMedia\("\(prefers-color-scheme: dark\)"\)/);
   assert.match(page, /themeMode: "system"/);
   assert.match(route, /"questionBanks", "englishTests", "englishPractice"/);
-  assert.match(route, /24_000_000/);
+  assert.match(await text("app/lib/sync-transfer.ts"), /24_000_000/);
   assert.match(localBank, /exportQuestionBankSyncBundle/);
   assert.match(localBank, /mergeQuestionBankSyncBundle/);
   assert.match(englishStore, /exportEnglishTestSyncBundle/);
@@ -1185,7 +1207,7 @@ test("keeps sync quiet and gives iPhone separate answer confirmation, next navig
 
   assert.match(page, /syncInFlightRef/);
   assert.match(page, /if \(showMessage\) \{\s*setManualSyncing\(true\)/);
-  assert.match(page, /aria-label="立即手动同步"/);
+  assert.match(await text("app/components/SyncStatusNotice.tsx"), /aria-label="立即手动同步"/);
   assert.match(page, /mobile-submit-bar/);
   assert.match(page, /确认答案/);
   assert.match(page, /className="mobile-next"/);

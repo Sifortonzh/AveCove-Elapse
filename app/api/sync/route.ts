@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { readSession } from "@/app/lib/server/auth";
 import { query, withTransaction } from "@/app/lib/server/db";
 import { mergeLearningRecords } from "@/app/lib/record-sync";
+import { readSyncRequest, syncJsonResponse, SyncTransferError } from "@/app/lib/server/sync-transfer";
+import { MAX_SYNC_CONTENT_BYTES } from "@/app/lib/sync-transfer";
 
 type StateRow = { payload: Record<string, unknown>; version: number; updated_at: Date };
-// Keep below the documented 25 MB Nginx request limit on the public site.
-const MAX_SYNC_BYTES = 24_000_000;
+// Compressed transport stays below Nginx's 25 MB limit; decoded data is bounded.
 
 type SyncBank = { id: string; updatedAt?: string; [key: string]: unknown };
 type BankBundle = {
@@ -69,14 +70,18 @@ export async function GET(request: Request) {
   const session = readSession(request);
   if (!session) return NextResponse.json({ error: "请先登录。" }, { status: 401 });
   const rows = await query<StateRow>("SELECT payload, version, updated_at FROM learning_states WHERE user_id = $1", [session.userId]);
-  return NextResponse.json({ state: rows[0] ?? null });
+  return syncJsonResponse({ state: rows[0] ?? null }, request);
 }
 
 export async function PUT(request: Request) {
   const session = readSession(request);
   if (!session) return NextResponse.json({ error: "请先登录。" }, { status: 401 });
-  const raw = await request.text();
-  if (Buffer.byteLength(raw, "utf8") > MAX_SYNC_BYTES) return NextResponse.json({ error: "同步内容超过 24 MB，请先导出备份并联系管理员处理。" }, { status: 413 });
+  let raw: string;
+  try { raw = await readSyncRequest(request); }
+  catch (error) {
+    if (error instanceof SyncTransferError) return NextResponse.json({ error: error.message }, { status: error.status });
+    throw error;
+  }
   let body: { state?: Record<string, unknown> };
   try {
     body = JSON.parse(raw) as { state?: Record<string, unknown> };
@@ -128,14 +133,17 @@ export async function PUT(request: Request) {
       notes: records.notes,
       recordLedger: records.ledger,
     };
+    const serialized = JSON.stringify(mergedPayload);
+    if (Buffer.byteLength(serialized, "utf8") > MAX_SYNC_CONTENT_BYTES) return { capacityExceeded: true as const };
     const result = await client.query<StateRow>(
       `INSERT INTO learning_states (user_id, payload, version, updated_at)
        VALUES ($1, $2::jsonb, 1, NOW())
        ON CONFLICT (user_id) DO UPDATE SET payload = EXCLUDED.payload, version = learning_states.version + 1, updated_at = NOW()
        RETURNING payload, version, updated_at`,
-      [session.userId, JSON.stringify(mergedPayload)],
+      [session.userId, serialized],
     );
     return result.rows;
   });
-  return NextResponse.json({ ok: true, state: rows[0] });
+  if ("capacityExceeded" in rows) return NextResponse.json({ error: "合并后的云端同步数据超过 96 MB，原云端数据未覆盖；请导出备份后联系管理员扩容。" }, { status: 413 });
+  return syncJsonResponse({ ok: true, state: rows[0] }, request);
 }

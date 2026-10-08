@@ -42,6 +42,8 @@ import { suggestQuestionBankGroup } from "./lib/bank-grouping";
 import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 import { compactQuestionNumbers } from "./lib/question-number";
+import { encodeSyncRequest } from "./lib/sync-transfer";
+import SyncStatusNotice from "./components/SyncStatusNotice";
 import { deleteQuestionAndRenumber, insertQuestionAfter } from "./lib/question-edit";
 import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
 import { hasOptionAnnotation, noteImageMarkdown } from "./lib/note-annotations";
@@ -719,18 +721,19 @@ export default function HomePage() {
       setSyncStatus("正在手动同步题库与学习记录… ☁️");
     }
     try {
+      const transfer = await encodeSyncRequest({ state: await collectLearningState() });
       const response = await fetch("/api/sync", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ state: await collectLearningState() }),
+        headers: { ...transfer.headers, "X-Elapse-Sync-Accept": "gzip" },
+        body: transfer.body,
       });
       const result = await response.json().catch(() => ({})) as {
         error?: string;
         state?: { payload?: Record<string, unknown> };
       };
-      if (!response.ok) throw new Error(result.error || "sync failed");
+      if (!response.ok) throw new Error(result.error || (response.status === 413 ? "服务器拒绝了过大的同步包。本机数据仍保留，请导出备份后联系管理员。" : "sync failed"));
       if (result.state?.payload) await applyLearningState(result.state.payload);
-      setSyncStatus(`题库与记录已同步 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} ☁️`);
+      setSyncStatus(`题库与记录已同步 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} ☁️ · 数据 ${(transfer.originalBytes / 1_000_000).toFixed(1)} MB / 传输 ${(transfer.transferBytes / 1_000_000).toFixed(1)} MB`);
       if (showMessage) setToast("题库、刷题记录与英文练习已安全同步 ☁️✨");
     } catch (error) {
       setSyncStatus(error instanceof Error && error.message !== "sync failed" ? error.message : "同步暂时离线，本机记录仍已保存");
@@ -743,7 +746,7 @@ export default function HomePage() {
   async function pullRemoteState(showMessage = false) {
     if (showMessage) setSyncStatus("正在读取云端学习记录… ☁️");
     try {
-      const response = await fetch("/api/sync");
+      const response = await fetch("/api/sync", { headers: { "X-Elapse-Sync-Accept": "gzip" } });
       if (!response.ok) throw new Error("sync unavailable");
       const result = await response.json() as { state?: { payload?: Record<string, unknown> } | null };
       if (result.state?.payload && Object.keys(result.state.payload).length) await applyLearningState(result.state.payload);
@@ -1907,7 +1910,7 @@ function HomeView({ bankName, questions, answered, wrong, noteCount, accuracy, p
         <button onClick={() => onPractice({ scope: "favorite" })}><Star size={19} />精选题</button>
         <button onClick={onNotes}><NotebookPen size={19} />我的笔记{noteCount > 0 && <em>{noteCount}</em>}</button>
       </nav>
-      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <div className="sync-caption-row"><small className="sync-caption">{syncStatus}</small><button className="sync-now" aria-label="立即手动同步" title="立即手动同步" onClick={onSync} disabled={syncing}><RefreshCw className={syncing ? "spinning" : ""} /></button></div>}<button className="import-entry" aria-label="导入题库" onClick={onImport}><Import size={18} /><span>导入题库</span></button><a className="custom-ai-entry" aria-label="自定义 AI" href="/custom-ai"><Bot size={17} /><span>自定义AI</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button><p>本地优先 · 无广告<br />.docx / PDF 本机处理 · 旧 .doc 仅内存转换</p></div>
+      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <SyncStatusNotice status={syncStatus} syncing={syncing} onSync={onSync} onDetails={onAccount} />}<button className="import-entry" aria-label="导入题库" onClick={onImport}><Import size={18} /><span>导入题库</span></button><a className="custom-ai-entry" aria-label="自定义 AI" href="/custom-ai"><Bot size={17} /><span>自定义AI</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button><p>本地优先 · 无广告<br />.docx / PDF 本机处理 · 旧 .doc 仅内存转换</p></div>
     </aside>
     <section className="home-main">
       <header className="home-topbar"><div className="home-quote"><p><Sparkles size={13} />{quote.lead}</p><h1>{quote.title}</h1></div><div className="top-actions"><button className="english-learning-toggle" aria-label="English Learning" onClick={onEnglish}><Languages size={17} /><span>English Learning</span></button><button aria-label="搜索题目" onClick={onSearch}><Search size={19} /></button><button aria-label="切换主题" onClick={onToggleTheme}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><button className="profile" onClick={onAccount} aria-label="同步身份">{(nickname.trim()[0] || "红").toUpperCase()}</button></div></header>
@@ -3211,7 +3214,7 @@ function AccountModal({ account, syncStatus, nickname: initialNickname, onClose,
     }
   }
 
-  return <div className="modal-layer account-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose} aria-label="关闭同步窗口"><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><div className="sync-coverage"><span><Database />已导入中文题库</span><span><BookOpen />英文 Test Library</span><span><CheckCircle2 />答题记录与写作草稿</span><span><NotebookPen />收藏、错题与笔记</span></div><p className="sync-privacy-copy">原始 Word、PDF 与图片不会上传；同步的是浏览器解析后的题库内容和学习记录。请只同步你有权使用的资料。</p><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。登录后可同步解析后的中英文题库与学习记录；原始文件仍只留在你的设备。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📚 同步题库与记录</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
+  return <div className="modal-layer account-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose} aria-label="关闭同步窗口"><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><div className="sync-coverage"><span><Database />已导入中文题库</span><span><BookOpen />英文 Test Library</span><span><CheckCircle2 />答题记录与写作草稿</span><span><NotebookPen />收藏、错题与笔记</span></div><p className="sync-privacy-copy">原始 Word、PDF 不会上传；解析后的题库、内嵌题图、笔记图片和学习记录会压缩同步。请只同步你有权使用的资料。</p><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。登录后可同步解析后的中英文题库与学习记录；原始文件仍只留在你的设备。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📚 同步题库与记录</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
 }
 
 function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: SavedQuestionBank[]; returnToQuiz?: boolean; onOpen: (bank: SavedQuestionBank, id: string) => Promise<void> | void; onClose: () => void }) {
