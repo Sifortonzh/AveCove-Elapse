@@ -5,6 +5,24 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("incremental sync sends only missing or newer banks without modifying source data", async () => {
+  const source = ts.transpileModule(await text("app/lib/sync-revisions.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { bankRevisions, banksNeedingTransfer } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+  const banks = [{ id: "same", updatedAt: "2026-10-01", questions: ["original"] }, { id: "edit", updatedAt: "2026-10-09" }, { id: "missing", updatedAt: "2026-09-01" }, { id: "older", updatedAt: "2026-09-01" }];
+  const snapshot = structuredClone(banks);
+  const known = { same: "2026-10-01", edit: "2026-10-08", older: "2026-10-02" };
+  assert.deepEqual(banksNeedingTransfer(banks, known).map((bank) => bank.id), ["edit", "missing"]);
+  assert.equal(bankRevisions(banks).same, "2026-10-01");
+  assert.deepEqual(banks, snapshot);
+  assert.deepEqual(banksNeedingTransfer([{ id: "legacy" }], {}), [{ id: "legacy" }]);
+  const route = await text("app/api/sync/route.ts");
+  assert.doesNotMatch(route, /RETURNING payload/);
+  assert.match(route, /SET LOCAL lock_timeout/);
+  assert.match(route, /COMPACT_SYNC_PAYLOAD_SQL/);
+  assert.match(route, /favoriteStars: records.favoriteStars/);
+  assert.match(route, /killedQuestions: records.killed/);
+});
+
 test("lossless compressed sync accepts libraries over the old limit and bounds decompression", async () => {
   const compile = (source) => `data:text/javascript;base64,${Buffer.from(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText).toString("base64")}`;
   const clientUrl = compile(await text("app/lib/sync-transfer.ts"));

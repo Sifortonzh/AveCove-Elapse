@@ -43,6 +43,7 @@ import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 import { compactQuestionNumbers } from "./lib/question-number";
 import { encodeSyncRequest } from "./lib/sync-transfer";
+import { bankRevisions, banksNeedingTransfer } from "./lib/sync-revisions";
 import SyncStatusNotice from "./components/SyncStatusNotice";
 import { deleteQuestionAndRenumber, insertQuestionAfter } from "./lib/question-edit";
 import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
@@ -381,10 +382,17 @@ export default function HomePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const importAbortRef = useRef<AbortController | null>(null);
   const syncInFlightRef = useRef(false);
+  const syncQueuedRef = useRef(false);
+  const syncedBankRevisionsRef = useRef<Record<string, string>>({});
+  const latestRecordsRef = useRef<LearningRecordsInput>({});
   const shareImportCheckedRef = useRef(false);
   const bankReplacementResolverRef = useRef<((choice: BankReplacementChoice) => void) | null>(null);
 
   useEffect(() => () => importAbortRef.current?.abort(), []);
+
+  useEffect(() => {
+    latestRecordsRef.current = { progress, firstProgress, favorites, favoriteStars, notes, killed: killedQuestions, ledger: recordLedger };
+  }, [progress, firstProgress, favorites, favoriteStars, notes, killedQuestions, recordLedger]);
 
   useEffect(() => {
     let active = true;
@@ -654,6 +662,7 @@ export default function HomePage() {
 
   function persistLearningRecords(records: Parameters<typeof normalizeLearningRecords>[0]) {
     const normalized = normalizeLearningRecords(records);
+    latestRecordsRef.current = normalized;
     setProgress(normalized.progress);
     setFirstProgress(normalized.firstProgress);
     setFavorites(normalized.favorites);
@@ -690,7 +699,9 @@ export default function HomePage() {
   }
 
   async function applyLearningState(state: Record<string, unknown>) {
-    const localRecords = normalizeLearningRecords({ progress, firstProgress, favorites, favoriteStars, notes, killed: killedQuestions, ledger: recordLedger });
+    // A bank download can take time. Merge against the latest answers/notes,
+    // not the render that started the request, so studying during sync is safe.
+    const localRecords = normalizeLearningRecords(latestRecordsRef.current);
     const mergedRecords = mergeLearningRecords(
       localRecords,
       { progress: state.progress, firstProgress: state.firstProgress, favorites: state.favorites, favoriteStars: state.favoriteStars, notes: state.notes, killed: state.killedQuestions, ledger: state.recordLedger },
@@ -710,8 +721,26 @@ export default function HomePage() {
     if (state.questionBanks) await refreshLocalQuestionBanks();
   }
 
+  async function applyRemoteSyncState(state: Record<string, unknown>) {
+    const bundle = state.questionBanks as { banks?: SavedQuestionBank[] } | undefined;
+    const revisions = bundle?.banks ?? [];
+    const local = bankRevisions(await listQuestionBanks());
+    const changed: SavedQuestionBank[] = [];
+    for (const revision of banksNeedingTransfer(revisions, local)) {
+      const response = await fetch(`/api/sync?bank=${encodeURIComponent(revision.id)}`, {
+        headers: { "X-Elapse-Sync-Accept": "gzip", "X-Elapse-Sync-Protocol": "2" }, signal: AbortSignal.timeout(90_000),
+      });
+      if (!response.ok) throw new Error(`读取云端题库失败（HTTP ${response.status}），本机数据保留，请重试。`);
+      const result = await response.json() as { bank?: SavedQuestionBank | null };
+      if (result.bank) changed.push(result.bank);
+    }
+    await applyLearningState({ ...state, questionBanks: bundle ? { ...bundle, banks: changed } : undefined });
+    syncedBankRevisionsRef.current = bankRevisions(revisions);
+  }
+
   async function pushRemoteState(showMessage = false) {
     if (syncInFlightRef.current) {
+      syncQueuedRef.current = true;
       if (showMessage) setToast("已有一次同步正在进行，请稍候 ☁️");
       return;
     }
@@ -721,41 +750,46 @@ export default function HomePage() {
       setSyncStatus("正在手动同步题库与学习记录… ☁️");
     }
     try {
-      const transfer = await encodeSyncRequest({ state: await collectLearningState() });
+      const state = await collectLearningState();
+      state.questionBanks.banks = banksNeedingTransfer(state.questionBanks.banks, syncedBankRevisionsRef.current);
+      const transfer = await encodeSyncRequest({ state });
       const response = await fetch("/api/sync", {
         method: "PUT",
-        headers: { ...transfer.headers, "X-Elapse-Sync-Accept": "gzip" },
+        headers: { ...transfer.headers, "X-Elapse-Sync-Accept": "gzip", "X-Elapse-Sync-Protocol": "2" },
         body: transfer.body,
+        signal: AbortSignal.timeout(90_000),
       });
       const result = await response.json().catch(() => ({})) as {
         error?: string;
         state?: { payload?: Record<string, unknown> };
       };
-      if (!response.ok) throw new Error(result.error || (response.status === 413 ? "服务器拒绝了过大的同步包。本机数据仍保留，请导出备份后联系管理员。" : "sync failed"));
-      if (result.state?.payload) await applyLearningState(result.state.payload);
+      if (!response.ok) throw new Error(result.error || (response.status === 413 ? "服务器拒绝了过大的同步包。本机数据仍保留，请导出备份后联系管理员。" : `同步失败（HTTP ${response.status}），本机数据保留，请重试。`));
+      if (result.state?.payload) await applyRemoteSyncState(result.state.payload);
+      setSyncReady(true);
       setSyncStatus(`题库与记录已同步 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} ☁️ · 数据 ${(transfer.originalBytes / 1_000_000).toFixed(1)} MB / 传输 ${(transfer.transferBytes / 1_000_000).toFixed(1)} MB`);
       if (showMessage) setToast("题库、刷题记录与英文练习已安全同步 ☁️✨");
     } catch (error) {
-      setSyncStatus(error instanceof Error && error.message !== "sync failed" ? error.message : "同步暂时离线，本机记录仍已保存");
+      setSyncStatus(error instanceof Error && error.name === "TimeoutError" ? "同步等待超时，本机记录保留，请重试。" : error instanceof Error && error.message !== "sync failed" ? error.message : "同步暂时离线，本机记录仍已保存");
     } finally {
       syncInFlightRef.current = false;
       if (showMessage) setManualSyncing(false);
+      if (syncQueuedRef.current) { syncQueuedRef.current = false; setSyncRevision((value) => value + 1); }
     }
   }
 
   async function pullRemoteState(showMessage = false) {
     if (showMessage) setSyncStatus("正在读取云端学习记录… ☁️");
     try {
-      const response = await fetch("/api/sync", { headers: { "X-Elapse-Sync-Accept": "gzip" } });
-      if (!response.ok) throw new Error("sync unavailable");
+      const response = await fetch("/api/sync", { headers: { "X-Elapse-Sync-Accept": "gzip", "X-Elapse-Sync-Protocol": "2" }, signal: AbortSignal.timeout(90_000) });
+      if (!response.ok) throw new Error(`读取云端失败（HTTP ${response.status}），本机数据保留，请重试。`);
       const result = await response.json() as { state?: { payload?: Record<string, unknown> } | null };
-      if (result.state?.payload && Object.keys(result.state.payload).length) await applyLearningState(result.state.payload);
+      if (result.state?.payload && Object.keys(result.state.payload).length) await applyRemoteSyncState(result.state.payload);
       setSyncReady(true);
       setSyncStatus(result.state ? "云端记录已接入 ☁️✨" : "同步空间已创建，正在上传本机记录 ☁️");
       if (showMessage) setToast("多端学习记录已刷新 ☁️✨");
-    } catch {
+    } catch (error) {
       setSyncReady(false);
-      setSyncStatus("同步服务暂时离线，本机记录仍安全保存");
+      setSyncStatus(error instanceof Error ? error.message : "同步服务暂时离线，本机记录仍安全保存");
     }
   }
 

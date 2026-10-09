@@ -27,9 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.3.6.** Lossless gzip sync supports up to 96 MB of decoded account data within a 24 MB transfer envelope. Uploads and downloads are compressed, oversized merges never overwrite the existing cloud snapshot, and sync messages wrap in a readable status card with a details action. Older uncompressed clients remain supported below the transfer limit.
+> **Current release: v2.3.3.7.** Fixes large-library sync timeouts using bank revision manifests and incremental transfers. Unchanged bank bodies remain inside PostgreSQL instead of crossing the database and HTTP connections on every answer. Lock waits are bounded, errors include HTTP status, and local data remains intact. Limits remain 96 MB decoded / 24 MB compressed.
 
-These are request/snapshot safety limits, not device RAM or purchased storage quotas. Large embedded images may still exceed the compressed transfer limit. Bank-level incremental sync and external image storage are the next scaling steps; no images or notes are deleted or downsampled automatically.
+Initial setup and edited banks still require the corresponding bank transfer; ordinary practice sends records and revisions only. These are request/snapshot safety limits, not device RAM or purchased storage quotas. External image storage remains a future scaling option; no images or notes are deleted or downsampled automatically. Refresh older devices to enable the incremental protocol.
 
 Question images can be embedded as `sourceImages: [{ "name": "figure.png", "dataUrl": "data:image/png;base64,..." }]`. The same field is supported on options; `images` is an alias. `sharedStemImages` and `explanationImages` attach images to shared cases and explanations. HTTPS image URLs are also supported. Embedded data URLs are recommended for portable, offline-ready banks.
 

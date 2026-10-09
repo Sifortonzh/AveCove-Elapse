@@ -4,6 +4,7 @@ import { query, withTransaction } from "@/app/lib/server/db";
 import { mergeLearningRecords } from "@/app/lib/record-sync";
 import { readSyncRequest, syncJsonResponse, SyncTransferError } from "@/app/lib/server/sync-transfer";
 import { MAX_SYNC_CONTENT_BYTES } from "@/app/lib/sync-transfer";
+import { COMPACT_SYNC_PAYLOAD_SQL, RESTORE_SYNC_BANKS_SQL } from "@/app/lib/server/sync-snapshot";
 
 type StateRow = { payload: Record<string, unknown>; version: number; updated_at: Date };
 // Compressed transport stays below Nginx's 25 MB limit; decoded data is bounded.
@@ -69,7 +70,16 @@ function mergeQuestionBankBundles(currentValue: unknown, incomingValue: unknown)
 export async function GET(request: Request) {
   const session = readSession(request);
   if (!session) return NextResponse.json({ error: "请先登录。" }, { status: 401 });
-  const rows = await query<StateRow>("SELECT payload, version, updated_at FROM learning_states WHERE user_id = $1", [session.userId]);
+  const bankId = new URL(request.url).searchParams.get("bank");
+  if (bankId) {
+    if (bankId.length > 160) return NextResponse.json({ error: "题库标识无效。" }, { status: 400 });
+    const banks = await query<{ bank: unknown }>(`SELECT bank FROM learning_states,
+      LATERAL jsonb_array_elements(COALESCE(payload#>'{questionBanks,banks}', '[]'::jsonb)) bank
+      WHERE user_id = $1 AND bank->>'id' = $2 LIMIT 1`, [session.userId, bankId]);
+    return syncJsonResponse({ bank: banks[0]?.bank ?? null }, request);
+  }
+  const compact = request.headers.get("x-elapse-sync-protocol") === "2";
+  const rows = await query<StateRow>(`SELECT ${compact ? COMPACT_SYNC_PAYLOAD_SQL : "payload"} AS payload, version, updated_at FROM learning_states WHERE user_id = $1`, [session.userId]);
   return syncJsonResponse({ state: rows[0] ?? null }, request);
 }
 
@@ -94,25 +104,28 @@ export async function PUT(request: Request) {
   const englishBundle = state.englishTests as { tests?: unknown[] } | undefined;
   if (bankBundle?.banks && (!Array.isArray(bankBundle.banks) || bankBundle.banks.length > 40)) return NextResponse.json({ error: "同步题库数量超出限制。" }, { status: 400 });
   if (englishBundle?.tests && (!Array.isArray(englishBundle.tests) || englishBundle.tests.length > 80)) return NextResponse.json({ error: "英文题库数量超出限制。" }, { status: 400 });
-  const allowedKeys = ["progress", "firstProgress", "favorites", "notes", "recordLedger", "settings", "nickname", "bankName", "questionBanks", "englishTests", "englishPractice"];
+  const allowedKeys = ["progress", "firstProgress", "favorites", "favoriteStars", "killedQuestions", "notes", "recordLedger", "settings", "nickname", "bankName", "questionBanks", "englishTests", "englishPractice"];
   const allowed = Object.fromEntries(allowedKeys.filter((key) => key in state).map((key) => [key, state[key]])) as Record<string, unknown>;
+  try {
   const rows = await withTransaction(async (client) => {
+    await client.query("SET LOCAL lock_timeout = '10s'");
+    await client.query("SET LOCAL statement_timeout = '60s'");
     // Serialise writes for one learner so simultaneous iPad/Mac uploads cannot
     // both merge against the same stale snapshot and lose the other update.
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [session.userId]);
     const currentResult = await client.query<StateRow>(
-      "SELECT payload, version, updated_at FROM learning_states WHERE user_id = $1 FOR UPDATE",
+      `SELECT ${COMPACT_SYNC_PAYLOAD_SQL} AS payload, version, updated_at FROM learning_states WHERE user_id = $1 FOR UPDATE`,
       [session.userId],
     );
     const currentPayload = currentResult.rows[0]?.payload ?? {};
-    if ("questionBanks" in allowed) {
-      allowed.questionBanks = mergeQuestionBankBundles(currentPayload.questionBanks, allowed.questionBanks);
-    }
+    allowed.questionBanks = mergeQuestionBankBundles(currentPayload.questionBanks, allowed.questionBanks);
     const records = mergeLearningRecords(
       {
         progress: currentPayload.progress,
         firstProgress: currentPayload.firstProgress,
         favorites: currentPayload.favorites,
+        favoriteStars: currentPayload.favoriteStars,
+        killed: currentPayload.killedQuestions,
         notes: currentPayload.notes,
         ledger: currentPayload.recordLedger,
       },
@@ -120,6 +133,8 @@ export async function PUT(request: Request) {
         progress: allowed.progress,
         firstProgress: allowed.firstProgress,
         favorites: allowed.favorites,
+        favoriteStars: allowed.favoriteStars,
+        killed: allowed.killedQuestions,
         notes: allowed.notes,
         ledger: allowed.recordLedger,
       },
@@ -130,20 +145,31 @@ export async function PUT(request: Request) {
       progress: records.progress,
       firstProgress: records.firstProgress,
       favorites: records.favorites,
+      favoriteStars: records.favoriteStars,
+      killedQuestions: records.killed,
       notes: records.notes,
       recordLedger: records.ledger,
     };
     const serialized = JSON.stringify(mergedPayload);
     if (Buffer.byteLength(serialized, "utf8") > MAX_SYNC_CONTENT_BYTES) return { capacityExceeded: true as const };
-    const result = await client.query<StateRow>(
+    if (serialized === JSON.stringify(currentPayload)) return currentResult.rows;
+    await client.query(
       `INSERT INTO learning_states (user_id, payload, version, updated_at)
        VALUES ($1, $2::jsonb, 1, NOW())
-       ON CONFLICT (user_id) DO UPDATE SET payload = EXCLUDED.payload, version = learning_states.version + 1, updated_at = NOW()
-       RETURNING payload, version, updated_at`,
+       ON CONFLICT (user_id) DO UPDATE SET payload = ${RESTORE_SYNC_BANKS_SQL}, version = learning_states.version + 1, updated_at = NOW()`,
       [session.userId, serialized],
     );
+    const size = await client.query<{ bytes: number }>("SELECT octet_length(payload::text) AS bytes FROM learning_states WHERE user_id = $1", [session.userId]);
+    if (size.rows[0].bytes > MAX_SYNC_CONTENT_BYTES) throw new SyncTransferError("合并后的云端数据超过 96 MB，本次写入已撤回，原云端数据保留。");
+    const result = await client.query<StateRow>(`SELECT ${request.headers.get("x-elapse-sync-protocol") === "2" ? COMPACT_SYNC_PAYLOAD_SQL : "payload"} AS payload, version, updated_at FROM learning_states WHERE user_id = $1`, [session.userId]);
     return result.rows;
   });
   if ("capacityExceeded" in rows) return NextResponse.json({ error: "合并后的云端同步数据超过 96 MB，原云端数据未覆盖；请导出备份后联系管理员扩容。" }, { status: 413 });
   return syncJsonResponse({ ok: true, state: rows[0] }, request);
+  } catch (error) {
+    if (error instanceof SyncTransferError) return NextResponse.json({ error: error.message }, { status: error.status });
+    const code = (error as { code?: string }).code;
+    console.error("[sync] upload failed", { code, message: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
+    return NextResponse.json({ error: code === "55P03" || code === "57014" ? "云端同步繁忙，已停止等待；本机数据保留，请稍后重试。" : "云端同步未完成，本机数据保留，请稍后重试。" }, { status: 503 });
+  }
 }
