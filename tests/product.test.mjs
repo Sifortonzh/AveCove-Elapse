@@ -5,6 +5,30 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("v2.3.9 sync feedback does not classify success as failed and preserves actionable errors", async () => {
+  const source = ts.transpileModule(await text("app/lib/sync-feedback.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { syncHasProblem, syncErrorMessage } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+  assert.equal(syncHasProblem("题库与记录已同步 · 12:54"), false);
+  assert.equal(syncHasProblem("failed"), true);
+  assert.equal(syncHasProblem("同步等待超时，本机记录保留"), true);
+  assert.equal(syncHasProblem("failed", true), false);
+  assert.equal(syncHasProblem("已同步，先前 failed"), false);
+  assert.doesNotMatch(syncErrorMessage(new Error("Failed to fetch")), /failed/i);
+  assert.match(syncErrorMessage(new DOMException("timeout", "TimeoutError")), /超时/);
+  assert.match(syncErrorMessage(new Error("读取云端失败（HTTP 503）")), /503/);
+  const page = await text("app/page.tsx");
+  const pull = page.slice(page.indexOf("async function pullRemoteState"), page.indexOf("async function finishAuthentication"));
+  assert.match(pull, /syncInFlightRef.current = true/);
+  assert.match(pull, /finally[\s\S]*syncInFlightRef.current = false/);
+  assert.match(page, /SyncFileList files=\{syncFiles\}/);
+  assert.match(page, /uploadConfirmed \? `云端已同步/);
+  assert.match(page, /navigator.clipboard.writeText\(originalText\)/);
+  assert.match(page, /await navigator.clipboard.writeText[\s\S]*setOptions/);
+  assert.match(page, /MarkdownNotePreview value=\{generatedText\}/);
+  assert.match(page, /chapterProgress=\{progress\}/);
+  assert.match(await text("app/components/PracticeExtras.tsx"), /已做对[\s\S]*已做错/);
+});
+
 test("incremental sync sends only missing or newer banks without modifying source data", async () => {
   const source = ts.transpileModule(await text("app/lib/sync-revisions.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   const { bankRevisions, banksNeedingTransfer } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
@@ -649,7 +673,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -956,7 +980,7 @@ test("persists in-practice question corrections into sync and shared banks", asy
   assert.match(styles, /\.question-type-edit-section/);
   assert.match(styles, /\.add-option-button/);
   assert.match(styles, /\.question-edit-modal\.editing \.option-edit-section>label/);
-  assert.match(page, /rows=\{creating \? 2 : 1\}/);
+  assert.match(page, /rows=\{1\}/);
   assert.match(page, /录入解析/);
   assert.match(page, /explanationSource: "AI 生成解析 · 手动保存"/);
 });
@@ -1224,7 +1248,7 @@ test("keeps sync quiet and gives iPhone separate answer confirmation, next navig
   ]);
 
   assert.match(page, /syncInFlightRef/);
-  assert.match(page, /if \(showMessage\) \{\s*setManualSyncing\(true\)/);
+  assert.match(page, /syncInFlightRef.current = true;\s*setManualSyncing\(true\)/);
   assert.match(await text("app/components/SyncStatusNotice.tsx"), /aria-label="立即手动同步"/);
   assert.match(page, /mobile-submit-bar/);
   assert.match(page, /确认答案/);
@@ -1409,7 +1433,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.3\.3"/);
+  assert.match(packageJson, /"version": "2\.3\.9"/);
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1808,7 +1832,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1869,7 +1893,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -1887,7 +1911,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -1907,7 +1931,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

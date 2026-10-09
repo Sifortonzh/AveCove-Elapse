@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.3.3" src="https://img.shields.io/badge/version-2.3.3-b43d35" />
+    <img alt="版本 2.3.9" src="https://img.shields.io/badge/version-2.3.9-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.3.3.8。** 修复大题库同步 504 超时：先核对题库版本，只上传或下载缺失及更新的题库；未修改的题库正文留在数据库，不再随每次作答往返传输。数据库合并一次读取原题库，避免逐题库反复展开大快照。写入等待有时限，同步失败会显示 HTTP 状态，本机数据始终保留。同步上限仍为 96 MB 原始数据 / 24 MB 压缩传输。
+> **当前版本：v2.3.9。** 同步读取与上传共用互斥锁，避免旧失败覆盖成功提示；同步详情列出最近上传/下载的题库，提供增量“快速同步”。新增题目的选项行更紧凑；修改选项支持清空、剪切，剪贴板失败时保留原文。AI 解析支持 Markdown 显示，章节目录标记已做题的正误，不改变计分。同步上限保持 96 MB 原始数据 / 24 MB 压缩传输。
 
 首次接入或题库修改后仍需要传输对应题库；其余作答仅同步记录与题库版本。这里是同步请求和快照的安全上限，并非设备内存或购买的存储额度。图片较多时可进一步接入独立图片存储；系统不会自动删题、删笔记或降低图片质量。旧设备请刷新页面启用增量协议。
 

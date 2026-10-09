@@ -45,6 +45,8 @@ import { compactQuestionNumbers } from "./lib/question-number";
 import { encodeSyncRequest } from "./lib/sync-transfer";
 import { bankRevisions, banksNeedingTransfer } from "./lib/sync-revisions";
 import SyncStatusNotice from "./components/SyncStatusNotice";
+import SyncFileList from "./components/SyncFileList";
+import { syncErrorMessage, type SyncFileChange } from "./lib/sync-feedback";
 import { deleteQuestionAndRenumber, insertQuestionAfter } from "./lib/question-edit";
 import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
 import { hasOptionAnnotation, noteImageMarkdown } from "./lib/note-annotations";
@@ -248,7 +250,7 @@ function MarkdownNotePreview({ value, empty = "还没有可预览的内容。" }
     else if (line.startsWith("## ")) { kind = "heading2"; content = line.slice(3); }
     else if (line.startsWith("# ")) { kind = "heading1"; content = line.slice(2); }
     else if (line.startsWith("> ")) { kind = "quote"; content = line.slice(2); }
-    else if (/^[-*]\s+/.test(line)) { kind = "list"; content = line.replace(/^[-*]\s+/, ""); }
+    else if (/^(?:[-*]|\d+[.)])\s+/.test(line)) { kind = "list"; content = line.replace(/^[-*]\s+/, ""); }
     if (kind === "space") return <span className="markdown-space" key={index} />;
     if (kind === "heading1") return <h3 key={index}>{inlineMarkdown(content)}</h3>;
     if (kind === "heading2") return <h4 key={index}>{inlineMarkdown(content)}</h4>;
@@ -371,6 +373,7 @@ export default function HomePage() {
   const [showAccount, setShowAccount] = useState(false);
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState("尚未开启多端同步");
+  const [syncFiles, setSyncFiles] = useState<SyncFileChange[]>([]);
   const [manualSyncing, setManualSyncing] = useState(false);
   const [syncRevision, setSyncRevision] = useState(0);
   const [systemDark, setSystemDark] = useState(false);
@@ -736,6 +739,7 @@ export default function HomePage() {
     }
     await applyLearningState({ ...state, questionBanks: bundle ? { ...bundle, banks: changed } : undefined });
     syncedBankRevisionsRef.current = bankRevisions(revisions);
+    return changed;
   }
 
   async function pushRemoteState(showMessage = false) {
@@ -745,13 +749,13 @@ export default function HomePage() {
       return;
     }
     syncInFlightRef.current = true;
-    if (showMessage) {
-      setManualSyncing(true);
-      setSyncStatus("正在手动同步题库与学习记录… ☁️");
-    }
+    setManualSyncing(true);
+    setSyncStatus(showMessage ? "正在快速同步变化内容… ☁️" : "正在自动同步学习记录… ☁️");
+    let uploadConfirmed = false;
     try {
       const state = await collectLearningState();
       state.questionBanks.banks = banksNeedingTransfer(state.questionBanks.banks, syncedBankRevisionsRef.current);
+      const uploadedBanks = state.questionBanks.banks;
       const transfer = await encodeSyncRequest({ state });
       const response = await fetch("/api/sync", {
         method: "PUT",
@@ -764,32 +768,50 @@ export default function HomePage() {
         state?: { payload?: Record<string, unknown> };
       };
       if (!response.ok) throw new Error(result.error || (response.status === 413 ? "服务器拒绝了过大的同步包。本机数据仍保留，请导出备份后联系管理员。" : `同步失败（HTTP ${response.status}），本机数据保留，请重试。`));
-      if (result.state?.payload) await applyRemoteSyncState(result.state.payload);
+      uploadConfirmed = true;
+      setSyncReady(true);
+      if (uploadedBanks.length) setSyncFiles(uploadedBanks.map((bank) => ({ id: bank.id, name: bank.name, direction: "上传", at: new Date().toISOString() })));
+      const downloadedBanks = result.state?.payload ? await applyRemoteSyncState(result.state.payload) : [];
+      const at = new Date().toISOString();
+      const changes: SyncFileChange[] = [...uploadedBanks.map((bank) => ({ id: bank.id, name: bank.name, direction: "上传" as const, at })), ...downloadedBanks.map((bank) => ({ id: bank.id, name: bank.name, direction: "下载" as const, at }))];
+      if (changes.length) setSyncFiles(changes);
       setSyncReady(true);
       setSyncStatus(`题库与记录已同步 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} ☁️ · 数据 ${(transfer.originalBytes / 1_000_000).toFixed(1)} MB / 传输 ${(transfer.transferBytes / 1_000_000).toFixed(1)} MB`);
       if (showMessage) setToast("题库、刷题记录与英文练习已安全同步 ☁️✨");
     } catch (error) {
-      setSyncStatus(error instanceof Error && error.name === "TimeoutError" ? "同步等待超时，本机记录保留，请重试。" : error instanceof Error && error.message !== "sync failed" ? error.message : "同步暂时离线，本机记录仍已保存");
+      setSyncStatus(uploadConfirmed ? `云端已同步 ☁️；本机刷新未完成，请快速同步重试。${syncErrorMessage(error)}` : syncErrorMessage(error));
     } finally {
       syncInFlightRef.current = false;
-      if (showMessage) setManualSyncing(false);
+      setManualSyncing(false);
       if (syncQueuedRef.current) { syncQueuedRef.current = false; setSyncRevision((value) => value + 1); }
     }
   }
 
   async function pullRemoteState(showMessage = false) {
-    if (showMessage) setSyncStatus("正在读取云端学习记录… ☁️");
+    // Pull and push share one lock: a stale failed pull must never overwrite
+    // the status or revision acknowledgement of a successful upload.
+    if (syncInFlightRef.current) { syncQueuedRef.current = true; return; }
+    syncInFlightRef.current = true;
+    setManualSyncing(true);
+    setSyncStatus("正在读取云端学习记录… ☁️");
     try {
       const response = await fetch("/api/sync", { headers: { "X-Elapse-Sync-Accept": "gzip", "X-Elapse-Sync-Protocol": "2" }, signal: AbortSignal.timeout(90_000) });
       if (!response.ok) throw new Error(`读取云端失败（HTTP ${response.status}），本机数据保留，请重试。`);
       const result = await response.json() as { state?: { payload?: Record<string, unknown> } | null };
-      if (result.state?.payload && Object.keys(result.state.payload).length) await applyRemoteSyncState(result.state.payload);
+      if (result.state?.payload && Object.keys(result.state.payload).length) {
+        const downloaded = await applyRemoteSyncState(result.state.payload);
+        if (downloaded.length) setSyncFiles(downloaded.map((bank) => ({ id: bank.id, name: bank.name, direction: "下载", at: new Date().toISOString() })));
+      }
       setSyncReady(true);
       setSyncStatus(result.state ? "云端记录已接入 ☁️✨" : "同步空间已创建，正在上传本机记录 ☁️");
       if (showMessage) setToast("多端学习记录已刷新 ☁️✨");
     } catch (error) {
       setSyncReady(false);
-      setSyncStatus(error instanceof Error ? error.message : "同步服务暂时离线，本机记录仍安全保存");
+      setSyncStatus(syncErrorMessage(error));
+    } finally {
+      syncInFlightRef.current = false;
+      setManualSyncing(false);
+      if (syncQueuedRef.current) { syncQueuedRef.current = false; setSyncRevision((value) => value + 1); }
     }
   }
 
@@ -1823,6 +1845,7 @@ export default function HomePage() {
         <CopyrightPage bankName={bankName} onHome={() => setView("home")} onRestoreDemo={restoreDemoBank} />
       ) : current ? (
         <QuizView
+          chapterProgress={progress}
           bankName={bankName}
           bankQuestions={questions}
           onOpenQuestion={openQuestion}
@@ -1914,7 +1937,7 @@ export default function HomePage() {
       {answerTargetBank && <AnswerImportModal bank={answerTargetBank} onMerge={mergeAnswerFile} onClose={() => setAnswerTargetBank(null)} />}
       {showSearch && <SearchModal banks={searchableBanks} returnToQuiz={view === "quiz" && Boolean(current)} onOpen={async (bank, questionId) => { if (bank.id === "__demo__") openQuestion(questionId); else { await openSavedQuestion(bank, questionId); setShowSearch(false); } }} onClose={() => setShowSearch(false)} />}
       {showNotes && <NotesModal bankName={bankName} questions={questions} progress={progress} favorites={favorites} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
-      {showAccount && <AccountModal account={account} syncStatus={syncStatus} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pushRemoteState(true)} onExport={() => { void exportLearningRecord(); }} onImport={importLearningRecord} />}
+      {showAccount && <AccountModal account={account} syncStatus={syncStatus} syncFiles={syncFiles} syncing={manualSyncing} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pushRemoteState(true)} onExport={() => { void exportLearningRecord(); }} onImport={importLearningRecord} />}
       {bankReplacementPrompt && <BankReplacementModal prompt={bankReplacementPrompt} onChoose={resolveBankReplacement} />}
       {incomingBankShare && <IncomingBankShareModal share={incomingBankShare} onImport={() => void importIncomingBankShare()} onClose={clearIncomingBankShare} />}
       {toast && <SuccessToast message={toast} onClose={() => setToast("")} />}
@@ -2632,6 +2655,7 @@ function IncomingBankShareModal({ share, onImport, onClose }: {
 }
 
 function QuizView(props: {
+  chapterProgress: Progress;
   bankName: string; bankQuestions: QuizQuestion[]; onOpenQuestion: (id: string) => void; onSearchNotes: () => void;
   current: QuizQuestion; currentIndex: number; total: number; completed: number; accuracy: number; selected: string[]; excluded: string[]; submitted: boolean; studyMode: StudyMode;
   examScore?: { earned: number; answeredMaximum: number; total: number };
@@ -2717,7 +2741,7 @@ function QuizView(props: {
     <button className="tablet-quiz-action" onClick={submitted || memorizing || blind ? props.onNext : props.onSubmit} disabled={!submitted && !memorizing && !blind && !selected.length}>{submitted || memorizing || blind ? <><span>下一题</span><ChevronRight /></> : <><CheckCircle2 /><span>确认答案</span></>}</button>
     <nav className="quiz-bottom"><button onClick={props.onPrevious}><ChevronLeft /><span>上一题</span></button><button onClick={props.onAnswerSheet}><ListChecks /><span>答题卡</span></button><button className={favorite ? "active" : ""} onClick={props.onFavorite}><Star fill={favorite ? "currentColor" : "none"} /><span>精选</span></button><button onClick={props.onMobilePanel}><MessageCircle /><span>学习区</span></button><button onClick={props.onSettings}><Settings2 /><span>设置</span></button><button className="mobile-next" onClick={props.onNext}><ChevronRight /><span>下一题</span></button></nav>
       {props.mobilePanel && <div className="mobile-learning"><button className="drawer-close" aria-label="关闭学习区" onClick={props.onMobilePanel}><X /></button><LearningPanel bankName={props.bankName} onSearchNotes={props.onSearchNotes} current={current} submitted={submitted && answerAvailable} note={note} knownNoteTags={props.knownNoteTags} aiMode={aiMode} aiTexts={aiTexts} aiLoading={aiLoading} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onSaveAiExplanation={props.onSaveAiExplanation} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} /></div>}
-      {showChapters && <ChapterDirectory questions={props.bankQuestions} currentQuestionId={current.id} onOpen={props.onOpenQuestion} onClose={() => setShowChapters(false)} />}
+      {showChapters && <ChapterDirectory questions={props.bankQuestions} progress={props.chapterProgress} currentQuestionId={current.id} onOpen={props.onOpenQuestion} onClose={() => setShowChapters(false)} />}
       {editingQuestion && <QuestionCorrectionModal question={current} onSave={props.onEditQuestion} onClose={() => setEditingQuestion(false)} />}
       {addingQuestion && <QuestionCorrectionModal creating question={addingQuestion} onSave={(question) => props.onAddQuestion(current.id, question)} onClose={() => setAddingQuestion(null)} />}
       {showKillQuestions && <KillQuestionsModal current={current} questions={props.bankQuestions} killed={props.killed} onApply={(ids, killed) => { props.onUpdateKilled(ids, killed); setShowKillQuestions(false); }} onClose={() => setShowKillQuestions(false)} />}
@@ -2822,6 +2846,16 @@ function QuestionCorrectionModal({ question, creating = false, onSave, onClose }
     setAnswer((current) => current.filter((label) => label !== removedLabel).map((label) => labelMap.get(label) ?? label));
   };
 
+  const clearOption = (index: number) => setOptions((current) => current.map((item, i) => i === index ? { ...item, text: "" } : item));
+  const cutOption = async (index: number) => {
+    const originalText = options[index].text;
+    try {
+      await navigator.clipboard.writeText(originalText);
+      setOptions((current) => current.map((item, i) => i === index && item.text === originalText ? { ...item, text: "" } : item));
+      setError("");
+    } catch { setError("无法访问剪贴板，选项内容已保留；请手动复制或剪切。📋"); }
+  };
+
   const save = async () => {
     if (!valid || busy) return;
     setBusy(true);
@@ -2851,7 +2885,7 @@ function QuestionCorrectionModal({ question, creating = false, onSave, onClose }
       <div className="question-edit-scroll">
         <label className="question-edit-field"><span>题干</span><textarea value={stem} rows={4} onChange={(event) => setStem(event.target.value)} /></label>
         <section className="question-type-edit-section"><header><strong>医学题型</strong><span>可手动纠正 A1、A2、A3、A4、B1、C、X 型</span></header><div>{medicalTypes.map((type) => <button key={type.id} className={medicalType === type.id ? "active" : ""} onClick={() => changeMedicalType(type.id)}><b>{type.name}</b><span>{type.detail}</span></button>)}</div></section>
-        <section className="option-edit-section"><div><span><strong>题目选项</strong><small>缺字或漏项时可直接修改、删除或补充</small></span><button className="add-option-button" onClick={addOption} disabled={options.length >= 7}>＋ 添加选项</button></div>{options.map((option, index) => <label key={`${option.label}-${index}`}><b>{option.label}</b><textarea rows={creating ? 2 : 1} value={option.text} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} /><button className="remove-option-button" onClick={() => removeOption(index)} disabled={options.length <= 2} aria-label={`删除 ${option.label} 选项`}><Trash2 size={16} /></button></label>)}</section>
+        <section className="option-edit-section"><div><span><strong>题目选项</strong><small>缺字或漏项时可直接修改、删除或补充</small></span><button className="add-option-button" onClick={addOption} disabled={options.length >= 7}>＋ 添加选项</button></div>{options.map((option, index) => <label key={`${option.label}-${index}`}><b>{option.label}</b><textarea rows={1} value={option.text} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} /><span className="option-edit-tools"><button type="button" onClick={() => clearOption(index)} title={`清空 ${option.label} 选项内容`} aria-label={`清空 ${option.label} 选项内容`}><RotateCcw size={15} /></button><button type="button" onClick={() => void cutOption(index)} title={`剪切 ${option.label} 选项内容`} aria-label={`剪切 ${option.label} 选项内容`} disabled={!option.text}><Scissors size={15} /></button><button className="remove-option-button" onClick={() => removeOption(index)} disabled={options.length <= 2} aria-label={`删除 ${option.label} 选项`}><Trash2 size={16} /></button></span></label>)}</section>
         <section className={`answer-edit-section ${answerVisible ? "revealed" : "concealed"}`}><header><div><strong>标准答案</strong><span>{answerVisible ? question.answer.length ? allowMultiple ? "X 型题可选择多个正确选项" : "请选择一个正确选项" : "本题暂无答案，请在这里手动补录" : "默认隐藏，避免只改文字时提前看到答案"}</span></div></header>{answerVisible ? <div className="answer-edit-choices">{options.map((option) => <button key={option.label} className={answer.includes(option.label) ? "active" : ""} onClick={() => toggleAnswer(option.label)} aria-pressed={answer.includes(option.label)}><i>{answer.includes(option.label) && <Check size={15} />}</i><b>{option.label}</b><span>{option.text || "待补充选项文字"}</span></button>)}</div> : <div className="answer-edit-mask"><div className="answer-blur-preview" aria-hidden="true">{options.slice(0, 4).map((option) => <span key={option.label}><i /><b>{option.label}</b><em>{option.text}</em></span>)}</div><div className="answer-reveal-panel"><EyeOff /><div><strong>标准答案已模糊保护</strong><p>只修题干或选项时无需查看答案；确认需要纠正答案后再主动展开。</p></div><button onClick={() => setAnswerVisible(true)}><Eye size={17} />显示并修订答案</button></div></div>}</section>
         <label className="question-edit-field explanation-edit-field"><span>原题解析 <small>可选</small></span><textarea value={explanation} rows={4} onChange={(event) => setExplanation(event.target.value)} placeholder="可粘贴原资料解析、答案依据或版本说明；没有可留空" /></label>
         {!creating && answerChanged && <div className="answer-revision-warning"><AlertCircle /><div><strong>改标准答案前，请再核对一次 ⚠️🩺</strong><p>原文件答案可能受教材版本、指南更新或识别误差影响；但手动修订也可能出错。请对照教材、官方答案或可靠解析再次核验后再保存哦 🔎✅</p></div></div>}
@@ -2936,7 +2970,7 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
     try { await action(); } catch (error) { setCommentMessage(error instanceof Error ? error.message : "操作失败"); }
   };
   return <aside className="learning-panel"><div className="learning-heading"><h2>解析与考点</h2><button className="note-search-trigger" onClick={onSearchNotes}><Search size={16} />搜索笔记</button></div><div className="learning-tabs">{modes.map((mode) => <button key={mode.id} className={aiMode === mode.id ? "active" : ""} onClick={() => onAi(mode.id)}>{mode.icon}{mode.displayLabel ?? mode.label}</button>)}</div>
-    <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? explanationIsAi ? "AI 生成后存入题库 · 与原题解析分开标识" : "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className={`original-explanation-panel ${explanationIsAi ? "ai-saved" : "source-saved"}`}><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“AI 解析”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>}</> : <>{generatedText && <p className="ai-copy">{generatedText}</p>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "录入解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
+    <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? explanationIsAi ? "AI 生成后存入题库 · 与原题解析分开标识" : "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className={`original-explanation-panel ${explanationIsAi ? "ai-saved" : "source-saved"}`}><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“AI 解析”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>}</> : <>{generatedText && <div className="ai-copy"><MarkdownNotePreview value={generatedText} /></div>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "录入解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
     {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={current.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
     <details className="community-card"><summary className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>{bankName} · {comments.length} 条</span></summary><div className="community-body"><p className="comment-scope-note">当前题库独立讨论 · 原题号 {current.sourceNumber}</p>{account ? <div className="comment-identity"><UserRound size={15} /><span>{account.nickname}</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={15} />登录后参与讨论</button>}<div className="comment-form"><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 300))} placeholder="写下你的判断依据、易错点或疑问…" disabled={!account || commentBusy} /><button onClick={() => void publishComment()} disabled={!account || commentBusy || commentDraft.trim().length < 2}><Send size={14} />{commentBusy ? "发布中…" : "发布"}</button></div>{commentMessage && <p className="comment-message">{commentMessage}</p>}<div className="local-comments">{comments.length ? comments.map((comment) => <article key={comment.id}><div><b>{comment.nickname}</b><time>{new Date(comment.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p>{comment.text}</p><div className="comment-tools"><button onClick={() => void runCommentAction(() => onLikeComment(comment.id))}><ThumbsUp size={13} />{comment.likes || "赞"}</button><button onClick={() => void runCommentAction(() => onReportComment(comment.id))}><Flag size={13} />举报</button>{comment.own && <button onClick={() => void runCommentAction(() => onDeleteComment(comment.id))}><Trash2 size={13} />删除</button>}</div></article>) : <p className="empty-comments">还没有讨论，成为这份题库中第一个留下学习线索的人。</p>}</div></div></details>
     <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} /><InkNote note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <button key={tag} title={`删除标签 ${tag}`} onClick={() => onNote(removeNoteTag(note, tag))}>#{tag}<X size={12} /></button>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
@@ -3205,8 +3239,8 @@ function AnswerImportModal({ bank, onMerge, onClose }: {
   return <div className="modal-layer answer-import-layer" onMouseDown={() => !busy && onClose()}><section className="answer-import-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>ANSWER PAIRING · TEST MODE</span><h2>{complete ? "答案已经合入题库" : "是否继续导入答案？"}</h2></div><button onClick={onClose} disabled={busy}><X /></button></header><div className="answer-import-summary"><ListChecks /><div><strong>{bank.name}</strong><p>共 {bank.questions.length} 题 · 待答案 {pendingCount} 题{draftCount ? ` · 已有 ${draftCount} 份测试作答待核对` : ""}</p></div></div><div className="answer-import-note"><ShieldCheck /><p>答案文件只用于按原题号匹配答案与原文解析。AI 不得凭医学常识补答案；匹配后仍建议抽查 A/B/C/X 分区、B 型共用选项与 C 型两陈述判定。</p></div>{!complete && <button className={`answer-file-picker ${file ? "selected" : ""}`} onClick={() => inputRef.current?.click()} disabled={busy}><Upload /><span><strong>{file?.name || "选择配套答案或解析文件"}</strong><small>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · 点击可更换` : "支持 Word / PDF；扫描件会先 OCR"}</small></span><input ref={inputRef} type="file" accept=".doc,.docx,.pdf,application/msword" hidden onChange={(event) => { setFile(event.target.files?.[0] ?? null); setError(""); }} /></button>}{(busy || state.progress > 0) && <div className="import-progress answer-import-progress"><div><span>{state.phase}</span><b>{state.progress}%</b></div><i><b style={{ width: `${state.progress}%` }} /></i><p>{state.detail}</p></div>}{error && <div className="import-error"><AlertCircle />{error}</div>}<footer><button className="ghost-action" onClick={onClose} disabled={busy}>{complete ? "完成并关闭" : "稍后再导入"}</button>{!complete && <button className="primary-action" onClick={() => void begin()} disabled={!file || busy}><Sparkles />{busy ? "正在关联答案…" : "AI 关联并一键对答案"}</button>}</footer></section></div>;
 }
 
-function AccountModal({ account, syncStatus, nickname: initialNickname, onClose, onAuthenticated, onLogout, onDelete, onSync, onExport, onImport }: {
-  account: AccountSession | null; syncStatus: string; nickname: string; onClose: () => void;
+function AccountModal({ account, syncStatus, syncFiles, syncing, nickname: initialNickname, onClose, onAuthenticated, onLogout, onDelete, onSync, onExport, onImport }: {
+  account: AccountSession | null; syncStatus: string; syncFiles: SyncFileChange[]; syncing: boolean; nickname: string; onClose: () => void;
   onAuthenticated: (user: AccountSession) => Promise<void>; onLogout: () => Promise<void>; onDelete: () => Promise<void>;
   onSync: () => Promise<void>; onExport: () => void; onImport: (file: File) => Promise<void>;
 }) {
@@ -3248,7 +3282,7 @@ function AccountModal({ account, syncStatus, nickname: initialNickname, onClose,
     }
   }
 
-  return <div className="modal-layer account-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose} aria-label="关闭同步窗口"><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><div className="sync-coverage"><span><Database />已导入中文题库</span><span><BookOpen />英文 Test Library</span><span><CheckCircle2 />答题记录与写作草稿</span><span><NotebookPen />收藏、错题与笔记</span></div><p className="sync-privacy-copy">原始 Word、PDF 不会上传；解析后的题库、内嵌题图、笔记图片和学习记录会压缩同步。请只同步你有权使用的资料。</p><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。登录后可同步解析后的中英文题库与学习记录；原始文件仍只留在你的设备。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📚 同步题库与记录</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
+  return <div className="modal-layer account-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose} aria-label="关闭同步窗口"><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><SyncFileList files={syncFiles} syncing={syncing} onSync={onSync} /><div className="sync-coverage"><span><Database />已导入中文题库</span><span><BookOpen />英文 Test Library</span><span><CheckCircle2 />答题记录与写作草稿</span><span><NotebookPen />收藏、错题与笔记</span></div><p className="sync-privacy-copy">原始 Word、PDF 不会上传；解析后的题库、内嵌题图、笔记图片和学习记录会压缩同步。请只同步你有权使用的资料。</p><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。登录后可同步解析后的中英文题库与学习记录；原始文件仍只留在你的设备。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📚 同步题库与记录</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
 }
 
 function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: SavedQuestionBank[]; returnToQuiz?: boolean; onOpen: (bank: SavedQuestionBank, id: string) => Promise<void> | void; onClose: () => void }) {
