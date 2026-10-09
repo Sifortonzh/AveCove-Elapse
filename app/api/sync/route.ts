@@ -4,7 +4,7 @@ import { query, withTransaction } from "@/app/lib/server/db";
 import { mergeLearningRecords } from "@/app/lib/record-sync";
 import { readSyncRequest, syncJsonResponse, SyncTransferError } from "@/app/lib/server/sync-transfer";
 import { MAX_SYNC_CONTENT_BYTES } from "@/app/lib/sync-transfer";
-import { COMPACT_SYNC_PAYLOAD_SQL, RESTORE_SYNC_BANKS_SQL } from "@/app/lib/server/sync-snapshot";
+import { COMPACT_SYNC_PAYLOAD_SQL, RESTORE_SYNC_BANKS_SQL, UNCHANGED_SYNC_BANKS_SQL } from "@/app/lib/server/sync-snapshot";
 
 type StateRow = { payload: Record<string, unknown>; version: number; updated_at: Date };
 // Compressed transport stays below Nginx's 25 MB limit; decoded data is bounded.
@@ -153,10 +153,12 @@ export async function PUT(request: Request) {
     const serialized = JSON.stringify(mergedPayload);
     if (Buffer.byteLength(serialized, "utf8") > MAX_SYNC_CONTENT_BYTES) return { capacityExceeded: true as const };
     if (serialized === JSON.stringify(currentPayload)) return currentResult.rows;
+    const originalBanks = (currentPayload.questionBanks as BankBundle | undefined)?.banks ?? [];
+    const unchangedBanks = JSON.stringify(originalBanks) === JSON.stringify((allowed.questionBanks as BankBundle).banks);
     await client.query(
       `INSERT INTO learning_states (user_id, payload, version, updated_at)
        VALUES ($1, $2::jsonb, 1, NOW())
-       ON CONFLICT (user_id) DO UPDATE SET payload = ${RESTORE_SYNC_BANKS_SQL}, version = learning_states.version + 1, updated_at = NOW()`,
+       ON CONFLICT (user_id) DO UPDATE SET payload = ${unchangedBanks ? UNCHANGED_SYNC_BANKS_SQL : RESTORE_SYNC_BANKS_SQL}, version = learning_states.version + 1, updated_at = NOW()`,
       [session.userId, serialized],
     );
     const size = await client.query<{ bytes: number }>("SELECT octet_length(payload::text) AS bytes FROM learning_states WHERE user_id = $1", [session.userId]);

@@ -25,3 +25,24 @@ export async function verifySyncSnapshot(client, compactSql, restoreSql) {
     await client.query("ROLLBACK");
   }
 }
+
+// Optional production-sized READ-ONLY source test: all writes go to a temporary
+// copy of one snapshot and are rolled back, never to public.learning_states.
+export async function verifyLargeSyncSnapshot(client, compactSql, restoreSql, unchangedSql) {
+  await client.query("BEGIN");
+  try {
+    await client.query("SET LOCAL statement_timeout = '30s'");
+    await client.query("CREATE TEMP TABLE learning_states ON COMMIT DROP AS SELECT * FROM public.learning_states ORDER BY updated_at DESC LIMIT 1");
+    await client.query("ALTER TABLE learning_states ADD PRIMARY KEY (user_id)");
+    const row = (await client.query(`SELECT user_id, ${compactSql} AS payload, md5((payload#>'{questionBanks,banks}')::text) AS checksum FROM learning_states`)).rows[0];
+    for (const [label, sql] of [["unchanged", unchangedSql], ["reordered", restoreSql]]) {
+      const payload = structuredClone(row.payload);
+      if (label === "reordered") payload.questionBanks.banks.reverse();
+      const started = Date.now();
+      await client.query(`INSERT INTO learning_states (user_id,payload,version,updated_at) VALUES ($1,$2,1,NOW()) ON CONFLICT (user_id) DO UPDATE SET payload=${sql}`, [row.user_id, JSON.stringify(payload)]);
+      const result = (await client.query("SELECT jsonb_array_length(payload#>'{questionBanks,banks}') AS banks FROM learning_states")).rows[0];
+      assert.equal(result.banks, row.payload.questionBanks.banks.length);
+      console.log(`Production-sized TEMP snapshot ${label}: ${Date.now() - started} ms, ${result.banks} banks retained`);
+    }
+  } finally { await client.query("ROLLBACK"); }
+}
