@@ -47,6 +47,7 @@ import { bankRevisions, banksNeedingTransfer } from "./lib/sync-revisions";
 import SyncStatusNotice from "./components/SyncStatusNotice";
 import SyncFileList from "./components/SyncFileList";
 import { syncErrorMessage, type SyncFileChange } from "./lib/sync-feedback";
+import { fetchSync } from "./lib/sync-request";
 import { deleteQuestionAndRenumber, insertQuestionAfter } from "./lib/question-edit";
 import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
 import { hasOptionAnnotation, noteImageMarkdown } from "./lib/note-annotations";
@@ -526,6 +527,22 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, favoriteStars, favorites, firstProgress, killedQuestions, nickname, notes, progress, recordLedger, settings, syncReady, syncRevision]);
 
+  useEffect(() => {
+    if (!account) return;
+    const resume = () => {
+      if (navigator.onLine && document.visibilityState === "visible") void pullRemoteState();
+    };
+    window.addEventListener("online", resume);
+    document.addEventListener("visibilitychange", resume);
+    const timer = window.setInterval(resume, 60_000);
+    return () => {
+      window.removeEventListener("online", resume);
+      document.removeEventListener("visibilitychange", resume);
+      window.clearInterval(timer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account]);
+
   const current = sessionQuestions[currentIndex];
   const currentDiscussionId = current ? commentThreadId(activeBankId, current.id) : "";
 
@@ -685,7 +702,7 @@ export default function HomePage() {
       exportQuestionBankSyncBundle(),
       exportEnglishTestSyncBundle(),
     ]);
-    const records = normalizeLearningRecords({ progress, firstProgress, favorites, favoriteStars, notes, killed: killedQuestions, ledger: recordLedger });
+    const records = normalizeLearningRecords(latestRecordsRef.current);
     return {
       progress: records.progress,
       firstProgress: records.firstProgress,
@@ -730,12 +747,13 @@ export default function HomePage() {
     const local = bankRevisions(await listQuestionBanks());
     const changed: SavedQuestionBank[] = [];
     for (const revision of banksNeedingTransfer(revisions, local)) {
-      const response = await fetch(`/api/sync?bank=${encodeURIComponent(revision.id)}`, {
+      const response = await fetchSync(`/api/sync?bank=${encodeURIComponent(revision.id)}`, {
         headers: { "X-Elapse-Sync-Accept": "gzip", "X-Elapse-Sync-Protocol": "2" }, signal: AbortSignal.timeout(90_000),
       });
       if (!response.ok) throw new Error(`读取云端题库失败（HTTP ${response.status}），本机数据保留，请重试。`);
       const result = await response.json() as { bank?: SavedQuestionBank | null };
-      if (result.bank) changed.push(result.bank);
+      if (!result.bank) throw new Error("云端题库尚未完整到达，本机数据保留，请重试。");
+      changed.push(result.bank);
     }
     await applyLearningState({ ...state, questionBanks: bundle ? { ...bundle, banks: changed } : undefined });
     syncedBankRevisionsRef.current = bankRevisions(revisions);
@@ -757,18 +775,19 @@ export default function HomePage() {
       state.questionBanks.banks = banksNeedingTransfer(state.questionBanks.banks, syncedBankRevisionsRef.current);
       const uploadedBanks = state.questionBanks.banks;
       const transfer = await encodeSyncRequest({ state });
-      const response = await fetch("/api/sync", {
+      const response = await fetchSync("/api/sync", {
         method: "PUT",
         headers: { ...transfer.headers, "X-Elapse-Sync-Accept": "gzip", "X-Elapse-Sync-Protocol": "2" },
         body: transfer.body,
         signal: AbortSignal.timeout(90_000),
-      });
+      }, (attempt) => setSyncStatus(`云端暂时繁忙，正在第 ${attempt} 次重试… ☁️`));
       const result = await response.json().catch(() => ({})) as {
         error?: string;
         state?: { payload?: Record<string, unknown> };
       };
       if (!response.ok) throw new Error(result.error || (response.status === 413 ? "服务器拒绝了过大的同步包。本机数据仍保留，请导出备份后联系管理员。" : `同步失败（HTTP ${response.status}），本机数据保留，请重试。`));
       uploadConfirmed = true;
+      setSyncStatus("上传已确认，正在核对云端变化… ☁️");
       setSyncReady(true);
       if (uploadedBanks.length) setSyncFiles(uploadedBanks.map((bank) => ({ id: bank.id, name: bank.name, direction: "上传", at: new Date().toISOString() })));
       const downloadedBanks = result.state?.payload ? await applyRemoteSyncState(result.state.payload) : [];
@@ -795,7 +814,7 @@ export default function HomePage() {
     setManualSyncing(true);
     setSyncStatus("正在读取云端学习记录… ☁️");
     try {
-      const response = await fetch("/api/sync", { headers: { "X-Elapse-Sync-Accept": "gzip", "X-Elapse-Sync-Protocol": "2" }, signal: AbortSignal.timeout(90_000) });
+      const response = await fetchSync("/api/sync", { headers: { "X-Elapse-Sync-Accept": "gzip", "X-Elapse-Sync-Protocol": "2" } }, (attempt) => setSyncStatus(`云端暂时繁忙，正在第 ${attempt} 次重试… ☁️`));
       if (!response.ok) throw new Error(`读取云端失败（HTTP ${response.status}），本机数据保留，请重试。`);
       const result = await response.json() as { state?: { payload?: Record<string, unknown> } | null };
       if (result.state?.payload && Object.keys(result.state.payload).length) {

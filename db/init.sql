@@ -94,3 +94,17 @@ CREATE TABLE IF NOT EXISTS pavilion_question_banks (
   UNIQUE(user_id, source_bank_id)
 );
 CREATE INDEX IF NOT EXISTS pavilion_question_banks_stage_idx ON pavilion_question_banks(study_stage, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS learning_sync_states (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS learning_sync_banks (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  bank_id TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  content_bytes BIGINT NOT NULL,
+  PRIMARY KEY (user_id, bank_id)
+);

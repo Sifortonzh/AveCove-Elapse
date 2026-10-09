@@ -5,6 +5,33 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("split sync isolates bank writes and retries only temporary failures", async () => {
+  const route = await text("app/api/sync/route.ts");
+  const store = await text("app/lib/server/sync-store.ts");
+  assert.match(store, /legacy snapshot is deliberately retained/);
+  assert.doesNotMatch(store, /DELETE FROM learning_states|UPDATE learning_states/);
+  assert.match(route, /!changedBanks.length && serialized === JSON.stringify\(currentPayload\)/);
+  assert.match(route, /sum\(content_bytes\)/);
+  const output = ts.transpileModule(await text("app/lib/sync-request.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { fetchSync } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const originalFetch = globalThis.fetch, originalTimer = globalThis.setTimeout;
+  let calls = 0;
+  try {
+    globalThis.setTimeout = (callback) => originalTimer(callback, 0);
+    globalThis.fetch = async () => new Response("{}", { status: ++calls < 3 ? 503 : 200 });
+    assert.equal((await fetchSync("http://sync.test")).status, 200);
+    assert.equal(calls, 3);
+    calls = 0;
+    globalThis.fetch = async () => { calls++; return new Response("{}", { status: 401 }); };
+    assert.equal((await fetchSync("http://sync.test")).status, 401);
+    assert.equal(calls, 1);
+    calls = 0;
+    globalThis.fetch = async () => { calls++; return new Response("{}", { status: 503 }); };
+    assert.equal((await fetchSync("http://sync.test")).status, 503);
+    assert.equal(calls, 3);
+  } finally { globalThis.fetch = originalFetch; globalThis.setTimeout = originalTimer; }
+});
+
 test("v2.3.9 sync feedback does not classify success as failed and preserves actionable errors", async () => {
   const source = ts.transpileModule(await text("app/lib/sync-feedback.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   const { syncHasProblem, syncErrorMessage } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
@@ -42,7 +69,9 @@ test("incremental sync sends only missing or newer banks without modifying sourc
   const route = await text("app/api/sync/route.ts");
   assert.doesNotMatch(route, /RETURNING payload/);
   assert.match(route, /SET LOCAL lock_timeout/);
-  assert.match(route, /COMPACT_SYNC_PAYLOAD_SQL/);
+  assert.match(route, /learning_sync_states/);
+  assert.match(route, /saveChangedSyncBanks/);
+  assert.doesNotMatch(route, /INSERT INTO learning_states/);
   assert.match(route, /favoriteStars: records.favoriteStars/);
   assert.match(route, /killedQuestions: records.killed/);
 });
@@ -673,7 +702,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.9");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1433,7 +1462,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.match(packageJson, /"version": "2\.3\.9"/);
+  assert.equal(JSON.parse(packageJson).version, "2.3.9.1");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1832,7 +1861,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.9");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1893,7 +1922,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -1911,7 +1940,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -1931,7 +1960,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

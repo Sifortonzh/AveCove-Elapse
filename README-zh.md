@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.3.9" src="https://img.shields.io/badge/version-2.3.9-b43d35" />
+    <img alt="版本 2.3.9.1" src="https://img.shields.io/badge/version-2.3.9.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.3.9。** 同步读取与上传共用互斥锁，避免旧失败覆盖成功提示；同步详情列出最近上传/下载的题库，提供增量“快速同步”。新增题目的选项行更紧凑；修改选项支持清空、剪切，剪贴板失败时保留原文。AI 解析支持 Markdown 显示，章节目录标记已做题的正误，不改变计分。同步上限保持 96 MB 原始数据 / 24 MB 压缩传输。
+> **当前版本：v2.3.9.1。** 中文题库正文与学习记录分表存储，日常答题和笔记同步不再重写整套题库。现有账号首次连接时无损迁移，旧快照保留用于恢复。临时失败最多重试两次；网络恢复、返回前台时重新读取云端。上传确认与下载完成分别提示。同步上限仍为 96 MB 原始数据 / 24 MB 压缩传输；不同设备请登录同一同步身份。
+
+自行部署请先执行 `npm run db:migrate`。自动发布流程会应用增量建表文件 `db/sync-v3.sql`。藏经阁保持独立；英文题库正文暂时仍保存在学习快照，独立图片存储属于后续升级，不包含在本次补丁中。
 
 首次接入或题库修改后仍需要传输对应题库；其余作答仅同步记录与题库版本。这里是同步请求和快照的安全上限，并非设备内存或购买的存储额度。图片较多时可进一步接入独立图片存储；系统不会自动删题、删笔记或降低图片质量。旧设备请刷新页面启用增量协议。
 

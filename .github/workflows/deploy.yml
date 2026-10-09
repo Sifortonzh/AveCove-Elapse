@@ -68,6 +68,7 @@ jobs:
              gzip -dc '/tmp/allo-app-${GITHUB_SHA}.tar.gz' | docker load; \
              docker tag 'allo-app:${GITHUB_SHA}' allo-app:latest; \
              cd '$SERVER_PATH'; \
+             docker compose exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\"' < db/sync-v3.sql; \
              docker compose up -d --no-build --remove-orphans; \
              printf '%s\n' '${GITHUB_SHA}' > .deployed-commit; \
              rm -f '/tmp/allo-app-${GITHUB_SHA}.tar.gz'; \
