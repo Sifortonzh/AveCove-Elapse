@@ -44,6 +44,7 @@ import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 import { compactQuestionNumbers } from "./lib/question-number";
 import { isXQuestion, practiceStats, newerPreferences } from "./lib/practice-stats";
 import { sharedCaseDraft, removeSharedPrefix, reviseSharedCase } from "./lib/shared-case";
+import { changeNoteTags, cleanNoteTag, noteTagCatalog, type TagAction } from "./lib/note-tags";
 import { encodeSyncRequest } from "./lib/sync-transfer";
 import { bankRevisions, banksNeedingTransfer } from "./lib/sync-revisions";
 import SyncStatusNotice from "./components/SyncStatusNotice";
@@ -120,6 +121,7 @@ type BankRequest = {
 type MarkdownLineKind = "heading1" | "heading2" | "heading3" | "quote" | "list" | "paragraph" | "space";
 type Settings = {
   updatedAt?: number;
+  noteTags?: string[];
   scope: Scope;
   questionTypes: QuestionTypeScope;
   western306Subject: Western306SubjectScope;
@@ -161,7 +163,7 @@ function normalizeSettings(value: unknown): Settings {
   const themeMode: ThemeMode = stored.themeMode === "light" || stored.themeMode === "dark" || stored.themeMode === "system"
     ? stored.themeMode
     : stored.darkMode ? "dark" : "system";
-  return { ...defaultSettings, ...stored, studyMode, western306Subject, themeMode, darkMode: themeMode === "dark" };
+  return { ...defaultSettings, ...stored, noteTags: noteTagCatalog(stored.noteTags), studyMode, western306Subject, themeMode, darkMode: themeMode === "dark" };
 }
 
 const homeQuotes = [
@@ -631,7 +633,18 @@ export default function HomePage() {
     };
     return [currentBank, ...questionBanks.filter((bank) => bank.id !== currentBank.id)];
   }, [activeBankId, bankName, questionBanks, questions]);
-  const knownNoteTags = useMemo(() => [...new Set(Object.values(notes).flatMap(parseNoteTags))].sort(), [notes]);
+  const knownNoteTags = useMemo(() => [...new Set([...(settings.noteTags ?? []), ...Object.values(notes).flatMap(parseNoteTags)])].sort(), [notes, settings.noteTags]);
+
+  function manageNoteTag(action: TagAction, tag: string, replacement?: string) {
+    const records = normalizeLearningRecords(latestRecordsRef.current);
+    const result = changeNoteTags(records.notes, latestSettingsRef.current.noteTags ?? [], action, tag, replacement);
+    let ledger = records.ledger;
+    const now = Date.now();
+    for (const id of result.changedIds) ledger = stampLearningRecord(ledger, id, { note: result.notes[id] }, now);
+    persistLearningRecords({ ...records, notes: result.notes, ledger });
+    saveSettings({ ...latestSettingsRef.current, noteTags: result.catalog });
+    setToast(action === "delete" ? `已移除 #${tag} 标签，笔记正文保留 🏷️` : action === "rename" ? `标签已改为 #${replacement}，相关笔记同步更新 ✏️` : `已添加 #${tag} 标签 🏷️`);
+  }
 
   function saveSettings(next: Settings) {
     const normalized = normalizeSettings({ ...next, updatedAt: Date.now() });
@@ -1858,7 +1871,7 @@ export default function HomePage() {
       ) : view === "bank-requests" ? (
         <QuestionBankVaultPage banks={questionBanks} account={account} onRequireLogin={() => setShowAccount(true)} onBack={() => setView("banks")} />
       ) : view === "notes" ? (
-        <NotesPage banks={searchableBanks} progress={progress} favorites={favorites} notes={notes} onBack={() => setView("home")} onOpen={async (bank, questionId) => {
+        <NotesPage banks={searchableBanks} progress={progress} favorites={favorites} notes={notes} tagCatalog={settings.noteTags ?? []} onManageTag={manageNoteTag} onBack={() => setView("home")} onOpen={async (bank, questionId) => {
           if (bank.id === "__demo__") openQuestion(questionId);
           else await openSavedQuestion(bank, questionId);
         }} />
@@ -2484,6 +2497,7 @@ function QuestionBankVaultPage({ banks, account, onRequireLogin, onBack }: { ban
   const [entries, setEntries] = useState<PavilionQuestionBank[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [sourceQuery, setSourceQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<"全部" | PavilionStudyStage>("全部");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -2503,6 +2517,10 @@ function QuestionBankVaultPage({ banks, account, onRequireLogin, onBack }: { ban
       && (!keyword || [entry.name, entry.groupName, entry.studyStage].join(" ").toLocaleLowerCase("zh-CN").includes(keyword))
     ));
   }, [entries, query, stageFilter]);
+  const visibleSources = useMemo(() => {
+    const terms = getSearchTerms(sourceQuery).map(term => term.toLocaleLowerCase("zh-CN"));
+    return banks.filter(bank => terms.every(term => [bank.name, bank.groupName, bank.sourceTitle, bank.description].join(" ").toLocaleLowerCase("zh-CN").includes(term)));
+  }, [banks, sourceQuery]);
 
   function toggleSelected(id: string) {
     setSelected((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]);
@@ -2548,11 +2566,11 @@ function QuestionBankVaultPage({ banks, account, onRequireLogin, onBack }: { ban
     setMessage("已从藏经阁移除，‘我的题库’原文件不受影响");
   }
 
-  const allSelected = banks.length > 0 && banks.every((bank) => selected.includes(bank.id));
+  const allSelected = visibleSources.length > 0 && visibleSources.every((bank) => selected.includes(bank.id));
   return <div className="bank-request-page bank-vault-page">
     <header className="bank-page-header"><button className="bank-request-back" onClick={onBack} aria-label="返回我的题库"><ChevronLeft />返回题库</button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><strong className="bank-request-page-title">藏经阁</strong></header>
     <main>
-      <section className="bank-request-compose bank-vault-uploader"><header><div><span>PUBLIC QUESTION BANK PAVILION</span><h1>把现有题库收入公共藏经阁</h1><p>登录后可把“我的题库”批量上传；所有注册用户均可浏览与下载，重复上传同一主键时自动更新你的版本。</p></div><Upload /></header><div className="bank-vault-select-head"><button type="button" onClick={() => setSelected(allSelected ? [] : banks.map((bank) => bank.id))}><CheckCircle2 />{allSelected ? "取消全选" : "全选题库"}</button><span>已选择 {selected.length}/{banks.length}</span></div>{banks.length ? <div className="bank-vault-source-grid">{banks.map((bank) => <button type="button" key={bank.id} className={selected.includes(bank.id) ? "active" : ""} onClick={() => toggleSelected(bank.id)}><i>{selected.includes(bank.id) && <Check />}</i><span><strong>{bank.name}</strong><small>{bank.groupName || "未分组"} · {bank.questions.length} 题</small></span></button>)}</div> : <div className="bank-request-empty"><Database /><strong>“我的题库”还是空的</strong><p>请先返回题库页导入文件，再批量收入藏经阁。</p></div>}<footer><button className="primary-action" onClick={() => void uploadSelected()} disabled={!selected.length || busy}><Upload />{busy ? "正在上传…" : `上传 ${selected.length || ""} 份题库`}</button></footer></section>
+      <section className="bank-request-compose bank-vault-uploader"><header><div><span>PUBLIC QUESTION BANK PAVILION</span><h1>把现有题库收入公共藏经阁</h1><p>登录后可把“我的题库”批量上传；所有注册用户均可浏览与下载，重复上传同一主键时自动更新你的版本。</p></div><Upload /></header><label className="bank-vault-source-search"><Search size={18}/><input aria-label="搜索待上传题库" value={sourceQuery} onChange={e=>setSourceQuery(e.target.value)} placeholder="搜索题库名称、分组或来源"/>{sourceQuery&&<button type="button" aria-label="清空待上传搜索" onClick={()=>setSourceQuery("")}><X size={16}/></button>}</label><div className="bank-vault-select-head"><button type="button" onClick={() => setSelected(ids => allSelected ? ids.filter(id => !visibleSources.some(bank => bank.id === id)) : [...new Set([...ids, ...visibleSources.map(bank => bank.id)])])}><CheckCircle2 />{allSelected ? "取消全选" : (sourceQuery.trim() ? "全选搜索结果" : "全选题库")}</button><span>已选择 {selected.length}/{banks.length} · 显示 {visibleSources.length} 份</span></div>{visibleSources.length ? <div className="bank-vault-source-grid">{visibleSources.map((bank) => <button type="button" key={bank.id} className={selected.includes(bank.id) ? "active" : ""} onClick={() => toggleSelected(bank.id)}><i>{selected.includes(bank.id) && <Check />}</i><span><strong>{bank.name}</strong><small>{bank.groupName || "未分组"} · {bank.questions.length} 题</small></span></button>)}</div> : <div className="bank-request-empty"><Database /><strong>{banks.length ? "没有匹配的题库" : "“我的题库”还是空的"}</strong><p>{banks.length ? "换一个关键词试试，已选择的题库会保留。" : "请先导入题库，再批量收入藏经阁。"}</p></div>}<footer><button className="primary-action" onClick={() => void uploadSelected()} disabled={!selected.length || busy}><Upload />{busy ? "正在上传…" : `上传 ${selected.length || ""} 份题库`}</button></footer></section>
       <section className="bank-request-list"><nav className="bank-request-stage-nav" aria-label="按培养阶段筛选藏经阁"><button className={stageFilter === "全部" ? "active" : ""} onClick={() => setStageFilter("全部")}>全部</button>{PAVILION_STUDY_STAGES.map((stage) => <button className={stageFilter === stage ? "active" : ""} key={stage} onClick={() => setStageFilter(stage)}>{stage}</button>)}</nav><header><div><span>PUBLIC PAVILION COLLECTION</span><h2>公共题库清单 <em>{visibleEntries.length}/{entries.length}</em></h2></div><label className="bank-request-search"><Search size={16} /><input aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库或原分组" /></label></header>{!account ? <div className="bank-request-empty"><UserRound /><strong>登录后查看公共藏经阁</strong><p>注册用户共享同一份题库清单，登录后即可浏览和下载。</p><button className="primary-action" onClick={onRequireLogin}>登录 / 注册</button></div> : visibleEntries.length ? <div className="bank-request-grid bank-vault-grid">{visibleEntries.map((entry) => <article key={entry.id}><header><span>{entry.studyStage}</span><em>{entry.own ? "我的上传" : entry.uploaderNickname || "共享"}</em></header><h3>{entry.name}</h3><p className="bank-request-subject">{entry.groupName || "未分组"} · 总题 {entry.questionCount} / 单选 {entry.singleCount ?? "—"} / X {entry.multipleCount ?? "—"}</p><small>更新于 {new Date(entry.uploadedAt).toLocaleString("zh-CN")}</small><footer><button onClick={() => void downloadEntry(entry)}><Download />下载 JSON</button>{entry.own && <button className="danger" aria-label={`移出 ${entry.name}`} title="移出藏经阁" onClick={() => void removeEntry(entry.id)}><Trash2 /></button>}</footer></article>)}</div> : <div className="bank-request-empty"><Library /><strong>{entries.length ? "当前筛选没有题库" : "藏经阁里还没有题库"}</strong><p>{entries.length ? "可切换培养阶段或减少搜索词。" : "从上方选择一份或多份现有题库，批量上传即可。"}</p></div>}</section>
     </main>{message && <SuccessToast message={message} onClose={() => setMessage("")} />}
   </div>;
@@ -3345,11 +3363,13 @@ function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: 
   return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>跨题库检索 · 按相关度排序</span><h2>搜索全部题库</h2></div><button onClick={onClose} aria-label={returnToQuiz ? "关闭搜索并返回当前题目" : "关闭搜索"}><X /></button></header>{returnToQuiz && <button className="search-return-strip" onClick={onClose}><ChevronLeft size={16} /><span><strong>当前练习已为你保留</strong><small>关闭搜索即可回到刚才的题目与已选答案</small></span></button>}<label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="题库名、疾病、症状或知识点；多个词用空格分隔" /><kbd>{results.length}</kbd></label><div className="search-results">{query.trim() ? results.length ? results.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => void onOpen(bank, question.id)}><span>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b> · {question.category} · 原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight size={17} /></button>) : <div className="search-empty"><CircleHelp /><p>没有找到同时匹配这些关键词的题目。可减少一个词，或改用疾病、症状及题库名称。</p></div> : <div className="search-empty search-guide"><Search /><p>输入关键词后，会同时检索所有题库，并优先显示题库名、分类和题干中的精准命中。</p></div>}</div></section></div>;
 }
 
-function NotesPage({ banks, progress, favorites, notes, onOpen, onBack }: {
+function NotesPage({ banks, progress, favorites, notes, tagCatalog, onManageTag, onOpen, onBack }: {
   banks: SavedQuestionBank[];
   progress: Progress;
   favorites: string[];
   notes: Record<string, string>;
+  tagCatalog: string[];
+  onManageTag: (action: TagAction, tag: string, replacement?: string) => void;
   onOpen: (bank: SavedQuestionBank, questionId: string) => Promise<void> | void;
   onBack: () => void;
 }) {
@@ -3358,15 +3378,18 @@ function NotesPage({ banks, progress, favorites, notes, onOpen, onBack }: {
   const [matchAllTags, setMatchAllTags] = useState(true);
   const [tagQuery, setTagQuery] = useState("");
   const [exportMessage, setExportMessage] = useState("");
+  const [tagAction, setTagAction] = useState<{ action: TagAction; tag: string } | null>(null);
+  const [tagName, setTagName] = useState("");
+  const [tagError, setTagError] = useState("");
   const allEntries = useMemo(() => banks.flatMap((bank) => bank.questions.flatMap((question) => {
     const markdown = notes[question.id]?.trim() ?? "";
     return markdown ? [{ bank, question, markdown, tags: parseNoteTags(markdown) }] : [];
   })), [banks, notes]);
   const tagCounts = useMemo(() => {
-    const counts = new Map<string, number>();
+    const counts = new Map<string, number>(tagCatalog.map(tag => [tag, 0]));
     allEntries.forEach((entry) => entry.tags.forEach((tag) => counts.set(tag, (counts.get(tag) ?? 0) + 1)));
     return [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "zh-CN"));
-  }, [allEntries]);
+  }, [allEntries, tagCatalog]);
   const visibleTags = useMemo(() => tagCounts.filter(([tag]) => tag.toLocaleLowerCase().includes(tagQuery.trim().toLocaleLowerCase())), [tagCounts, tagQuery]);
   const entries = useMemo(() => {
     const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -3385,6 +3408,15 @@ function NotesPage({ banks, progress, favorites, notes, onOpen, onBack }: {
   const wrongNotes = allEntries.filter((entry) => progress[entry.question.id] === "wrong").length;
   const featuredNotes = allEntries.filter((entry) => favorites.includes(entry.question.id)).length;
   const toggleTag = (tag: string) => setActiveTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]);
+  const openTagAction = (action: TagAction, tag = "") => { setTagAction({action,tag}); setTagName(action === "rename" ? tag : ""); setTagError(""); };
+  const submitTagAction = () => {
+    if (!tagAction) return;
+    try {
+      onManageTag(tagAction.action, tagAction.action === "add" ? tagName : tagAction.tag, tagName);
+      setActiveTags(current => [...new Set(current.flatMap(tag => tag !== tagAction.tag ? [tag] : tagAction.action === "rename" ? [cleanNoteTag(tagName)] : []))]);
+      setTagAction(null);
+    } catch (error) { setTagError(error instanceof Error ? error.message : "标签暂时无法修改。"); }
+  };
   const exportPdf = () => {
     setExportMessage("");
     try {
@@ -3398,9 +3430,10 @@ function NotesPage({ banks, progress, favorites, notes, onOpen, onBack }: {
     {exportMessage && <p className="notes-export-message notes-page-message">{exportMessage}</p>}
     <section className="notes-dashboard" aria-label="笔记概览"><article><NotebookPen /><div><strong>{allEntries.length}</strong><span>笔记</span></div></article><article><Link2 /><div><strong>{tagCounts.length}</strong><span>标签</span></div></article><article><AlertCircle /><div><strong>{wrongNotes}</strong><span>错题笔记</span></div></article><article><Star /><div><strong>{featuredNotes}</strong><span>精选笔记</span></div></article></section>
     <div className="notes-page-workspace">
-      <aside className="notes-tag-library"><div className="notes-tag-library-heading"><div><span>标签组合</span><strong>{activeTags.length ? `已选 ${activeTags.length} 个` : "全部标签"}</strong></div>{activeTags.length > 0 && <button onClick={() => setActiveTags([])}>清空</button>}</div><label><Search size={14} /><input value={tagQuery} onChange={(event) => setTagQuery(event.target.value)} placeholder={`查找 ${tagCounts.length} 个标签`} /></label>{activeTags.length > 1 && <div className="notes-tag-logic"><button className={matchAllTags ? "active" : ""} onClick={() => setMatchAllTags(true)}>同时包含</button><button className={!matchAllTags ? "active" : ""} onClick={() => setMatchAllTags(false)}>任一标签</button></div>}<div className="notes-tag-cloud">{visibleTags.map(([tag, count]) => <button key={tag} className={activeTags.includes(tag) ? "active" : ""} onClick={() => toggleTag(tag)}><span>#{tag}</span><em>{count}</em></button>)}</div></aside>
+      <aside className="notes-tag-library"><div className="notes-tag-library-heading"><div><span>标签组合</span><strong>{activeTags.length ? `已选 ${activeTags.length} 个` : "全部标签"}</strong></div>{activeTags.length > 0 && <button onClick={() => setActiveTags([])}>清空</button>}</div><label><Search size={14} /><input value={tagQuery} onChange={(event) => setTagQuery(event.target.value)} placeholder={`查找 ${tagCounts.length} 个标签`} /></label>{activeTags.length > 1 && <div className="notes-tag-logic"><button className={matchAllTags ? "active" : ""} onClick={() => setMatchAllTags(true)}>同时包含</button><button className={!matchAllTags ? "active" : ""} onClick={() => setMatchAllTags(false)}>任一标签</button></div>}<button className="notes-tag-add" type="button" onClick={()=>openTagAction("add")}><Plus size={15}/>添加标签</button><div className="notes-tag-cloud">{visibleTags.map(([tag, count]) => <div className="notes-tag-row" key={tag}><button type="button" className={activeTags.includes(tag) ? "active" : ""} onClick={() => toggleTag(tag)}><span>#{tag}</span><em>{count}</em></button><button type="button" aria-label={"改名标签 "+tag} title="改名" onClick={()=>openTagAction("rename",tag)}><Pencil size={14}/></button><button type="button" aria-label={"删除标签 "+tag} title="删除标签，保留笔记" onClick={()=>openTagAction("delete",tag)}><Trash2 size={14}/></button></div>)}{!visibleTags.length&&<p className="notes-tag-empty">{tagCounts.length ? "没有匹配的标签" : "添加标签，方便整理笔记 🏷️"}</p>}</div></aside>
       <main className="notes-library-main"><label className="notes-page-search"><Search size={19} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库、题目、笔记正文、来源或标签" /><kbd>{entries.length}</kbd></label>{activeTags.length > 0 && <div className="notes-active-tags"><span>{matchAllTags ? "同时包含" : "包含任一"}</span>{activeTags.map((tag) => <button key={tag} onClick={() => toggleTag(tag)}>#{tag}<X size={12} /></button>)}</div>}<div className="notes-card-grid">{entries.length ? entries.map(({ bank, question, markdown, tags }) => <article className="notes-library-card" key={`${bank.id}-${question.id}`}><header><span>{question.medicalQuestionType || (question.multiple ? "多选" : "单选")}</span><small>{bank.name} · 原题号 {question.sourceNumber}</small></header><button className="notes-card-open" onClick={() => void onOpen(bank, question.id)}><strong>{question.stem || `原题号 ${question.sourceNumber}`}</strong><p>{markdownSummary(markdown)}</p></button>{tags.length > 0 && <footer>{tags.map((tag) => <button key={tag} className={activeTags.includes(tag) ? "active" : ""} onClick={() => toggleTag(tag)}>#{tag}</button>)}</footer>}</article>) : <div className="notes-page-empty"><NotebookPen /><h3>{allEntries.length ? "没有匹配的笔记" : "这里还没有笔记"}</h3><p>{allEntries.length ? "减少关键词或取消一个叠加标签，再试一次。" : "答题时记录判断依据、添加标签，或把 AI 解析写入笔记后会自动汇总到这里。"}</p></div>}</div></main>
     </div>
+    {tagAction && <div className="modal-layer" onClick={() => setTagAction(null)}><section className="note-tag-dialog" role="dialog" aria-modal="true" aria-labelledby="note-tag-dialog-title" onClick={event => event.stopPropagation()}><header><h2 id="note-tag-dialog-title">{tagAction.action === "add" ? "🏷️ 添加标签" : tagAction.action === "rename" ? "✏️ 标签改名" : "🗑️ 删除标签"}</h2><button className="icon-button" aria-label="关闭标签编辑" onClick={() => setTagAction(null)}><X /></button></header>{tagAction.action === "delete" ? <p>删除 #{tagAction.tag}，仅移除笔记中的这个标签，正文和图片都会保留。此修改会参与多端同步。</p> : <label>标签名称<input autoFocus aria-label="标签名称" value={tagName} maxLength={24} onChange={event => setTagName(event.target.value)} onKeyDown={event => { if (event.key === "Enter") submitTagAction(); }} placeholder="例如：传染病、易错点" /><small>支持中文、英文、数字、_ 和 -；改名会更新所有相关笔记。</small></label>}{tagError && <p role="alert" className="note-tag-error">{tagError}</p>}<footer><button className="secondary-action" onClick={() => setTagAction(null)}>取消</button><button className="primary-action" onClick={submitTagAction}>{tagAction.action === "delete" ? "确认移除标签" : "保存标签"}</button></footer></section></div>}
   </div>;
 }
 

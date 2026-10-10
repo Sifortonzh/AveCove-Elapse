@@ -5,6 +5,26 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("note tags support add rename and removal while retaining notes and other tags", async () => {
+  const output = ts.transpileModule(await text("app/lib/note-tags.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { changeNoteTags, noteTagCatalog } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const notes = { a: "判断依据\n#传染病 #传染病学\n![图](https://example.test/x.png)", b: "#传染病 #易错点", c: "无标签正文" };
+  const original = structuredClone(notes);
+  const added = changeNoteTags(notes, [], "add", "#待复习");
+  assert.deepEqual(added.notes, notes); assert.ok(added.catalog.includes("待复习")); assert.deepEqual(added.changedIds, []);
+  const renamed = changeNoteTags(notes, added.catalog, "rename", "传染病", "感染");
+  assert.match(renamed.notes.a, /#感染 #传染病学/); assert.match(renamed.notes.a, /!\[图\]/);
+  assert.deepEqual(renamed.changedIds, ["a", "b"]); assert.equal(renamed.notes.c, notes.c);
+  const removed = changeNoteTags(renamed.notes, renamed.catalog, "delete", "感染");
+  assert.match(removed.notes.a, /判断依据/); assert.match(removed.notes.a, /#传染病学/); assert.doesNotMatch(removed.notes.a, /#感染/);
+  assert.ok(!removed.catalog.includes("感染")); assert.ok(removed.catalog.includes("待复习")); assert.deepEqual(notes, original);
+  assert.throws(() => changeNoteTags(notes, [], "add", " # "), /标签名称/);
+  assert.deepEqual(noteTagCatalog(["#感染", "感染", null]), ["感染"]);
+  const page = await text("app/page.tsx");
+  assert.match(page, /aria-label="搜索待上传题库"/); assert.match(page, /全选搜索结果/);
+  assert.match(page, /visibleSources\.map/); assert.match(page, /stampLearningRecord\(ledger, id, \{ note:/);
+});
+
 test("A3 correction separates shared cases and groups children without losing answers", async () => {
   const output = ts.transpileModule(await text("app/lib/shared-case.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   const { sharedCaseDraft, reviseSharedCase, groupSharedCases } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
@@ -742,7 +762,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1502,7 +1522,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.3.9.3");
+  assert.equal(JSON.parse(packageJson).version, "2.3.9.4");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1901,7 +1921,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1962,7 +1982,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -1980,7 +2000,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2000,7 +2020,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
