@@ -4,6 +4,7 @@ import { inferPavilionStudyStage, parseSharedQuestionBankPackage, type SharedQue
 import { readSession } from "@/app/lib/server/auth";
 import { query } from "@/app/lib/server/db";
 import { allowRequest } from "@/app/lib/server/rate-limit";
+import { isXQuestion } from "@/app/lib/practice-stats";
 
 type PavilionRow = {
   id: string;
@@ -12,6 +13,8 @@ type PavilionRow = {
   group_name: string;
   study_stage: string;
   question_count: number;
+  single_count: number;
+  multiple_count: number;
   uploader_nickname: string;
   updated_at: Date;
   own: boolean;
@@ -41,6 +44,13 @@ function ensurePavilionTable() {
         )
       `);
       await query("CREATE INDEX IF NOT EXISTS pavilion_question_banks_stage_idx ON pavilion_question_banks(study_stage, updated_at DESC)");
+      await query("ALTER TABLE pavilion_question_banks ADD COLUMN IF NOT EXISTS single_count INTEGER, ADD COLUMN IF NOT EXISTS multiple_count INTEGER");
+      await query(`UPDATE pavilion_question_banks p SET multiple_count = counts.x, single_count = counts.total - counts.x
+        FROM (SELECT id, count(*)::int AS total,
+          count(*) FILTER (WHERE q->>'multiple'='true' OR upper(trim(q->>'questionType')) IN ('X','多','多选')
+            OR q->>'medicalQuestionType'='X' OR jsonb_array_length(COALESCE(q->'answer','[]'::jsonb))>1)::int AS x
+          FROM pavilion_question_banks, LATERAL jsonb_array_elements(payload#>'{bank,questions}') q
+          WHERE single_count IS NULL GROUP BY id) counts WHERE p.id=counts.id`);
     })().catch((error) => {
       globalThis.__avecovePavilionTableReady = undefined;
       throw error;
@@ -57,6 +67,8 @@ function publicEntry(row: PavilionRow) {
     groupName: row.group_name,
     studyStage: row.study_stage,
     questionCount: row.question_count,
+    singleCount: row.single_count,
+    multipleCount: row.multiple_count,
     uploaderNickname: row.uploader_nickname,
     uploadedAt: row.updated_at.toISOString(),
     own: row.own,
@@ -76,7 +88,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ package: rows[0].payload }, { headers: { "Cache-Control": "private, no-store" } });
     }
     const rows = await query<PavilionRow>(
-      `SELECT id, source_bank_id, name, group_name, study_stage, question_count, uploader_nickname, updated_at,
+      `SELECT id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, uploader_nickname, updated_at,
         (user_id = $1) AS own
        FROM pavilion_question_banks
        ORDER BY updated_at DESC LIMIT 500`,
@@ -107,14 +119,15 @@ export async function POST(request: Request) {
     await ensurePavilionTable();
     const rows = await query<PavilionRow>(
       `INSERT INTO pavilion_question_banks
-        (id, user_id, source_bank_id, name, group_name, study_stage, question_count, payload, uploader_nickname)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+        (id, user_id, source_bank_id, name, group_name, study_stage, question_count, payload, uploader_nickname, single_count, multiple_count)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)
        ON CONFLICT (user_id, source_bank_id) DO UPDATE SET
         name = EXCLUDED.name, group_name = EXCLUDED.group_name, study_stage = EXCLUDED.study_stage,
         question_count = EXCLUDED.question_count, payload = EXCLUDED.payload,
+        single_count = EXCLUDED.single_count, multiple_count = EXCLUDED.multiple_count,
         uploader_nickname = EXCLUDED.uploader_nickname, updated_at = NOW()
-       RETURNING id, source_bank_id, name, group_name, study_stage, question_count, uploader_nickname, updated_at, true AS own`,
-      [randomUUID(), session.userId, sourceBankId, parsed.name.slice(0, 160), groupName, stage, parsed.questions.length, JSON.stringify(payload), session.nickname.slice(0, 30)],
+       RETURNING id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, uploader_nickname, updated_at, true AS own`,
+      [randomUUID(), session.userId, sourceBankId, parsed.name.slice(0, 160), groupName, stage, parsed.questions.length, JSON.stringify(payload), session.nickname.slice(0, 30), parsed.questions.filter(q => !isXQuestion(q)).length, parsed.questions.filter(isXQuestion).length],
     );
     return NextResponse.json({ entry: publicEntry(rows[0]) });
   } catch {

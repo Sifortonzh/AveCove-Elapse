@@ -1,0 +1,6 @@
+# App-only release: reuse verified production dependencies; no server-side compilation.
+FROM allo-app:latest
+USER root
+RUN rm -rf /app/.next
+COPY --chown=1001:1001 runtime/ /app/
+USER nextjs

@@ -5,6 +5,22 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("filtered progress, chapter totals and newer settings share one contract", async () => {
+  const output = ts.transpileModule(await text("app/lib/practice-stats.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { practiceStats, newerPreferences } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const questions = [{id:"s",multiple:false,answer:["A"]},{id:"x",multiple:false,medicalQuestionType:"X",answer:["A"]},{id:"k",multiple:false,answer:[]}];
+  assert.equal(practiceStats(questions,{s:"correct"},true,["k"]).percent,100);
+  assert.equal(practiceStats(questions,{s:"correct"},false,["k"]).percent,50);
+  assert.equal(practiceStats(questions,{},true,["s","k"]).percent,0);
+  assert.equal(newerPreferences({updatedAt:20,scope:"all"},{updatedAt:10,scope:"wrong"}).scope,"all");
+  assert.equal(newerPreferences({updatedAt:20},{updatedAt:30,questionTypes:"single"}).questionTypes,"single");
+  const page = await text("app/page.tsx");
+  assert.match(page,/章节 \{chapterStats.answered\}\/\{chapterStats.total\}/);
+  assert.match(page,/单选 \{entry.singleCount/);
+  assert.match(page,/MarkdownNotePreview value=\{current.explanation\}/);
+  assert.match(await text("app/components/PracticeExtras.tsx"),/"✅" : "❌"/);
+});
+
 test("split sync isolates bank writes and retries only temporary failures", async () => {
   const route = await text("app/api/sync/route.ts");
   const store = await text("app/lib/server/sync-store.ts");
@@ -702,7 +718,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -790,7 +806,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /仅做单选/);
   assert.match(page, /单选＋X 型/);
   assert.match(page, /active\.questionTypes === "single" && isXQuestion\(question\)/);
-  assert.match(page, /question\.medicalQuestionType === "X"/);
+  assert.match(await text("app/lib/practice-stats.ts"), /question\.medicalQuestionType === "X"/);
   assert.match(page, /multiple accept="\.json,application\/json"/);
   assert.match(page, /DocumentImportWorkbench/);
   assert.match(page, /下载提取文字 JSON/);
@@ -1462,7 +1478,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.3.9.1");
+  assert.equal(JSON.parse(packageJson).version, "2.3.9.2");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1822,7 +1838,7 @@ test("ships the v2.1.2 jump-safe practice and library refinements", async () => 
   assert.match(page, /const sessionCompleted = sessionQuestions\.filter/);
   assert.match(page, /completed=\{sessionCompleted\}/);
   assert.match(page, /props\.completed \/ Math\.max\(total, 1\)/);
-  assert.match(page, /已完成 \{props\.completed\}\/\{total\}/);
+  assert.match(page, /章节 \{chapterStats\.answered\}\/\{chapterStats\.total\}/);
   assert.match(page, /scrollIntoView\(\{ block: "center", inline: "center" \}\)/);
   assert.match(page, /aria-current=\{index === currentIndex/);
   assert.match(page, /aria-label="导出题库复习笔记"/);
@@ -1861,7 +1877,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1922,7 +1938,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -1940,7 +1956,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -1960,7 +1976,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.1");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

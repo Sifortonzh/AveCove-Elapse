@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.3.9.1" src="https://img.shields.io/badge/version-2.3.9.1-b43d35" />
+    <img alt="Version 2.3.9.2" src="https://img.shields.io/badge/version-2.3.9.2-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.9.1.** Sync now stores Chinese bank bodies separately from learning records: ordinary answer/note updates no longer rewrite entire libraries. Existing accounts migrate losslessly on first connection; legacy snapshots remain for recovery. Transient failures retry twice, and returning online or to the foreground refreshes cloud changes. Upload confirmation is distinct from download completion. Capacity remains 96 MB decoded / 24 MB compressed; use the same sync identity on each device.
+> **Current release: v2.3.9.2.** Chapters use ✅/❌ and show answered/total counts. Timestamped preferences survive synchronization; quick review does not replace your usual settings. Single-choice filtering also controls bank completion. Pavilion cards show total, single-choice and X-type counts. Saved explanations below questions support Markdown. Bank bodies remain separate from learning records, with legacy snapshots retained for recovery. Capacity is 96 MB decoded / 24 MB compressed.
 
 Self-hosters: run `npm run db:migrate` before starting this release. The deployment workflow applies the additive `db/sync-v3.sql` migration automatically. The Pavilion remains independent. English library bodies still use the learning snapshot; independent media storage is a future upgrade, not included in this patch.
 

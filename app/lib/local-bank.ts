@@ -36,6 +36,8 @@ export type PavilionQuestionBank = {
   sourceBankId: string;
   name: string;
   questionCount: number;
+  singleCount?: number;
+  multipleCount?: number;
   groupName: string;
   studyStage: PavilionStudyStage;
   uploadedAt: string;

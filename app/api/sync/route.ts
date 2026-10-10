@@ -5,6 +5,7 @@ import { mergeLearningRecords } from "@/app/lib/record-sync";
 import { readSyncRequest, syncJsonResponse, SyncTransferError } from "@/app/lib/server/sync-transfer";
 import { MAX_SYNC_CONTENT_BYTES } from "@/app/lib/sync-transfer";
 import { ensureSyncStore, readSyncBank, readSyncSnapshot, saveChangedSyncBanks } from "@/app/lib/server/sync-store";
+import { newerPreferences } from "@/app/lib/practice-stats";
 
 type StateRow = { payload: Record<string, unknown>; version: number; updated_at: Date };
 // Compressed transport stays below Nginx's 25 MB limit; decoded data is bounded.
@@ -142,6 +143,10 @@ export async function PUT(request: Request) {
     const mergedPayload = {
       ...currentPayload,
       ...allowed,
+      settings: newerPreferences(
+        (currentPayload.settings ?? {}) as { updatedAt?: number },
+        (allowed.settings ?? {}) as { updatedAt?: number },
+      ),
       progress: records.progress,
       firstProgress: records.firstProgress,
       favorites: records.favorites,
