@@ -6,7 +6,8 @@ const compile = source => 'data:text/javascript;base64,' + Buffer.from(ts.transp
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
 }).outputText).toString('base64');
 const grouping = compile(await readFile('app/lib/bank-grouping.ts', 'utf8'));
-const source = (await readFile('app/lib/local-bank.ts', 'utf8')).replace(/from "\.\/bank-grouping"/g, `from "${grouping}"`);
+const sharedCase = compile(await readFile('app/lib/shared-case.ts', 'utf8'));
+const source = (await readFile('app/lib/local-bank.ts', 'utf8')).replace(/from "\.\/bank-grouping"/g, `from "${grouping}"`).replace(/from "\.\/shared-case"/g, `from "${sharedCase}"`);
 const { parseSharedQuestionBankPackage } = await import(compile(source));
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
