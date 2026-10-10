@@ -5,6 +5,28 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("A3 correction separates shared cases and groups children without losing answers", async () => {
+  const output = ts.transpileModule(await text("app/lib/shared-case.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { sharedCaseDraft, reviseSharedCase, groupSharedCases } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const shared = "25岁妇女，肛周扁平丘疹半个月，无痛痒。查体：肛周分布6个直径3～5mm大小扁平丘疹，皮肤色，少许分泌物。既往患者有2个性伴。";
+  const base = { category:"皮肤",options:[{label:"A",text:"甲"},{label:"B",text:"乙"}],answer:["B"],multiple:false,explanation:"**原解析**",sourceImages:[{url:"https://example.test/image.png"}] };
+  const bank = [{...base,id:"q1",sourceNumber:"11",stem:shared+"最可能的诊断？"},{...base,id:"q2",sourceNumber:"12",stem:shared+"应选择何种检查？"},{...base,id:"q3",sourceNumber:"13",category:"另一章",stem:shared+"怎样治疗？"},{...base,id:"q4",sourceNumber:"14",stem:"另一个患者的诊断？"}];
+  const untouched=structuredClone(bank);
+  const draft=sharedCaseDraft(bank[0],bank);
+  assert.equal(draft.sharedStem,shared);assert.equal(draft.children.length,2);assert.equal(draft.children[0].stem,"最可能的诊断？");
+  const updated=reviseSharedCase(bank,{...bank[0],medicalQuestionType:"A3",questionType:"A",sharedStem:shared,stem:"最可能的诊断？"});
+  assert.equal(updated[1].stem,"应选择何种检查？");assert.equal(updated[0].sharedStemGroup,updated[1].sharedStemGroup);
+  assert.deepEqual(updated[1].answer,bank[1].answer);assert.deepEqual(updated[1].options,bank[1].options);assert.deepEqual(updated[1].sourceImages,bank[1].sourceImages);assert.equal(updated[1].explanation,bank[1].explanation);
+  assert.deepEqual(updated.map(q=>q.id),bank.map(q=>q.id));assert.deepEqual(updated[2],bank[2]);assert.deepEqual(updated[3],bank[3]);assert.deepEqual(bank,untouched);
+  const edit=reviseSharedCase(updated,{...updated[0],sharedStem:shared+"补充病史。"},[{...updated[1],stem:"修改后的小题问题？"}]);
+  assert.equal(edit[1].sharedStem,shared+"补充病史。");assert.equal(edit[1].stem,"修改后的小题问题？");
+  const groups=groupSharedCases([{...updated[0],sharedStemGroup:"same"},{...updated[1],sharedStemGroup:"other"},{...updated[0],id:"other-chapter",category:"另一章",sharedStemGroup:"same"}]);
+  assert.equal(groups[0].sharedStemGroup,groups[1].sharedStemGroup);assert.notEqual(groups[0].sharedStemGroup,groups[2].sharedStemGroup);
+  const withoutGroup=reviseSharedCase(updated,{...updated[0],medicalQuestionType:"A1",sharedStem:undefined,sharedStemGroup:undefined,stem:shared+"最可能的诊断？"});
+  assert.equal(withoutGroup[0].sharedStem,undefined);assert.deepEqual(withoutGroup[1],updated[1]);
+  const page=await text("app/page.tsx");assert.match(page,/aria-label="共用题干"/);assert.match(page,/同组小题 ·/);assert.match(page,/setQuestions\(saved.questions\)/);
+});
+
 test("filtered progress, chapter totals and newer settings share one contract", async () => {
   const output = ts.transpileModule(await text("app/lib/practice-stats.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   const { practiceStats, newerPreferences } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
@@ -142,7 +164,9 @@ test("question images keep portable sources through the real importer and share 
     compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
   }).outputText).toString("base64")}`;
   const groupingUrl = compile(await text("app/lib/bank-grouping.ts"));
-  const bankSource = (await text("app/lib/local-bank.ts")).replace(/from "\.\/bank-grouping"/g, `from "${groupingUrl}"`);
+  const sharedOutput = ts.transpileModule(await text("app/lib/shared-case.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const sharedUrl = `data:text/javascript;base64,${Buffer.from(sharedOutput).toString("base64")}`;
+  const bankSource = (await text("app/lib/local-bank.ts")).replace(/from "\.\/bank-grouping"/g, `from "${groupingUrl}"`).replace(/from "\.\/shared-case"/g, `from "${sharedUrl}"`);
   const { parseSharedQuestionBankPackage, createSharedQuestionBankPackage } = await import(compile(bankSource));
   const { normalizeQuestionImages } = await import(compile(await text("app/lib/question-images.ts")));
   const image = { name: "image1.png", dataUrl: "data:image/png;base64,iVBORw0KGgo=", caption: "示意图" };
@@ -718,7 +742,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1478,7 +1502,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.3.9.2");
+  assert.equal(JSON.parse(packageJson).version, "2.3.9.3");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1877,7 +1901,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1938,7 +1962,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -1956,7 +1980,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -1976,7 +2000,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.2");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.3");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

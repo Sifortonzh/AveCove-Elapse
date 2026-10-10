@@ -1,5 +1,6 @@
 import type { QuizQuestion } from "./question-parser";
 import { normalizeQuestionBankGroup, suggestQuestionBankGroup } from "./bank-grouping";
+import { groupSharedCases } from "./shared-case";
 
 export type SavedQuestionBank = {
   id: string;
@@ -186,10 +187,10 @@ function normalizeBank(input: QuestionBankInput): SavedQuestionBank {
   const id = input.id ?? createBankId();
   const now = new Date().toISOString();
   const name = input.name.trim() || "未命名题库";
-  const questions = input.questions.map((question, index) => normalizeQuestion({
+  const questions = groupSharedCases(input.questions.map((question, index) => normalizeQuestion({
     ...question,
     id: isNew ? `${id}:${index + 1}` : question.id,
-  }, `${id}:${index + 1}`));
+  }, `${id}:${index + 1}`)));
   const storedGroupName = normalizeQuestionBankGroup(input.groupName);
   return {
     id,

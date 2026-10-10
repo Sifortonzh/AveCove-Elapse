@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.3.9.2" src="https://img.shields.io/badge/version-2.3.9.2-b43d35" />
+    <img alt="版本 2.3.9.3" src="https://img.shields.io/badge/version-2.3.9.3-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.3.9.2。** 章节正误使用 ✅/❌，显示当前章节已做/总题数；筛选偏好按修改时间同步，快捷复盘不覆盖日常偏好。仅做单选时，题库进度按单选计算；藏经阁显示总题、单选和 X 型数量。题目下方的已录入解析支持 Markdown。中文题库正文与学习记录分表同步，旧快照保留用于恢复；容量为 96 MB 原始数据 / 24 MB 压缩传输。
+> **当前版本：v2.3.9.3。** A3/A4 修订支持“共用题干＋各小题问题”，自动关联同章节、相同病例的小题，保留独立选项、答案和记录；保存、同步与分享使用同一分组结构。章节正误使用 ✅/❌，显示当前章节已做/总题数；筛选偏好按修改时间同步，快捷复盘不覆盖日常偏好。仅做单选时，题库进度按单选计算；藏经阁显示总题、单选和 X 型数量。题目下方的已录入解析支持 Markdown。中文题库正文与学习记录分表同步，旧快照保留用于恢复；容量为 96 MB 原始数据 / 24 MB 压缩传输。
 
 自行部署请先执行 `npm run db:migrate`。自动发布流程会应用增量建表文件 `db/sync-v3.sql`。藏经阁保持独立；英文题库正文暂时仍保存在学习快照，独立图片存储属于后续升级，不包含在本次补丁中。
 

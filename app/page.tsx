@@ -43,6 +43,7 @@ import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 import { compactQuestionNumbers } from "./lib/question-number";
 import { isXQuestion, practiceStats, newerPreferences } from "./lib/practice-stats";
+import { sharedCaseDraft, removeSharedPrefix, reviseSharedCase } from "./lib/shared-case";
 import { encodeSyncRequest } from "./lib/sync-transfer";
 import { bankRevisions, banksNeedingTransfer } from "./lib/sync-revisions";
 import SyncStatusNotice from "./components/SyncStatusNotice";
@@ -1545,7 +1546,7 @@ export default function HomePage() {
     setToast(featured ? `“${updated.name}”已加入精选试卷 ⭐✨` : `“${updated.name}”已移出精选试卷`);
   }
 
-  async function reviseCurrentQuestion(revision: QuizQuestion) {
+  async function reviseCurrentQuestion(revision: QuizQuestion, children: QuizQuestion[] = []) {
     const optionLabels = new Set(revision.options.map((option) => option.label.toUpperCase()));
     const revisedAnswer = [...new Set(revision.answer.map((label) => label.toUpperCase()))]
       .filter((label) => optionLabels.has(label));
@@ -1557,9 +1558,7 @@ export default function HomePage() {
       answerPending: revisedAnswer.length === 0,
       multiple: revision.questionType === "X" || revisedAnswer.length > 1,
     };
-    const replaceQuestion = (items: QuizQuestion[]) => items.map((question) => (
-      question.id === revisedQuestion.id ? revisedQuestion : question
-    ));
+    const replaceQuestion = (items: QuizQuestion[]) => reviseSharedCase(items, revisedQuestion, children);
     const nextQuestions = replaceQuestion(questions);
     let saved: SavedQuestionBank;
 
@@ -1586,8 +1585,9 @@ export default function HomePage() {
       setQuestionBanks((banks) => [saved, ...banks.filter((candidate) => candidate.id !== saved.id)]);
     }
 
-    setQuestions(replaceQuestion(saved.questions));
-    setSessionQuestions((session) => replaceQuestion(session));
+    setQuestions(saved.questions);
+    const replacements = new Map(saved.questions.map(q => [q.id, q]));
+    setSessionQuestions((session) => session.map(q => replacements.get(q.id) ?? q));
     setAiTexts({});
 
     const previousSelection = answerSelections[revisedQuestion.id] ?? selected;
@@ -2699,7 +2699,7 @@ function QuizView(props: {
   onMobilePanel: () => void; onSearch: () => void;
   onOpenRelated: (questionId: string) => void;
   onUpdateKilled: (questionIds: string[], killed: boolean) => void;
-  onEditQuestion: (question: QuizQuestion) => Promise<void>;
+  onEditQuestion: (question: QuizQuestion, children?: QuizQuestion[]) => Promise<void>;
   onAddQuestion: (afterQuestionId: string, question: QuizQuestion) => Promise<void>;
   onDeleteQuestion: (questionId: string) => Promise<void>;
   knownNoteTags: string[];
@@ -2768,7 +2768,7 @@ function QuizView(props: {
     <nav className="quiz-bottom"><button onClick={props.onPrevious}><ChevronLeft /><span>上一题</span></button><button onClick={props.onAnswerSheet}><ListChecks /><span>答题卡</span></button><button className={favorite ? "active" : ""} onClick={props.onFavorite}><Star fill={favorite ? "currentColor" : "none"} /><span>精选</span></button><button onClick={props.onMobilePanel}><MessageCircle /><span>学习区</span></button><button onClick={props.onSettings}><Settings2 /><span>设置</span></button><button className="mobile-next" onClick={props.onNext}><ChevronRight /><span>下一题</span></button></nav>
       {props.mobilePanel && <div className="mobile-learning"><button className="drawer-close" aria-label="关闭学习区" onClick={props.onMobilePanel}><X /></button><LearningPanel bankName={props.bankName} onSearchNotes={props.onSearchNotes} current={current} submitted={submitted && answerAvailable} note={note} knownNoteTags={props.knownNoteTags} aiMode={aiMode} aiTexts={aiTexts} aiLoading={aiLoading} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onSaveAiExplanation={props.onSaveAiExplanation} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} /></div>}
       {showChapters && <ChapterDirectory questions={props.bankQuestions} progress={props.chapterProgress} currentQuestionId={current.id} onOpen={props.onOpenQuestion} onClose={() => setShowChapters(false)} />}
-      {editingQuestion && <QuestionCorrectionModal question={current} onSave={props.onEditQuestion} onClose={() => setEditingQuestion(false)} />}
+      {editingQuestion && <QuestionCorrectionModal question={current} bankQuestions={props.bankQuestions} onSave={props.onEditQuestion} onClose={() => setEditingQuestion(false)} />}
       {addingQuestion && <QuestionCorrectionModal creating question={addingQuestion} onSave={(question) => props.onAddQuestion(current.id, question)} onClose={() => setAddingQuestion(null)} />}
       {showKillQuestions && <KillQuestionsModal current={current} questions={props.bankQuestions} killed={props.killed} onApply={(ids, killed) => { props.onUpdateKilled(ids, killed); setShowKillQuestions(false); }} onClose={() => setShowKillQuestions(false)} />}
       {deletingQuestion && <div className="modal-layer question-delete-layer" onMouseDown={() => !deleteBusy && setDeletingQuestion(false)}><section className="question-delete-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="question-delete-title"><span><Trash2 /></span><div><small>DELETE QUESTION</small><h2 id="question-delete-title">删除原题号 {current.sourceNumber}？</h2><p>删除后，连续原题号会自动顺延；本题的作答、精选、笔记和斩题记录也会一并清理。分享与多端同步将采用删除后的版本。</p>{deleteError && <em>{deleteError}</em>}</div><footer><button className="ghost-action" disabled={deleteBusy} onClick={() => setDeletingQuestion(false)}>取消</button><button className="danger-action" disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); setDeleteError(""); try { await props.onDeleteQuestion(current.id); setDeletingQuestion(false); } catch (error) { setDeleteError(error instanceof Error ? error.message : "删除失败，请稍后重试"); } finally { setDeleteBusy(false); } }}><Trash2 />{deleteBusy ? "正在删除…" : "确认删除"}</button></footer></section></div>}
@@ -2803,13 +2803,17 @@ function KillQuestionsModal({ current, questions, killed, onApply, onClose }: {
   return <div className="modal-layer" onMouseDown={onClose}><section className="kill-question-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>SKIP WITHOUT SCORING</span><h2>斩题</h2><p>斩掉的题会直接跳过，答题卡以斜杠标记，不计入做题数、正确率或 306 得分。</p></div><button onClick={onClose} aria-label="关闭"><X /></button></header><button className={killed ? "restore-current" : "kill-current"} onClick={() => onApply([current.id], !killed)}>{killed ? <RotateCcw /> : <Scissors />}<span><strong>{killed ? "恢复当前题" : "斩掉当前题"}</strong><small>原题号 {current.sourceNumber} · {current.category}</small></span></button><div className="batch-kill-section"><label htmlFor="kill-question-range">批量斩题 · 当前章节原题号</label><input id="kill-question-range" value={range} onChange={(event) => setRange(event.target.value)} placeholder="例如：1-31，35，40-42" /><p>将在“{current.category}”中匹配 {matched.length} 题；不会波及其他章节的同号题。</p><button disabled={!matched.length} onClick={() => onApply(matched.map((question) => question.id), true)}><Scissors size={17} />确认批量斩题</button></div></section></div>;
 }
 
-function QuestionCorrectionModal({ question, creating = false, onSave, onClose }: {
+function QuestionCorrectionModal({ question, bankQuestions = [], creating = false, onSave, onClose }: {
   question: QuizQuestion;
+  bankQuestions?: QuizQuestion[];
   creating?: boolean;
-  onSave: (question: QuizQuestion) => Promise<void>;
+  onSave: (question: QuizQuestion, children?: QuizQuestion[]) => Promise<void>;
   onClose: () => void;
 }) {
   const [stem, setStem] = useState(question.stem);
+  const [sharedStem, setSharedStem] = useState(question.sharedStem ?? "");
+  const [addedChildren, setAddedChildren] = useState<string[]>([]);
+  const [childStems, setChildStems] = useState<Record<string, string>>({});
   const [options, setOptions] = useState(question.options.map((option) => ({ ...option })));
   const [answer, setAnswer] = useState([...question.answer]);
   const [medicalType, setMedicalType] = useState<MedicalQuestionType>(question.medicalQuestionType
@@ -2819,6 +2823,16 @@ function QuestionCorrectionModal({ question, creating = false, onSave, onClose }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const allowMultiple = medicalType === "X";
+  const sharedCase = medicalType === "A3" || medicalType === "A4";
+  const individualStem = sharedCase ? removeSharedPrefix(stem, sharedStem) : stem.trim();
+  const automaticChildren = sharedCase && sharedStem.trim()
+    ? sharedCaseDraft({ ...question, sharedStem }, bankQuestions).children.filter(q => q.id !== question.id && !q.multiple && !q.sharedOptionGroup)
+    : [];
+  const siblingIds = new Set([...automaticChildren.map(q => q.id), ...addedChildren]);
+  const siblings = bankQuestions.filter(q => siblingIds.has(q.id));
+  const childStem = (q: QuizQuestion) => childStems[q.id] ?? removeSharedPrefix(q.stem, sharedStem);
+  const nextChild = bankQuestions.slice(bankQuestions.findIndex(q => q.id === question.id) + 1)
+    .find(q => q.category === question.category && !siblingIds.has(q.id) && !q.multiple && !q.sharedOptionGroup);
   const medicalTypes: Array<{ id: MedicalQuestionType; name: string; detail: string }> = [
     { id: "A1", name: "A1", detail: "单句单选" },
     { id: "A2", name: "A2", detail: "病例单选" },
@@ -2833,7 +2847,8 @@ function QuestionCorrectionModal({ question, creating = false, onSave, onClose }
     || medicalType !== (question.medicalQuestionType
       ?? (question.questionType === "B" ? "B1" : question.questionType === "C" ? "C" : question.questionType === "X" ? "X" : "A1"));
   const valid = Boolean(
-    stem.trim()
+    individualStem.trim()
+    && (!sharedCase || (sharedStem.trim() && siblings.every(q => childStem(q).trim())))
     && options.length >= 2
     && options.every((option) => option.text.trim())
     && (!creating || answer.length > 0)
@@ -2850,6 +2865,15 @@ function QuestionCorrectionModal({ question, creating = false, onSave, onClose }
 
   const changeMedicalType = (nextType: MedicalQuestionType) => {
     setMedicalType(nextType);
+    if (nextType === "A3" || nextType === "A4") {
+      const draft = sharedCaseDraft({ ...question, stem, sharedStem }, bankQuestions);
+      setSharedStem(draft.sharedStem);
+      if (draft.sharedStem) setStem(removeSharedPrefix(stem, draft.sharedStem));
+    } else if (sharedCase) {
+      setStem([sharedStem.trim(), stem.trim()].filter(Boolean).join("\n"));
+      setSharedStem("");
+      setAddedChildren([]);
+    }
     if (nextType !== "X") setAnswer((current) => current.slice(0, 1));
   };
 
@@ -2889,15 +2913,17 @@ function QuestionCorrectionModal({ question, creating = false, onSave, onClose }
     try {
       await onSave({
         ...question,
-        stem: stem.trim(),
+        stem: individualStem.trim(),
         options: options.map((option) => ({ ...option, text: option.text.trim() })),
         answer: [...answer].sort(),
         answerPending: answer.length === 0,
         multiple: medicalType === "X",
         questionType: medicalType === "B1" ? "B" : medicalType === "C" ? "C" : medicalType === "X" ? "X" : "A",
         medicalQuestionType: medicalType,
+        sharedStem: sharedCase ? sharedStem.trim() : undefined,
+        sharedStemGroup: sharedCase ? question.sharedStemGroup : undefined,
         explanation: explanation.trim() || undefined,
-      });
+      }, sharedCase ? siblings.map(q => ({ ...q, stem: childStem(q).trim(), sharedStem: sharedStem.trim(), medicalQuestionType: medicalType, questionType: "A", multiple: false })) : []);
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "暂时无法保存修订，请稍后重试");
@@ -2909,8 +2935,10 @@ function QuestionCorrectionModal({ question, creating = false, onSave, onClose }
     <section className={`question-edit-modal ${creating ? "creating" : "editing"}`} role="dialog" aria-modal="true" aria-labelledby="question-edit-title" onMouseDown={(event) => event.stopPropagation()}>
       <header><div><span>{creating ? "INSERT QUESTION" : "QUESTION CORRECTION"}</span><h2 id="question-edit-title">{creating ? "在当前题后新增一道题" : "修订题目与标准答案"}</h2><p>{creating ? "填写题型、题目、选项与答案；解析可选。保存后，后续连续原题号会自动顺延。" : "发现识别错字时可直接修正；保存后，题库同步与分享文件都会采用新版本。"}</p></div><button onClick={onClose} disabled={busy} aria-label={creating ? "关闭新增题目" : "关闭纠错编辑"}><X /></button></header>
       <div className="question-edit-scroll">
-        <label className="question-edit-field"><span>题干</span><textarea value={stem} rows={4} onChange={(event) => setStem(event.target.value)} /></label>
         <section className="question-type-edit-section"><header><strong>医学题型</strong><span>可手动纠正 A1、A2、A3、A4、B1、C、X 型</span></header><div>{medicalTypes.map((type) => <button key={type.id} className={medicalType === type.id ? "active" : ""} onClick={() => changeMedicalType(type.id)}><b>{type.name}</b><span>{type.detail}</span></button>)}</div></section>
+        {sharedCase && <section className="shared-case-editor"><label className="question-edit-field"><span>共用题干 <small>{medicalType === "A4" ? "递进病例材料" : "同组病例只填写一次"}</small></span><textarea aria-label="共用题干" value={sharedStem} rows={4} onChange={event => setSharedStem(event.target.value)} placeholder="填写本组几道题共同使用的病例或材料" /></label>{!sharedStem.trim() && <button type="button" className="ghost-action" onClick={() => { setSharedStem(stem); setStem(""); }}>将现有题干移到共用题干 📋</button>}<p>相同章节、相同共用题干会自动关联；每道小题保留独立选项、答案和记录。</p></section>}
+        <label className="question-edit-field"><span>{sharedCase ? `小题 ${question.sourceNumber} · 单独问题` : "题干"}</span><textarea aria-label={sharedCase ? "当前小题问题" : "题干"} value={stem} rows={sharedCase ? 2 : 4} onChange={(event) => setStem(event.target.value)} placeholder={sharedCase ? "例如：该患者最可能的诊断是什么？" : undefined} /></label>
+        {sharedCase && <section className="shared-case-children"><header><strong>同组小题 · {siblings.length + 1} 题</strong>{!creating && nextChild && <button type="button" className="ghost-action" onClick={() => setAddedChildren(ids => [...ids, nextChild.id])}>＋ 加入后一题 {nextChild.sourceNumber}</button>}</header>{siblings.map(q => <label key={q.id} className="question-edit-field"><span>小题 {q.sourceNumber} · 单独问题{addedChildren.includes(q.id) && <button type="button" onClick={() => setAddedChildren(ids => ids.filter(id => id !== q.id))}>移出</button>}</span><textarea aria-label={`小题 ${q.sourceNumber} 的问题`} rows={2} value={childStem(q)} onChange={event => setChildStems(values => ({ ...values, [q.id]: event.target.value }))} /></label>)}<small>下方选项、标准答案及解析仅修改当前小题；保存会同时更新上面的共用题干与各小题问题。</small></section>}
         <section className="option-edit-section"><div><span><strong>题目选项</strong><small>缺字或漏项时可直接修改、删除或补充</small></span><button className="add-option-button" onClick={addOption} disabled={options.length >= 7}>＋ 添加选项</button></div>{options.map((option, index) => <label key={`${option.label}-${index}`}><b>{option.label}</b><textarea rows={1} value={option.text} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} /><span className="option-edit-tools"><button type="button" onClick={() => clearOption(index)} title={`清空 ${option.label} 选项内容`} aria-label={`清空 ${option.label} 选项内容`}><RotateCcw size={15} /></button><button type="button" onClick={() => void cutOption(index)} title={`剪切 ${option.label} 选项内容`} aria-label={`剪切 ${option.label} 选项内容`} disabled={!option.text}><Scissors size={15} /></button><button className="remove-option-button" onClick={() => removeOption(index)} disabled={options.length <= 2} aria-label={`删除 ${option.label} 选项`}><Trash2 size={16} /></button></span></label>)}</section>
         <section className={`answer-edit-section ${answerVisible ? "revealed" : "concealed"}`}><header><div><strong>标准答案</strong><span>{answerVisible ? question.answer.length ? allowMultiple ? "X 型题可选择多个正确选项" : "请选择一个正确选项" : "本题暂无答案，请在这里手动补录" : "默认隐藏，避免只改文字时提前看到答案"}</span></div></header>{answerVisible ? <div className="answer-edit-choices">{options.map((option) => <button key={option.label} className={answer.includes(option.label) ? "active" : ""} onClick={() => toggleAnswer(option.label)} aria-pressed={answer.includes(option.label)}><i>{answer.includes(option.label) && <Check size={15} />}</i><b>{option.label}</b><span>{option.text || "待补充选项文字"}</span></button>)}</div> : <div className="answer-edit-mask"><div className="answer-blur-preview" aria-hidden="true">{options.slice(0, 4).map((option) => <span key={option.label}><i /><b>{option.label}</b><em>{option.text}</em></span>)}</div><div className="answer-reveal-panel"><EyeOff /><div><strong>标准答案已模糊保护</strong><p>只修题干或选项时无需查看答案；确认需要纠正答案后再主动展开。</p></div><button onClick={() => setAnswerVisible(true)}><Eye size={17} />显示并修订答案</button></div></div>}</section>
         <label className="question-edit-field explanation-edit-field"><span>原题解析 <small>可选</small></span><textarea value={explanation} rows={4} onChange={(event) => setExplanation(event.target.value)} placeholder="可粘贴原资料解析、答案依据或版本说明；没有可留空" /></label>
