@@ -5,6 +5,15 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("note library uses equal card slots across tag filters and keeps tag overflow reachable", async () => {
+  const css = await text("app/globals.css"), page = await text("app/page.tsx");
+  assert.match(css, /\.notes-library-card\{height:14rem;display:flex;flex-direction:column/);
+  assert.match(css, /\.notes-card-open strong\{height:2\.8rem;min-height:2\.8rem/);
+  assert.match(css, /\.notes-library-card>footer\{height:2rem;min-height:2rem;[^}]*overflow-x:auto/);
+  assert.match(page, /<footer aria-label="笔记标签">\{tags.length === 0/);
+  assert.match(page, /notes-card-tags-empty">未添加标签/);
+});
+
 test("note tags support add rename and removal while retaining notes and other tags", async () => {
   const output = ts.transpileModule(await text("app/lib/note-tags.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   const { changeNoteTags, noteTagCatalog } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
@@ -762,7 +771,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.5");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1522,7 +1531,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.3.9.4");
+  assert.equal(JSON.parse(packageJson).version, "2.3.9.5");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1921,7 +1930,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.5");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -1982,7 +1991,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.5");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2000,7 +2009,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.5");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2020,7 +2029,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.4");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.5");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

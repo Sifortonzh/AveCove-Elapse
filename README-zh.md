@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.3.9.4" src="https://img.shields.io/badge/version-2.3.9.4-b43d35" />
+    <img alt="版本 2.3.9.5" src="https://img.shields.io/badge/version-2.3.9.5-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.3.9.4。** 我的笔记支持标签增、删、改、查：修改标签保留笔记正文与图片，复用现有记录同步机制。收入公共藏经阁前可按题库名称、分组或来源搜索，筛选与批量选择互不干扰。A3/A4 修订支持“共用题干＋各小题问题”，自动关联同章节、相同病例的小题，保留独立选项、答案和记录；保存、同步与分享使用同一分组结构。容量为 96 MB 原始数据 / 24 MB 压缩传输。
+> **当前版本：v2.3.9.5。** 笔记卡片在不同标签筛选下保持统一占位：标题、摘要与标签区对齐，多标签可横向滚动，不再撑高卡片。标签支持增、删、改、查，保留正文与图片。收入公共藏经阁前可搜索现有题库，筛选不清空已选项。A3/A4 修订支持“共用题干＋各小题问题”，保留独立选项、答案和记录。容量为 96 MB 原始数据 / 24 MB 压缩传输。
 
 自行部署请先执行 `npm run db:migrate`。自动发布流程会应用增量建表文件 `db/sync-v3.sql`。藏经阁保持独立；英文题库正文暂时仍保存在学习快照，独立图片存储属于后续升级，不包含在本次补丁中。
 
