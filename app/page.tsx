@@ -1096,12 +1096,21 @@ export default function HomePage() {
     const nextFavorites = shouldUnfavorite
       ? favorites.filter((id) => id !== current.id)
       : shouldFavorite ? [...favorites, current.id] : favorites;
+    // Wrong-question review also strengthens an existing Featured question.
+    // A newly featured mistake starts at one star; ordinary practice is unchanged.
+    const raiseReviewStars = sessionScope === "wrong" && result === "wrong" && favorites.includes(current.id);
+    const nextStars = raiseReviewStars ? Math.min(99, Math.max(1, favoriteStars[current.id] ?? 1) + 1) : 1;
+    const nextFavoriteStars = { ...favoriteStars };
+    if (raiseReviewStars || shouldFavorite) nextFavoriteStars[current.id] = nextStars;
+    if (shouldUnfavorite) delete nextFavoriteStars[current.id];
     const nextLedger = stampLearningRecord(recordLedger, current.id, {
       progress: result,
       ...(!firstProgress[current.id] ? { firstProgress: result } : {}),
       ...(shouldFavorite ? { favorite: true } : shouldUnfavorite ? { favorite: false } : {}),
+      ...(raiseReviewStars || shouldFavorite ? { favoriteStars: nextStars } : shouldUnfavorite ? { favoriteStars: 0 } : {}),
     });
-    persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites: nextFavorites, favoriteStars, notes, ledger: nextLedger });
+    persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites: nextFavorites, favoriteStars: nextFavoriteStars, notes, ledger: nextLedger });
+    if (raiseReviewStars) setToast(`再次做错，本题精选星级升至 ${nextStars} 星 ★`);
     if (sessionStudyMode === "standard" && settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
   }
 
