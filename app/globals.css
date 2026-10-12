@@ -757,4 +757,16 @@ input,textarea,select{padding-block:12px}
 /* v2.3.9: retain compact option tools on tablet and phone layouts. */
 .question-edit-modal .option-edit-section>label{grid-template-columns:34px minmax(0,1fr) auto;gap:6px;margin-top:5px}
 .chapter-directory details>button>span{flex:1;min-width:0}
+/* v2.3.9.7: a stable chapter heading, compact answer-card actions and Pavilion import. */
+.chapter-directory{display:flex;flex-direction:column;overflow:hidden}
+.chapter-directory>header,.chapter-directory>p{flex-shrink:0}
+.chapter-directory-list{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.chapter-directory .current-chapter>summary{position:sticky;top:0;z-index:2;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.batch-kill-layer{z-index:93}
+.batch-kill-actions{display:flex;flex-wrap:wrap;gap:8px}
+.answer-sheet-actions{flex-wrap:wrap;justify-content:flex-end}
+.bank-request-stage-nav .pavilion-search-trigger{position:sticky;right:0;flex-shrink:0;border-color:var(--bean);background:var(--surface);box-shadow:-8px 0 12px var(--surface)}
+.bank-vault-grid footer{flex-wrap:wrap}
+.bank-vault-grid .pavilion-import-button{color:var(--green);background:var(--green-soft);border-color:var(--green)}
+.pavilion-import-button:disabled{opacity:.5;cursor:wait}
 @media(max-width:520px){.option-edit-tools{flex-direction:column}.option-edit-tools>button{height:28px;min-height:28px!important}.chapter-directory .chapter-result{font-size:.65rem}.sync-file-list>header{align-items:flex-start;flex-wrap:wrap}}

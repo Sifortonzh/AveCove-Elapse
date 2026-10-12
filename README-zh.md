@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.3.9.6" src="https://img.shields.io/badge/version-2.3.9.6-b43d35" />
+    <img alt="版本 2.3.9.7" src="https://img.shields.io/badge/version-2.3.9.7-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.3.9.6。** 错题复盘中，已精选的题再次做错会增加一颗星，并保存、同步星级。Mac 与其他桌面浏览器也显示右下角悬浮“确认答案 / 下一题”，滚动长题时仍可操作。笔记卡片保持统一占位，标签支持增、删、改、查。容量为 96 MB 原始数据 / 24 MB 压缩传输。
+> **当前版本：v2.3.9.7。** 单题“斩”直接执行；批量斩题与恢复移到答题卡，按当前答题卡题号操作。公共藏经阁支持直接导入“我的题库”，公共副本保持独立；分组栏末尾增加搜索入口。章节目录滚动时，当前章节标题保持可见，方便收起与跳转。容量为 96 MB 原始数据 / 24 MB 压缩传输。
 
 自行部署请先执行 `npm run db:migrate`。自动发布流程会应用增量建表文件 `db/sync-v3.sql`。藏经阁保持独立；英文题库正文暂时仍保存在学习快照，独立图片存储属于后续升级，不包含在本次补丁中。
 

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.3.9.6" src="https://img.shields.io/badge/version-2.3.9.6-b43d35" />
+    <img alt="Version 2.3.9.7" src="https://img.shields.io/badge/version-2.3.9.7-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.9.6.** Wrong-answer review now adds one star when an already Featured question is missed again, with the level saved and synchronized. Mac and other desktop browsers now share the persistent bottom-right Confirm / Next control with iPad. Note cards retain consistent slots; tags support add, rename, remove and search. Capacity is 96 MB decoded / 24 MB compressed.
+> **Current release: v2.3.9.7.** Slash Skip acts immediately on the current question; batch skipping and restoration live in the answer sheet and use its displayed question numbers. Public Pavilion banks can be imported directly into your private library, while the public copy remains independent. A search shortcut follows the Pavilion stage filters, and the current chapter heading stays visible while scrolling its question list. Capacity is 96 MB decoded / 24 MB compressed.
 
 Self-hosters: run `npm run db:migrate` before starting this release. The deployment workflow applies the additive `db/sync-v3.sql` migration automatically. The Pavilion remains independent. English library bodies still use the learning snapshot; independent media storage is a future upgrade, not included in this patch.
 

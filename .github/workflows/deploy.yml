@@ -47,7 +47,7 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_PATH: ${{ secrets.SERVER_PATH }}
         run: |
-          rsync -az --delete --exclude '.env' --exclude 'backups' --exclude '.git' \
+          rsync -az --delete --exclude '.env' --exclude 'backups' --exclude '.git' --exclude '.deployed-commit' \
             -e 'ssh -i ~/.ssh/deploy_key' ./ "$SERVER_USER@$SERVER_HOST:$SERVER_PATH/"
       - name: Upload production image
         env:

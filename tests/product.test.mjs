@@ -5,6 +5,37 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("direct slash skip and answer-sheet batch ranges use visible numbers only", async () => {
+  const page = await text("app/page.tsx");
+  assert.match(page, /onClick=\{\(\) => props.onUpdateKilled\(\[current.id\], !props.killed\)\}/);
+  assert.doesNotMatch(page, /setShowKillQuestions/);
+  assert.match(page, /onUpdateKilled=\{updateKilledQuestions\}/);
+  assert.match(page, /questions.filter\(\(_, index\) => requested.has\(index \+ 1\)\)/);
+  assert.match(page, /恢复这些题/);
+  const source = page.slice(page.indexOf("function parseKillNumberSpec("), page.indexOf("function KillQuestionsModal("));
+  const compiled = ts.transpileModule(source + "\nexport {parseKillNumberSpec}", {compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const { parseKillNumberSpec } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  assert.deepEqual([...parseKillNumberSpec("1-3，5，7-8")], [1,2,3,5,7,8]);
+  assert.deepEqual([...parseKillNumberSpec("8-3,abc,-1,1-9999")], []);
+  const numbered = [{ id:"a", sourceNumber:"25-S-005" }, { id:"b", sourceNumber:"1" }, { id:"c", sourceNumber:"04-117" }];
+  const requested = parseKillNumberSpec("2-3");
+  assert.deepEqual(numbered.filter((_,index)=>requested.has(index+1)).map(q=>q.id), ["b","c"]);
+});
+
+test("Pavilion import reuses guarded private-bank storage and chapter heading stays pinned", async () => {
+  const page = await text("app/page.tsx"), css = await text("app/globals.css"), extras = await text("app/components/PracticeExtras.tsx");
+  assert.match(page, /onImport=\{importPavilionBank\}/);
+  assert.match(page, /await onImport\(parseSharedQuestionBankPackage\(result.package\)\)/);
+  assert.match(page, /async function importPavilionBank[^]*?await saveImportedBank/);
+  assert.match(page, /aria-label="搜索已收录题库"/);
+  assert.match(page, /collectionSearchRef.current\?\.focus\(\{ preventScroll: true \}\)/);
+  const importer = page.slice(page.indexOf("  async function importPavilionBank("),page.indexOf("  async function handleFiles("));
+  assert.doesNotMatch(importer, /DELETE|fetch\(/);
+  assert.match(extras, /className=\{containsCurrent \? "current-chapter" : ""\}/);
+  assert.match(css, /\.chapter-directory \.current-chapter>summary\{position:sticky;top:0/);
+  assert.match(css, /\.chapter-directory-list\{min-height:0;overflow-y:auto/);
+});
+
 test("wrong review raises existing Featured stars and desktop confirmation remains fixed", async () => {
   const page = await text("app/page.tsx"), css = await text("app/globals.css");
   assert.match(page, /raiseReviewStars = sessionScope === "wrong" && result === "wrong" && favorites.includes\(current.id\)/);
@@ -802,7 +833,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.6");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1562,7 +1593,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.3.9.6");
+  assert.equal(JSON.parse(packageJson).version, "2.3.9.7");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1961,7 +1992,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.9.6");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2022,7 +2053,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.6");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2040,7 +2071,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.6");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2060,7 +2091,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.6");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
