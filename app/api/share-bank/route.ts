@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
-import { parseSharedQuestionBankPackage, type SharedQuestionBankPackage } from "@/app/lib/local-bank";
+import { parseSharedQuestionBankPackage, sanitizeSharedQuestionBankPackage, publicQuestion, type SharedQuestionBankPackage } from "@/app/lib/local-bank";
 import { query } from "@/app/lib/server/db";
 import { allowRequest, requestFingerprint } from "@/app/lib/server/rate-limit";
 
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       author: parsed.author?.slice(0, 120),
       copyrightNotice: parsed.copyrightNotice?.slice(0, 500),
       groupName: parsed.groupName?.slice(0, 60),
-      questions: parsed.questions,
+      questions: parsed.questions.map(publicQuestion),
     },
   };
   const token = randomBytes(24).toString("base64url");
@@ -110,7 +110,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "链接不存在或已过期，请让分享者重新生成。" }, { status: 404 });
     }
     return NextResponse.json(
-      { package: rows[0].payload, expiresAt: rows[0].expires_at.toISOString() },
+      { package: sanitizeSharedQuestionBankPackage(rows[0].payload), expiresAt: rows[0].expires_at.toISOString() },
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch {

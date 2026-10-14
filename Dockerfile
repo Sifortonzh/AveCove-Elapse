@@ -17,6 +17,9 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
+ARG ELAPSE_BUILD_SHA=unknown
+ENV ELAPSE_BUILD_SHA=$ELAPSE_BUILD_SHA
+LABEL org.opencontainers.image.revision=$ELAPSE_BUILD_SHA
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0

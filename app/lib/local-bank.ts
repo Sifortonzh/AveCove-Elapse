@@ -133,6 +133,8 @@ const BANK_KEY_PREFIX = "bank:";
 const PAVILION_KEY_PREFIX = "pavilion:";
 const LEARNING_RECORDS_KEY = "learning-records:v1";
 const ANSWER_SELECTIONS_KEY = "answer-selections:v1";
+const LEARNING_OWNER_KEY = "learning-owner:v1";
+export type ArchivedBankNotes = { id: string; name: string; archivedAt: string; questions: QuizQuestion[]; notes: Record<string, string> };
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -256,6 +258,58 @@ export function saveLocalAnswerSelections(selections: unknown): Promise<void> {
   const write = learningWriteQueue.catch(() => undefined).then(() => writeValues([[ANSWER_SELECTIONS_KEY, selections]], false));
   learningWriteQueue = write;
   return write;
+}
+
+export async function switchLocalLearningAccount(owner: string) {
+  await learningWriteQueue.catch(() => undefined);
+  const previous = await readValue<string>(LEARNING_OWNER_KEY);
+  const records = await readValue<unknown>(LEARNING_RECORDS_KEY);
+  const selections = await readValue<Record<string, string[]>>(ANSWER_SELECTIONS_KEY) ?? {};
+  if (!previous || previous === owner) {
+    await writeValues([[LEARNING_OWNER_KEY, owner]], false);
+    return { records, selections };
+  }
+  const next = await readValue<{ records: unknown; selections: Record<string, string[]>; explanations?: Record<string, Pick<QuizQuestion, "explanation" | "explanationSource" | "explanationImages">> }>(`learning-account:${owner}`);
+  const banks = await listQuestionBanks();
+  const explanations: Record<string, Pick<QuizQuestion, "explanation" | "explanationSource" | "explanationImages">> = {};
+  const scopedBanks = banks.map(bank => ({ ...bank, questions: bank.questions.map(question => {
+    const base = { ...question };
+    if (/AI|手动保存|个人笔记/i.test(question.explanationSource ?? "")) {
+      explanations[question.id] = { explanation: question.explanation, explanationSource: question.explanationSource, explanationImages: question.explanationImages };
+      delete base.explanation; delete base.explanationSource; delete base.explanationImages;
+    }
+    return next?.explanations?.[question.id] ? { ...base, ...next.explanations[question.id] } : base;
+  }) }));
+  await writeValues([
+    [`learning-account:${previous}`, { records, selections, explanations }],
+    ...scopedBanks.map(bank => [bankKey(bank.id), bank] as [IDBValidKey, unknown]),
+    [LEARNING_OWNER_KEY, owner], [LEARNING_RECORDS_KEY, next?.records ?? {}],
+    [ANSWER_SELECTIONS_KEY, next?.selections ?? {}],
+  ], false);
+  return { records: next?.records ?? {}, selections: next?.selections ?? {} };
+}
+
+export async function archiveBankNotes(bank: SavedQuestionBank, notes: Record<string, string>, favorites: string[]) {
+  const owner = await readValue<string>(LEARNING_OWNER_KEY) ?? "guest";
+  const selected = new Set(favorites);
+  const questions = bank.questions.filter(q => notes[q.id]?.trim() || selected.has(q.id) || (q.explanation?.trim() && /AI/i.test(q.explanationSource ?? "")));
+  const archive: ArchivedBankNotes = { id: bank.id, name: bank.name, archivedAt: new Date().toISOString(), questions,
+    notes: Object.fromEntries(questions.filter(q => notes[q.id]).map(q => [q.id, notes[q.id]])) };
+  await writeValues([[`note-archive:${owner}:${bank.id}`, archive]], false);
+  return archive;
+}
+
+export async function listArchivedBankNotes(): Promise<ArchivedBankNotes[]> {
+  const owner = await readValue<string>(LEARNING_OWNER_KEY) ?? "guest";
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const entries: ArchivedBankNotes[] = [];
+    const transaction = database.transaction(STORE_NAME, "readonly");
+    const request = transaction.objectStore(STORE_NAME).openCursor();
+    request.onsuccess = () => { const cursor = request.result; if (!cursor) return; if (String(cursor.key).startsWith(`note-archive:${owner}:`)) entries.push(cursor.value as ArchivedBankNotes); cursor.continue(); };
+    transaction.oncomplete = () => { database.close(); resolve(entries.sort((a,b) => b.archivedAt.localeCompare(a.archivedAt))); };
+    transaction.onerror = () => { database.close(); reject(transaction.error); };
+  });
 }
 
 function normalizeBankOrder(value: unknown): string[] {
@@ -580,7 +634,25 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
   return { merged, activeBankId };
 }
 
-export function createSharedQuestionBankPackage(bank: SavedQuestionBank): SharedQuestionBankPackage {
+// Public banks contain source material, never an uploader's personal study state.
+export function publicQuestion(question: QuizQuestion): QuizQuestion {
+  const keys: Array<keyof QuizQuestion> = ["id", "sourceNumber", "category", "stem", "answer", "answerPending", "multiple", "examProfile", "examYear", "examFormat", "questionType", "medicalQuestionType", "points", "sharedStem", "sharedStemGroup", "sharedOptionGroup", "answerSource", "sourceImages", "images", "sharedStemImages", "imagePending", "imageSourceMissing"];
+  const result = Object.fromEntries(keys.filter(key => question[key] !== undefined).map(key => [key, question[key]])) as QuizQuestion;
+  result.options = question.options.map(option => ({ label: option.label, text: option.text, ...(option.sourceImages ? { sourceImages: option.sourceImages } : {}), ...(option.images ? { images: option.images } : {}) }));
+  if (!/AI|手动保存|个人笔记/i.test(question.explanationSource ?? "")) {
+    if (question.explanation !== undefined) result.explanation = question.explanation;
+    if (question.explanationSource !== undefined) result.explanationSource = question.explanationSource;
+    if (question.explanationImages !== undefined) result.explanationImages = question.explanationImages;
+  }
+  return result;
+}
+
+export function sanitizeSharedQuestionBankPackage(value: unknown): SharedQuestionBankPackage {
+  const bank = parseSharedQuestionBankPackage(value);
+  return createSharedQuestionBankPackage(bank);
+}
+
+export function createSharedQuestionBankPackage(bank: QuestionBankInput): SharedQuestionBankPackage {
   return {
     format: "hongdou-question-bank",
     version: 1,
@@ -594,7 +666,7 @@ export function createSharedQuestionBankPackage(bank: SavedQuestionBank): Shared
       author: bank.author,
       copyrightNotice: bank.copyrightNotice,
       groupName: bank.groupName,
-      questions: bank.questions,
+      questions: bank.questions.map(publicQuestion),
     },
   };
 }

@@ -8,10 +8,11 @@ export function isXQuestion(question: QuizQuestion): boolean {
 
 export function practiceStats(questions: QuizQuestion[], progress: Record<string, "correct" | "wrong">, singleOnly = false, killed: readonly string[] = []) {
   const excluded = new Set(killed);
-  const available = questions.filter((q) => !excluded.has(q.id) && (!singleOnly || !isXQuestion(q)));
-  const answered = available.filter((q) => Boolean(progress[q.id])).length;
-  const correct = available.filter((q) => progress[q.id] === "correct").length;
-  return { available, total: available.length, answered, correct, wrong: answered - correct,
+  const available = questions.filter((q) => !singleOnly || !isXQuestion(q));
+  const answered = available.filter((q) => excluded.has(q.id) || Boolean(progress[q.id])).length;
+  const graded = available.filter((q) => !excluded.has(q.id) && Boolean(progress[q.id]));
+  const correct = graded.filter((q) => progress[q.id] === "correct").length;
+  return { available, total: available.length, answered, graded: graded.length, correct, wrong: graded.length - correct,
     percent: available.length ? answered / available.length * 100 : 0 };
 }
 

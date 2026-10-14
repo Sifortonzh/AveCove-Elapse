@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { inferPavilionStudyStage, parseSharedQuestionBankPackage, type SharedQuestionBankPackage } from "@/app/lib/local-bank";
+import { inferPavilionStudyStage, parseSharedQuestionBankPackage, sanitizeSharedQuestionBankPackage, type SharedQuestionBankPackage } from "@/app/lib/local-bank";
 import { readSession } from "@/app/lib/server/auth";
 import { query } from "@/app/lib/server/db";
 import { allowRequest } from "@/app/lib/server/rate-limit";
@@ -85,13 +85,14 @@ export async function GET(request: Request) {
     if (id) {
       const rows = await query<{ payload: SharedQuestionBankPackage }>("SELECT payload FROM pavilion_question_banks WHERE id = $1", [id]);
       if (!rows[0]) return NextResponse.json({ error: "这份题库已被移出藏经阁。" }, { status: 404 });
-      return NextResponse.json({ package: rows[0].payload }, { headers: { "Cache-Control": "private, no-store" } });
+      return NextResponse.json({ package: sanitizeSharedQuestionBankPackage(rows[0].payload) }, { headers: { "Cache-Control": "private, no-store" } });
     }
     const rows = await query<PavilionRow>(
-      `SELECT id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, uploader_nickname, updated_at,
-        (user_id = $1) AS own
-       FROM pavilion_question_banks
-       ORDER BY updated_at DESC LIMIT 500`,
+      `SELECT p.id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count,
+        COALESCE(NULLIF(u.nickname, ''), p.uploader_nickname) AS uploader_nickname, p.updated_at,
+        (p.user_id = $1) AS own
+       FROM pavilion_question_banks p LEFT JOIN users u ON u.id = p.user_id
+       ORDER BY p.updated_at DESC LIMIT 500`,
       [session.userId],
     );
     return NextResponse.json({ entries: rows.map(publicEntry) }, { headers: { "Cache-Control": "private, no-store" } });
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
   try { parsed = parseSharedQuestionBankPackage(body.package); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "无法识别题库。" }, { status: 400 }); }
   const sourceBankId = String(body.sourceBankId ?? parsed.id ?? "").trim().slice(0, 160);
   if (!sourceBankId) return NextResponse.json({ error: "题库缺少稳定主键。" }, { status: 400 });
-  const payload = body.package as SharedQuestionBankPackage;
+  const payload = sanitizeSharedQuestionBankPackage(body.package);
   const groupName = parsed.groupName?.trim().slice(0, 60) ?? "";
   const stage = inferPavilionStudyStage(parsed.name, groupName);
   try {

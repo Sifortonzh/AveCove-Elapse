@@ -19,6 +19,7 @@ jobs:
         run: |
           docker build \
             --build-arg NEXT_PUBLIC_SITE_URL=https://allo.avecrouge.top \
+            --build-arg ELAPSE_BUILD_SHA="${GITHUB_SHA}" \
             --tag "allo-app:${GITHUB_SHA}" .
           docker save "allo-app:${GITHUB_SHA}" | gzip -1 > "/tmp/allo-app-${GITHUB_SHA}.tar.gz"
       - name: Prepare SSH
@@ -47,7 +48,7 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_PATH: ${{ secrets.SERVER_PATH }}
         run: |
-          rsync -az --delete --exclude '.env' --exclude 'backups' --exclude '.git' --exclude '.deployed-commit' \
+          rsync -az --delete --exclude '.env' --exclude 'backups' --exclude 'runtime' --exclude '.git' --exclude '.deployed-commit' \
             -e 'ssh -i ~/.ssh/deploy_key' ./ "$SERVER_USER@$SERVER_HOST:$SERVER_PATH/"
       - name: Upload production image
         env:

@@ -66,5 +66,5 @@ export function readSession(request: Request): SessionUser | null {
 export function publicSession(user: SessionUser) {
   const email = user.email;
   const maskedEmail = email ? email.replace(/^(.{1,2}).*(@.*)$/, "$1•••$2") : undefined;
-  return { nickname: user.nickname, email: maskedEmail, expiresAt: user.expiresAt };
+  return { id: user.userId, nickname: user.nickname, email: maskedEmail, expiresAt: user.expiresAt };
 }

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.3.9.8" src="https://img.shields.io/badge/version-2.3.9.8-b43d35" />
+    <img alt="Version 2.4.1" src="https://img.shields.io/badge/version-2.4.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.3.9.8.** Note exports rank Featured questions by descending star level, with ties and other entries in chapter order. Wrong-answer review shuffles only unstarred or one-star mistakes; correct answers lower the star level without removing the Featured flag. The header shows confirmed whole-library answers alongside chapter totals. The personal note editor starts collapsed and opens when new content is written. Capacity is 96 MB decoded / 24 MB compressed.
+> **Current release: v2.4.1.** Public bank sharing retains source questions and explanations while removing personal notes, draft selections and personal AI explanations. Switching sync accounts in one browser isolates medical study records and personal AI explanations. Before deleting a bank, notes, images and drawings can be archived in one offline HTML file; local archives remain downloadable from My Notes. Slashed questions count toward chapter and bank completion without inflating accuracy. Note exports highlight correct options, question types include answer-sheet numbers, note previews expand, and Pavilion file actions occupy a separate row with current uploader nicknames.
 
 Self-hosters: run `npm run db:migrate` before starting this release. The deployment workflow applies the additive `db/sync-v3.sql` migration automatically. The Pavilion remains independent. English library bodies still use the learning snapshot; independent media storage is a future upgrade, not included in this patch.
 

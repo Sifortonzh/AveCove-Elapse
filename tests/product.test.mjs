@@ -22,7 +22,7 @@ test("wrong review excludes stronger starred questions, shuffles, and shows conf
   assert.match(page, /wrong: typedQuestions.filter\([^\n]*favoriteStars\[question.id\][^\n]*<= 1/);
   assert.match(page, /active.scope === "wrong" \|\| active.scope === "favorite"\) pool = shuffle\(pool\)/);
   assert.match(page, /全库 \{libraryStats.answered\}\/\{libraryStats.total\}/);
-  assert.match(page, /const libraryStats = practiceStats\(props.bankQuestions, props.chapterProgress\)/);
+  assert.match(page, /const libraryStats = practiceStats\(props.bankQuestions, props.chapterProgress, false, props.killedQuestions\)/);
   assert.match(page, /const \[noteExpanded, setNoteExpanded\] = useState\(false\)/);
   assert.match(page, /previous.id !== current.id\) setNoteExpanded\(false\)/);
   assert.match(page, /previous.note !== note && note.trim\(\)\) setNoteExpanded\(true\)/);
@@ -153,8 +153,8 @@ test("filtered progress, chapter totals and newer settings share one contract", 
   const { practiceStats, newerPreferences } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
   const questions = [{id:"s",multiple:false,answer:["A"]},{id:"x",multiple:false,medicalQuestionType:"X",answer:["A"]},{id:"k",multiple:false,answer:[]}];
   assert.equal(practiceStats(questions,{s:"correct"},true,["k"]).percent,100);
-  assert.equal(practiceStats(questions,{s:"correct"},false,["k"]).percent,50);
-  assert.equal(practiceStats(questions,{},true,["s","k"]).percent,0);
+  assert.ok(Math.abs(practiceStats(questions,{s:"correct"},false,["k"]).percent - 200/3) < 0.0001);
+  assert.equal(practiceStats(questions,{},true,["s","k"]).percent,100);
   assert.equal(newerPreferences({updatedAt:20,scope:"all"},{updatedAt:10,scope:"wrong"}).scope,"all");
   assert.equal(newerPreferences({updatedAt:20},{updatedAt:30,questionTypes:"single"}).questionTypes,"single");
   const page = await text("app/page.tsx");
@@ -863,7 +863,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
+  assert.equal(JSON.parse(manifest).version, "2.4.1");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1623,7 +1623,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.3.9.8");
+  assert.equal(JSON.parse(packageJson).version, "2.4.1");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1982,7 +1982,7 @@ test("ships the v2.1.2 jump-safe practice and library refinements", async () => 
 
   assert.match(page, /const sessionCompleted = sessionQuestions\.filter/);
   assert.match(page, /completed=\{sessionCompleted\}/);
-  assert.match(page, /props\.completed \/ Math\.max\(total, 1\)/);
+  assert.match(page, /const progress = libraryStats.percent/);
   assert.match(page, /章节 \{chapterStats\.answered\}\/\{chapterStats\.total\}/);
   assert.match(page, /scrollIntoView\(\{ block: "center", inline: "center" \}\)/);
   assert.match(page, /aria-current=\{index === currentIndex/);
@@ -2022,7 +2022,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
+  assert.equal(JSON.parse(manifest).version, "2.4.1");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2083,7 +2083,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
+  assert.equal(JSON.parse(manifest).version, "2.4.1");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2101,7 +2101,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
+  assert.equal(JSON.parse(manifest).version, "2.4.1");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2121,7 +2121,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
+  assert.equal(JSON.parse(manifest).version, "2.4.1");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
@@ -2143,4 +2143,81 @@ test("reveals answer feedback before persistence and stores growing practice dat
   assert.doesNotMatch(page, /localStorage\.setItem\("hongdou-record-ledger"/);
   assert.match(localBank, /const LEARNING_RECORDS_KEY = "learning-records:v1"/);
   assert.match(localBank, /learningWriteQueue\.catch\(\(\) => undefined\)/);
+});
+
+
+test("public question packages remove personal material at both client and server boundaries", async () => {
+  const source = await text("app/lib/local-bank.ts");
+  const compiled = ts.transpileModule(source.slice(source.indexOf("export function publicQuestion(")), {compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {createSharedQuestionBankPackage, sanitizeSharedQuestionBankPackage} = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  const base = {id:"q",sourceNumber:"1",category:"章节",stem:"题干",options:[{label:"A",text:"甲",note:"私密选项批注",sourceImages:[{dataUrl:"data:image/png;base64,QQ=="}]}],answer:["A"],multiple:false,draftAnswer:["B"],note:"上传者笔记",favoriteStars:5,explanation:"我的 AI 判断",explanationSource:"AI 生成解析 · 手动保存",explanationImages:[{dataUrl:"data:image/png;base64,QQ=="}]};
+  const bank = {id:"bank",name:"共享",importedAt:"2026-10-14",questions:[base,{...base,id:"source",explanation:"教材原解析",explanationSource:"教材"}]};
+  const before=structuredClone(bank);
+  const published=createSharedQuestionBankPackage(bank);
+  assert.equal(published.bank.questions[0].explanation,undefined);
+  assert.equal(published.bank.questions[0].explanationImages,undefined);
+  assert.equal(published.bank.questions[0].draftAnswer,undefined);
+  assert.equal(published.bank.questions[0].note,undefined);
+  assert.equal(published.bank.questions[0].options[0].note,undefined);
+  assert.deepEqual(published.bank.questions[0].answer,["A"]);
+  assert.deepEqual(published.bank.questions[0].options[0].sourceImages,base.options[0].sourceImages);
+  assert.equal(published.bank.questions[1].explanation,"教材原解析");
+  const oldPackage={format:"hongdou-question-bank",version:1,notes:{q:"私密"},bank};
+  assert.deepEqual(sanitizeSharedQuestionBankPackage(oldPackage).bank.questions,published.bank.questions);
+  assert.deepEqual(bank,before);
+});
+
+test("switching accounts restores their own notes, choices and personal AI without mixing users", async () => {
+  const source=await text("app/lib/local-bank.ts");
+  const body=source.slice(source.indexOf("export async function switchLocalLearningAccount("),source.indexOf("export async function archiveBankNotes("));
+  const fixture=`const LEARNING_OWNER_KEY="owner", LEARNING_RECORDS_KEY="records", ANSWER_SELECTIONS_KEY="selections";
+    let learningWriteQueue=Promise.resolve(); const rows=new Map();
+    const readValue=async key=>rows.get(key), bankKey=id=>"bank:"+id;
+    const writeValues=async entries=>entries.forEach(([key,value])=>rows.set(key,structuredClone(value)));
+    const listQuestionBanks=async ()=>[...rows].filter(([key])=>key.startsWith("bank:")).map(([,value])=>value);
+    export {rows}; ${body}`;
+  const compiled=ts.transpileModule(fixture,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {rows,switchLocalLearningAccount}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  rows.set("records",{notes:{q:"甲的笔记"}});rows.set("selections",{q:["A"]});
+  rows.set("bank:b",{id:"b",questions:[{id:"q",stem:"共享题干",explanation:"甲的 AI",explanationSource:"AI"},{id:"s",explanation:"教材",explanationSource:"教材"}]});
+  await switchLocalLearningAccount("甲");
+  assert.deepEqual((await switchLocalLearningAccount("乙")).records,{});
+  assert.equal(rows.get("bank:b").questions[0].explanation,undefined);
+  assert.equal(rows.get("bank:b").questions[1].explanation,"教材");
+  rows.set("records",{notes:{q:"乙的笔记"}});rows.set("selections",{q:["B"]});
+  const a=await switchLocalLearningAccount("甲");
+  assert.deepEqual(a.records,{notes:{q:"甲的笔记"}});assert.deepEqual(a.selections,{q:["A"]});
+  assert.equal(rows.get("bank:b").questions[0].explanation,"甲的 AI");
+  const b=await switchLocalLearningAccount("乙");assert.deepEqual(b.records,{notes:{q:"乙的笔记"}});
+  assert.equal(rows.get("bank:b").questions[0].explanation,undefined);
+});
+
+test("slashing finishes questions without fabricating correct answers or counting pending choices", async () => {
+  const compiled=ts.transpileModule(await text("app/lib/practice-stats.ts"),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {practiceStats}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  const questions=[{id:"a",answer:["A"],multiple:false},{id:"b",answer:["A"],multiple:false},{id:"x",answer:["A","B"],multiple:true}];
+  const stats=practiceStats(questions,{a:"wrong"},true,["a","b","missing"]);
+  assert.equal(stats.total,2);assert.equal(stats.answered,2);assert.equal(stats.percent,100);assert.equal(stats.correct,0);assert.equal(stats.wrong,0);assert.equal(stats.graded,0);
+  assert.equal(practiceStats(questions,{},false).answered,0);
+});
+
+test("PDF highlights all correct options and keeps pending answers explicit", async () => {
+  const {buildNotePdfHtml}=await loadNotePdfExport();
+  const q={id:"q",sourceNumber:"1",category:"章节",stem:"多选",options:[{label:"A",text:"甲"},{label:"B",text:"乙"},{label:"C",text:"丙"}],answer:["A","C"],multiple:true};
+  const html=buildNotePdfHtml("银行",[{title:"精选",questions:[q,{...q,id:"pending",answer:[]}]}],{});
+  assert.equal((html.match(/<li class="correct-option">/g)||[]).length,2);
+  assert.doesNotMatch(html,/<p class="answer">答案：/);assert.match(html,/答案待补录/);assert.match(html,/print-color-adjust:exact/);
+});
+
+test("bank note archives retain only annotated context, stars and personal AI", async () => {
+  const source=await text("app/lib/local-bank.ts");
+  const body=source.slice(source.indexOf("export async function archiveBankNotes("),source.indexOf("export async function listArchivedBankNotes("));
+  const fixture=`const LEARNING_OWNER_KEY="owner";const stored=new Map();const readValue=async ()=>"a";const writeValues=async entries=>entries.forEach(([k,v])=>stored.set(k,v));export {stored};${body}`;
+  const compiled=ts.transpileModule(fixture,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {archiveBankNotes,stored}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  const note="笔记\n![笔记图片](data:image/jpeg;base64,QQ==)\n```elapse-ink\n[[[1,2],[3,4]]]\n```";
+  const bank={id:"b",name:"题库",questions:[{id:"note"},{id:"star"},{id:"ai",explanation:"个人解析",explanationSource:"AI"},{id:"plain"}]};
+  const archive=await archiveBankNotes(bank,{note,foreign:"其他题库笔记"},["star"]);
+  assert.deepEqual(archive.questions.map(q=>q.id),["note","star","ai"]);
+  assert.deepEqual(archive.notes,{note});assert.ok(stored.has("note-archive:a:b"));assert.equal(bank.questions.length,4);
 });

@@ -19,11 +19,11 @@ import { QuestionImages } from "./components/QuestionImages";
 import { extractQuestionFileText, importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
 import { AI_SOURCE_CONVERSION_PROMPT, downloadAiSourcePackage } from "./lib/ai-source-export";
 import {
-  activateQuestionBank, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
+  activateQuestionBank, archiveBankNotes, listArchivedBankNotes, switchLocalLearningAccount, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
   exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, loadLocalAnswerSelections, loadLocalLearningRecords, loadQuestionBankGroupOrder, loadQuestionBankOrder,
   loadQuestionBankSortMode, mergeQuestionBankSyncBundle, parseSharedQuestionBankPackage, saveActiveBank,
   saveQuestionBank, saveQuestionBankGroupOrder, saveQuestionBankOrder, saveQuestionBankSortMode, saveLocalAnswerSelections, saveLocalLearningRecords,
-  updateQuestionBankDetails, PAVILION_STUDY_STAGES, type PavilionQuestionBank, type PavilionStudyStage, type QuestionBankInput, type QuestionBankSortMode, type SavedQuestionBank,
+  updateQuestionBankDetails, PAVILION_STUDY_STAGES, type PavilionQuestionBank, type PavilionStudyStage, type QuestionBankInput, type QuestionBankSortMode, type SavedQuestionBank, type ArchivedBankNotes,
 } from "./lib/local-bank";
 import { exportEnglishTestSyncBundle, mergeEnglishTestSyncBundle } from "./lib/english-test";
 import { exportEnglishPracticeSyncBundle, mergeEnglishPracticeSyncBundle } from "./lib/english-practice";
@@ -54,7 +54,7 @@ import { fetchSync } from "./lib/sync-request";
 import { deleteQuestionAndRenumber, insertQuestionAfter } from "./lib/question-edit";
 import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
 import { hasOptionAnnotation, noteImageMarkdown } from "./lib/note-annotations";
-import { collectNoteExportSections, printNotePdf } from "./lib/note-pdf-export";
+import { collectNoteExportSections, downloadBankNoteArchive, printNotePdf } from "./lib/note-pdf-export";
 
 type Progress = Record<string, "correct" | "wrong">;
 type Scope = "all" | "unanswered" | "wrong" | "favorite";
@@ -64,7 +64,7 @@ type ThemeMode = "system" | "light" | "dark";
 type StudyMode = "standard" | "blind" | "memorize";
 type AiMode = "summary" | "pitfall" | "companion";
 type View = "home" | "quiz" | "banks" | "bank-requests" | "notes" | "copyright";
-type AccountSession = { nickname: string; email?: string; expiresAt: number };
+type AccountSession = { id: string; nickname: string; email?: string; expiresAt: number };
 type SharedComment = { id: string; nickname: string; text: string; createdAt: string; status?: string; likes: number; own?: boolean };
 type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "cancelled" | "ai-ready"; detail: string };
 type AiFallbackFile = { id: string; fileName: string; extractedText: string };
@@ -369,6 +369,7 @@ export default function HomePage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [nickname, setNickname] = useState("红豆同学");
   const [account, setAccount] = useState<AccountSession | null>(null);
+  const [noteArchives, setNoteArchives] = useState<ArchivedBankNotes[]>([]);
   const [comments, setComments] = useState<Record<string, SharedComment[]>>({});
   const [showAccount, setShowAccount] = useState(false);
   const [syncReady, setSyncReady] = useState(false);
@@ -428,6 +429,7 @@ export default function HomePage() {
           setAnswerSelections(Object.fromEntries(Object.entries(savedSelections).filter((entry): entry is [string, string[]] => Array.isArray(entry[1]) && entry[1].every((label) => typeof label === "string" && /^[A-G]$/.test(label)))));
         }
         setNickname(localStorage.getItem("hongdou-nickname") ?? "红豆同学");
+        setNoteArchives(await listArchivedBankNotes());
       } catch {
         // Ignore invalid local data and keep safe defaults.
       }
@@ -509,6 +511,7 @@ export default function HomePage() {
         const response = await fetch("/api/auth/session");
         const result = await response.json() as { user?: AccountSession | null };
         if (!active || !result.user) return;
+        await activateLearningAccount(result.user.id);
         setAccount(result.user);
         setNickname(result.user.nickname);
         await pullRemoteState();
@@ -566,7 +569,7 @@ export default function HomePage() {
   const statsQuestions = settings.western306Subject === "all" || !questions.some(q => q.examProfile === "western-medicine-306") ? questions : questions.filter((q) => western306SubjectForQuestion(q) === settings.western306Subject);
   const bankStats = practiceStats(statsQuestions, progress, settings.questionTypes === "single", killedQuestions);
   const { answered, correct, wrong } = bankStats;
-  const accuracy = answered ? Math.round((correct / answered) * 100) : 0;
+  const accuracy = bankStats.graded ? Math.round((correct / bankStats.graded) * 100) : 0;
   const examScore = questions.some((question) => question.examProfile === "western-medicine-306")
     ? western306Score(questions.filter((question) => !killedIds.has(question.id)), progress, firstProgress)
     : undefined;
@@ -574,9 +577,7 @@ export default function HomePage() {
     ? western306Score(sessionQuestions.filter((question) => !killedIds.has(question.id)), progress, firstProgress)
     : undefined;
   const sessionAnswered = sessionQuestions.filter((question) => !killedIds.has(question.id) && Boolean(displayedProgress[question.id])).length;
-  const sessionCompleted = sessionQuestions.filter((question) => !killedIds.has(question.id) && (
-    Boolean(displayedProgress[question.id]) || (sessionStudyMode === "blind" && Boolean(displayedAnswerSelections[question.id]?.length))
-  )).length;
+  const sessionCompleted = sessionQuestions.filter((question) => killedIds.has(question.id) || Boolean(displayedProgress[question.id])).length;
   const sessionCorrect = sessionQuestions.filter((question) => !killedIds.has(question.id) && displayedProgress[question.id] === "correct").length;
   const sessionAccuracy = sessionAnswered ? (sessionCorrect / sessionAnswered) * 100 : 0;
   const isFavorite = current ? favorites.includes(current.id) : false;
@@ -850,7 +851,23 @@ export default function HomePage() {
     }
   }
 
+  async function activateLearningAccount(owner: string) {
+    if (syncInFlightRef.current) throw new Error("☁️ 请等当前同步完成，再切换身份。");
+    setSyncReady(false);
+    const stored = await switchLocalLearningAccount(owner);
+    persistLearningRecords(normalizeLearningRecords(stored.records as LearningRecordsInput));
+    setAnswerSelections(stored.selections);
+    setNoteArchives(await listArchivedBankNotes());
+    await refreshLocalQuestionBanks();
+    syncedBankRevisionsRef.current = {};
+    setView("home");
+    setAiTexts({});
+    setReviewProgress({});
+    setReviewSelections({});
+  }
+
   async function finishAuthentication(user: AccountSession) {
+    await activateLearningAccount(user.id);
     setAccount(user);
     saveNickname(user.nickname);
     setSyncReady(false);
@@ -861,11 +878,12 @@ export default function HomePage() {
 
   async function logoutAccount() {
     await fetch("/api/auth/session", { method: "DELETE" }).catch(() => undefined);
+    await activateLearningAccount("guest");
     setAccount(null);
     setSyncReady(false);
     setSyncStatus("尚未开启多端同步");
     setShowAccount(false);
-    setToast("已退出同步身份，本机学习记录仍然保留 🌿");
+    setToast("已退出同步身份；个人记录保留在该账号的本机空间 🔐");
   }
 
   async function deleteAccount() {
@@ -1782,7 +1800,14 @@ export default function HomePage() {
     setToast(`原题号 ${result.deleted.sourceNumber} 已删除，连续题号与学习记录已同步整理 🗑️📚`);
   }
 
-  async function removeSavedBank(id: string) {
+  async function removeSavedBank(id: string, archiveNotes = true) {
+    const bank = questionBanks.find(item => item.id === id);
+    if (!bank) throw new Error("题库已不存在，请刷新后重试。");
+    if (archiveNotes) {
+      const archive = await archiveBankNotes(bank, normalizeLearningRecords(latestRecordsRef.current).notes, favorites);
+      setNoteArchives(await listArchivedBankNotes());
+      if (archive.questions.length) downloadBankNoteArchive(archive);
+    }
     await deleteQuestionBank(id);
     setQuestionBanks((banks) => banks.filter((bank) => bank.id !== id));
     if (activeBankId === id) await restoreDemoBank();
@@ -1886,7 +1911,7 @@ export default function HomePage() {
       ) : view === "bank-requests" ? (
         <QuestionBankVaultPage banks={questionBanks} account={account} onImport={importPavilionBank} onRequireLogin={() => setShowAccount(true)} onBack={() => setView("banks")} />
       ) : view === "notes" ? (
-        <NotesPage banks={searchableBanks} progress={progress} favorites={favorites} favoriteStars={favoriteStars} notes={notes} tagCatalog={settings.noteTags ?? []} onManageTag={manageNoteTag} onBack={() => setView("home")} onOpen={async (bank, questionId) => {
+        <NotesPage archives={noteArchives} banks={searchableBanks} progress={progress} favorites={favorites} favoriteStars={favoriteStars} notes={notes} tagCatalog={settings.noteTags ?? []} onManageTag={manageNoteTag} onBack={() => setView("home")} onOpen={async (bank, questionId) => {
           if (bank.id === "__demo__") openQuestion(questionId);
           else await openSavedQuestion(bank, questionId);
         }} />
@@ -1894,6 +1919,7 @@ export default function HomePage() {
         <CopyrightPage bankName={bankName} onHome={() => setView("home")} onRestoreDemo={restoreDemoBank} />
       ) : current ? (
         <QuizView
+          killedQuestions={killedQuestions}
           chapterProgress={progress}
           bankName={bankName}
           bankQuestions={bankStats.available}
@@ -2082,7 +2108,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, favoriteSt
   onSelect: (id: string) => Promise<void>;
   onUpdate: (id: string, details: { name: string; description: string; sourceTitle: string; edition: string; author: string; copyrightNotice: string; groupName: string }) => Promise<void>;
   onToggleFeatured: (id: string, featured: boolean) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onDelete: (id: string, archiveNotes?: boolean) => Promise<void>;
   onReset: (bank: SavedQuestionBank) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
@@ -2096,6 +2122,9 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, favoriteSt
   const [editGroupName, setEditGroupName] = useState("");
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [archiveBeforeDelete, setArchiveBeforeDelete] = useState(true);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [sharingBank, setSharingBank] = useState<SavedQuestionBank | null>(null);
   const [resettingBank, setResettingBank] = useState<SavedQuestionBank | null>(null);
   const [groupOrder, setGroupOrder] = useState<string[]>([]);
@@ -2352,7 +2381,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, favoriteSt
             <div className="bank-card-progress" aria-label={`已完成 ${completedCount} 道，共 ${stats.total} 道，进度 ${completionLabel}%`}><div><span>{singleOnly ? "单选进度" : "学习进度"} · {completedCount}/{stats.total}</span><b>{completionLabel}%</b></div><i><b style={{ width: `${completion}%` }} /></i></div>
           </>}
           <div className="bank-card-meta"><span>导入于 {new Date(bank.importedAt).toLocaleDateString("zh-CN")}</span><span>仅存本机</span></div>
-          {isDeleting ? <div className="bank-delete-confirm"><p>确认删除“我的题库”中的这份文件？同步设备上的私人副本也会移除；藏经阁已发布的公开副本保持独立，不会一起删除。</p><div><button onClick={() => { void onDelete(bank.id); setDeletingId(null); }}>确认移除</button><button onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="导出题库复习笔记" title={noteExportCount ? `导出 ${noteExportCount} 道精选或批注题为 PDF` : "暂无可导出的精选或批注题"} disabled={!noteExportCount} onClick={() => exportBankNotes(bank)}><Download /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => setDeletingId(bank.id)}><Trash2 /></button></footer>}
+          {isDeleting ? <div className="bank-delete-confirm"><p>确认删除“我的题库”中的这份文件？同步设备上的私人副本也会移除；藏经阁已发布的公开副本保持独立，不会一起删除。</p><label className="archive-delete-choice"><input type="checkbox" checked={archiveBeforeDelete} onChange={event => setArchiveBeforeDelete(event.target.checked)} disabled={deleteBusy}/>📓 是否将题库笔记以最少文件存储归档 📃</label><small>保存为一份可离线阅读的 HTML，含笔记、图片、手绘和相关题目；本机“我的笔记”也保留归档下载入口。</small>{deleteError && <p role="alert">{deleteError}</p>}<div><button disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); setDeleteError(""); try { await onDelete(bank.id, archiveBeforeDelete); setDeletingId(null); } catch (error) { setDeleteError(error instanceof Error ? error.message : "删除失败，题库保留"); } finally { setDeleteBusy(false); } }}>{deleteBusy ? "正在保存…" : "确认移除"}</button><button disabled={deleteBusy} onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="导出题库复习笔记" title={noteExportCount ? `导出 ${noteExportCount} 道精选或批注题为 PDF` : "暂无可导出的精选或批注题"} disabled={!noteExportCount} onClick={() => exportBankNotes(bank)}><Download /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => { setDeletingId(bank.id); setArchiveBeforeDelete(true); setDeleteError(""); }}><Trash2 /></button></footer>}
         </article>;
       })}</div>{group.banks.length > groupVisibleLimit && <button type="button" className={`bank-group-toggle ${groupExpanded ? "expanded" : ""}`} aria-expanded={groupExpanded} onClick={() => toggleGroup(group.name)}>{groupExpanded ? "收起题库" : `展开其余 ${hiddenCount} 份题库`}<ChevronRight /></button>}</section>;
       })}</div></div> : <div className="bank-empty">{keyword ? <CircleHelp /> : <Database />}<h2>{keyword ? "没有找到匹配的题库" : "题库书架还是空的"}</h2><p>{keyword ? "这里只搜索题库名称、分组、简介和来源；刷题时仍可使用“搜题”检索题目内容。" : "导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。"}</p>{keyword ? <button className="ghost-action" onClick={() => setQuery("")}><X size={17} />清除搜索</button> : <button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button>}</div>}</section>
@@ -2603,7 +2632,7 @@ function QuestionBankVaultPage({ banks, account, onImport, onRequireLogin, onBac
     <header className="bank-page-header"><button className="bank-request-back" onClick={onBack} aria-label="返回我的题库"><ChevronLeft />返回题库</button><Brand compact hideTagline /><span className="bank-page-header-spacer" /><strong className="bank-request-page-title">藏经阁</strong></header>
     <main>
       <section className="bank-request-compose bank-vault-uploader"><header><div><span>PUBLIC QUESTION BANK PAVILION</span><h1>把现有题库收入公共藏经阁</h1><p>登录后可把“我的题库”批量上传；所有注册用户均可浏览与下载，重复上传同一主键时自动更新你的版本。</p></div><Upload /></header><label className="bank-vault-source-search"><Search size={18}/><input aria-label="搜索待上传题库" value={sourceQuery} onChange={e=>setSourceQuery(e.target.value)} placeholder="搜索题库名称、分组或来源"/>{sourceQuery&&<button type="button" aria-label="清空待上传搜索" onClick={()=>setSourceQuery("")}><X size={16}/></button>}</label><div className="bank-vault-select-head"><button type="button" onClick={() => setSelected(ids => allSelected ? ids.filter(id => !visibleSources.some(bank => bank.id === id)) : [...new Set([...ids, ...visibleSources.map(bank => bank.id)])])}><CheckCircle2 />{allSelected ? "取消全选" : (sourceQuery.trim() ? "全选搜索结果" : "全选题库")}</button><span>已选择 {selected.length}/{banks.length} · 显示 {visibleSources.length} 份</span></div>{visibleSources.length ? <div className="bank-vault-source-grid">{visibleSources.map((bank) => <button type="button" key={bank.id} className={selected.includes(bank.id) ? "active" : ""} onClick={() => toggleSelected(bank.id)}><i>{selected.includes(bank.id) && <Check />}</i><span><strong>{bank.name}</strong><small>{bank.groupName || "未分组"} · {bank.questions.length} 题</small></span></button>)}</div> : <div className="bank-request-empty"><Database /><strong>{banks.length ? "没有匹配的题库" : "“我的题库”还是空的"}</strong><p>{banks.length ? "换一个关键词试试，已选择的题库会保留。" : "请先导入题库，再批量收入藏经阁。"}</p></div>}<footer><button className="primary-action" onClick={() => void uploadSelected()} disabled={!selected.length || busy}><Upload />{busy ? "正在上传…" : `上传 ${selected.length || ""} 份题库`}</button></footer></section>
-      <section className="bank-request-list"><nav className="bank-request-stage-nav" aria-label="按培养阶段筛选藏经阁"><button className={stageFilter === "全部" ? "active" : ""} onClick={() => setStageFilter("全部")}>全部</button>{PAVILION_STUDY_STAGES.map((stage) => <button className={stageFilter === stage ? "active" : ""} key={stage} onClick={() => setStageFilter(stage)}>{stage}</button>)}<button type="button" className="pavilion-search-trigger" aria-label="搜索已收录题库" title="搜索已收录题库" onClick={() => { collectionSearchRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }); collectionSearchRef.current?.focus({ preventScroll: true }); }}>🔍</button></nav><header><div><span>PUBLIC PAVILION COLLECTION</span><h2>公共题库清单 <em>{visibleEntries.length}/{entries.length}</em></h2></div><label className="bank-request-search"><Search size={16} /><input ref={collectionSearchRef} aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库或原分组" /></label></header>{!account ? <div className="bank-request-empty"><UserRound /><strong>登录后查看公共藏经阁</strong><p>注册用户共享同一份题库清单，登录后即可浏览和下载。</p><button className="primary-action" onClick={onRequireLogin}>登录 / 注册</button></div> : visibleEntries.length ? <div className="bank-request-grid bank-vault-grid">{visibleEntries.map((entry) => <article key={entry.id}><header><span>{entry.studyStage}</span><em>{entry.own ? "我的上传" : entry.uploaderNickname || "共享"}</em></header><h3>{entry.name}</h3><p className="bank-request-subject">{entry.groupName || "未分组"} · 总题 {entry.questionCount} / 单选 {entry.singleCount ?? "—"} / X {entry.multipleCount ?? "—"}</p><small>更新于 {new Date(entry.uploadedAt).toLocaleString("zh-CN")}</small><footer><button className="pavilion-import-button" disabled={Boolean(importingId)} onClick={() => void importEntry(entry)}><Import />{importingId === entry.id ? "正在导入…" : "导入我的题库"}</button><button onClick={() => void downloadEntry(entry)}><Download />下载 JSON</button>{entry.own && <button className="danger" aria-label={`移出 ${entry.name}`} title="移出藏经阁" onClick={() => void removeEntry(entry.id)}><Trash2 /></button>}</footer></article>)}</div> : <div className="bank-request-empty"><Library /><strong>{entries.length ? "当前筛选没有题库" : "藏经阁里还没有题库"}</strong><p>{entries.length ? "可切换培养阶段或减少搜索词。" : "从上方选择一份或多份现有题库，批量上传即可。"}</p></div>}</section>
+      <section className="bank-request-list"><nav className="bank-request-stage-nav" aria-label="按培养阶段筛选藏经阁"><button className={stageFilter === "全部" ? "active" : ""} onClick={() => setStageFilter("全部")}>全部</button>{PAVILION_STUDY_STAGES.map((stage) => <button className={stageFilter === stage ? "active" : ""} key={stage} onClick={() => setStageFilter(stage)}>{stage}</button>)}<button type="button" className="pavilion-search-trigger" aria-label="搜索已收录题库" title="搜索已收录题库" onClick={() => { collectionSearchRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }); collectionSearchRef.current?.focus({ preventScroll: true }); }}>🔍</button></nav><header><div><span>PUBLIC PAVILION COLLECTION</span><h2>公共题库清单 <em>{visibleEntries.length}/{entries.length}</em></h2></div><label className="bank-request-search"><Search size={16} /><input ref={collectionSearchRef} aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库或原分组" /></label></header>{!account ? <div className="bank-request-empty"><UserRound /><strong>登录后查看公共藏经阁</strong><p>注册用户共享同一份题库清单，登录后即可浏览和下载。</p><button className="primary-action" onClick={onRequireLogin}>登录 / 注册</button></div> : visibleEntries.length ? <div className="bank-request-grid bank-vault-grid">{visibleEntries.map((entry) => <article key={entry.id}><header><span>{entry.studyStage}</span><em>{entry.uploaderNickname || "共享"}{entry.own ? " · 我的上传" : ""}</em></header><h3>{entry.name}</h3><p className="bank-request-subject">{entry.groupName || "未分组"} · 总题 {entry.questionCount} / 单选 {entry.singleCount ?? "—"} / X {entry.multipleCount ?? "—"}</p><small>更新于 {new Date(entry.uploadedAt).toLocaleString("zh-CN")}</small><footer><button className="pavilion-import-button" disabled={Boolean(importingId)} onClick={() => void importEntry(entry)}><Import />{importingId === entry.id ? "正在导入…" : "导入我的题库"}</button><div className="pavilion-file-actions"><button onClick={() => void downloadEntry(entry)}><Download />下载 JSON</button>{entry.own && <button className="danger" aria-label={`移出 ${entry.name}`} title="移出藏经阁" onClick={() => void removeEntry(entry.id)}><Trash2 />删除</button>}</div></footer></article>)}</div> : <div className="bank-request-empty"><Library /><strong>{entries.length ? "当前筛选没有题库" : "藏经阁里还没有题库"}</strong><p>{entries.length ? "可切换培养阶段或减少搜索词。" : "从上方选择一份或多份现有题库，批量上传即可。"}</p></div>}</section>
     </main>{message && <SuccessToast message={message} onClose={() => setMessage("")} />}
   </div>;
 }
@@ -2731,6 +2760,7 @@ function IncomingBankShareModal({ share, onImport, onClose }: {
 
 function QuizView(props: {
   chapterProgress: Progress;
+  killedQuestions: string[];
   bankName: string; bankQuestions: QuizQuestion[]; onOpenQuestion: (id: string) => void; onSearchNotes: () => void;
   current: QuizQuestion; currentIndex: number; total: number; completed: number; accuracy: number; selected: string[]; excluded: string[]; submitted: boolean; studyMode: StudyMode;
   examScore?: { earned: number; answeredMaximum: number; total: number };
@@ -2754,8 +2784,8 @@ function QuizView(props: {
   onDeleteQuestion: (questionId: string) => Promise<void>;
   knownNoteTags: string[];
 }) {
-  const chapterStats = practiceStats(props.bankQuestions.filter(q => q.category === props.current.category), props.chapterProgress);
-  const libraryStats = practiceStats(props.bankQuestions, props.chapterProgress);
+  const chapterStats = practiceStats(props.bankQuestions.filter(q => q.category === props.current.category), props.chapterProgress, false, props.killedQuestions);
+  const libraryStats = practiceStats(props.bankQuestions, props.chapterProgress, false, props.killedQuestions);
   const [editingQuestion, setEditingQuestion] = useState(false);
   const [addingQuestion, setAddingQuestion] = useState<QuizQuestion | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
@@ -2765,14 +2795,14 @@ function QuizView(props: {
   const { current, total, selected, excluded, submitted, studyMode, result, favorite, favoriteStars, note, aiMode, aiTexts, aiLoading, examScore } = props;
   const questionNumbers = useMemo(() => compactQuestionNumbers(props.bankQuestions, props.bankName), [props.bankQuestions, props.bankName]);
   const currentNumber = questionNumbers.get(current.id);
-  const progress = Math.min(100, (props.completed / Math.max(total, 1)) * 100);
+  const progress = libraryStats.percent;
   const progressLabel = progress.toFixed(2);
   const answerAvailable = current.answer.length > 0;
   const memorizing = studyMode === "memorize";
   const blind = studyMode === "blind";
   const explanationIsAi = /AI/i.test(current.explanationSource ?? "");
   const modeSuffix = blind ? " · 盲刷" : memorizing ? " · 背题" : "";
-  const questionKind = `${current.medicalQuestionType || current.questionType || (current.multiple ? "多" : "单")}${answerAvailable ? modeSuffix : " · 测试模式"}`;
+  const questionKind = `${props.currentIndex + 1}•${current.medicalQuestionType || current.questionType || (current.multiple ? "多" : "单")}${answerAvailable ? modeSuffix : " · 测试模式"}`;
   const chooseHint = memorizing
     ? answerAvailable ? "标准答案已直接展开；结合题干与原资料解析快速记忆" : "当前题库没有提供标准答案，暂时只能查看题干与选项"
     : blind
@@ -2817,7 +2847,7 @@ function QuizView(props: {
     <button className="tablet-quiz-action" onClick={submitted || memorizing || blind ? props.onNext : props.onSubmit} disabled={!submitted && !memorizing && !blind && !selected.length}>{submitted || memorizing || blind ? <><span>下一题</span><ChevronRight /></> : <><CheckCircle2 /><span>确认答案</span></>}</button>
     <nav className="quiz-bottom"><button onClick={props.onPrevious}><ChevronLeft /><span>上一题</span></button><button onClick={props.onAnswerSheet}><ListChecks /><span>答题卡</span></button><button className={favorite ? "active" : ""} onClick={props.onFavorite}><Star fill={favorite ? "currentColor" : "none"} /><span>精选</span></button><button onClick={props.onMobilePanel}><MessageCircle /><span>学习区</span></button><button onClick={props.onSettings}><Settings2 /><span>设置</span></button><button className="mobile-next" onClick={props.onNext}><ChevronRight /><span>下一题</span></button></nav>
       {props.mobilePanel && <div className="mobile-learning"><button className="drawer-close" aria-label="关闭学习区" onClick={props.onMobilePanel}><X /></button><LearningPanel bankName={props.bankName} onSearchNotes={props.onSearchNotes} current={current} submitted={submitted && answerAvailable} note={note} knownNoteTags={props.knownNoteTags} aiMode={aiMode} aiTexts={aiTexts} aiLoading={aiLoading} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onSaveAiExplanation={props.onSaveAiExplanation} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} /></div>}
-      {showChapters && <ChapterDirectory questions={props.bankQuestions} progress={props.chapterProgress} currentQuestionId={current.id} onOpen={props.onOpenQuestion} onClose={() => setShowChapters(false)} />}
+      {showChapters && <ChapterDirectory killed={props.killedQuestions} questions={props.bankQuestions} progress={props.chapterProgress} currentQuestionId={current.id} onOpen={props.onOpenQuestion} onClose={() => setShowChapters(false)} />}
       {editingQuestion && <QuestionCorrectionModal question={current} bankQuestions={props.bankQuestions} onSave={props.onEditQuestion} onClose={() => setEditingQuestion(false)} />}
       {addingQuestion && <QuestionCorrectionModal creating question={addingQuestion} onSave={(question) => props.onAddQuestion(current.id, question)} onClose={() => setAddingQuestion(null)} />}
       {deletingQuestion && <div className="modal-layer question-delete-layer" onMouseDown={() => !deleteBusy && setDeletingQuestion(false)}><section className="question-delete-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="question-delete-title"><span><Trash2 /></span><div><small>DELETE QUESTION</small><h2 id="question-delete-title">删除原题号 {current.sourceNumber}？</h2><p>删除后，连续原题号会自动顺延；本题的作答、精选、笔记和斩题记录也会一并清理。分享与多端同步将采用删除后的版本。</p>{deleteError && <em>{deleteError}</em>}</div><footer><button className="ghost-action" disabled={deleteBusy} onClick={() => setDeletingQuestion(false)}>取消</button><button className="danger-action" disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); setDeleteError(""); try { await props.onDeleteQuestion(current.id); setDeletingQuestion(false); } catch (error) { setDeleteError(error instanceof Error ? error.message : "删除失败，请稍后重试"); } finally { setDeleteBusy(false); } }}><Trash2 />{deleteBusy ? "正在删除…" : "确认删除"}</button></footer></section></div>}
@@ -3009,7 +3039,8 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
   onRequireLogin: () => void;
 }) {
   const [tagDraft, setTagDraft] = useState("");
-  const [notePreview, setNotePreview] = useState(false);
+  const [notePreview, setNotePreview] = useState(true);
+  const [expandedPreview, setExpandedPreview] = useState(false);
   const [noteExpanded, setNoteExpanded] = useState(false);
   const previousNote = useRef({ id: current.id, note });
   useEffect(() => {
@@ -3084,7 +3115,8 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
     <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? explanationIsAi ? "AI 生成后存入题库 · 与原题解析分开标识" : "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className={`original-explanation-panel ${explanationIsAi ? "ai-saved" : "source-saved"}`}><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“AI 解析”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>}</> : <>{generatedText && <div className="ai-copy"><MarkdownNotePreview value={generatedText} /></div>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "录入解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
     {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={current.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
     <details className="community-card"><summary className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>{bankName} · {comments.length} 条</span></summary><div className="community-body"><p className="comment-scope-note">当前题库独立讨论 · 原题号 {current.sourceNumber}</p>{account ? <div className="comment-identity"><UserRound size={15} /><span>{account.nickname}</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={15} />登录后参与讨论</button>}<div className="comment-form"><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 300))} placeholder="写下你的判断依据、易错点或疑问…" disabled={!account || commentBusy} /><button onClick={() => void publishComment()} disabled={!account || commentBusy || commentDraft.trim().length < 2}><Send size={14} />{commentBusy ? "发布中…" : "发布"}</button></div>{commentMessage && <p className="comment-message">{commentMessage}</p>}<div className="local-comments">{comments.length ? comments.map((comment) => <article key={comment.id}><div><b>{comment.nickname}</b><time>{new Date(comment.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p>{comment.text}</p><div className="comment-tools"><button onClick={() => void runCommentAction(() => onLikeComment(comment.id))}><ThumbsUp size={13} />{comment.likes || "赞"}</button><button onClick={() => void runCommentAction(() => onReportComment(comment.id))}><Flag size={13} />举报</button>{comment.own && <button onClick={() => void runCommentAction(() => onDeleteComment(comment.id))}><Trash2 size={13} />删除</button>}</div></article>) : <p className="empty-comments">还没有讨论，成为这份题库中第一个留下学习线索的人。</p>}</div></div></details>
-    <details className="note-card collapsible-note-card" open={noteExpanded} onToggle={(event) => setNoteExpanded(event.currentTarget.open)}><summary className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></summary><div className="note-editor-body"><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} /><InkNote note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <button key={tag} title={`删除标签 ${tag}`} onClick={() => onNote(removeNoteTag(note, tag))}>#{tag}<X size={12} /></button>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div></details>
+    <details className="note-card collapsible-note-card" open={noteExpanded} onToggle={(event) => setNoteExpanded(event.currentTarget.open)}><summary className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></summary><div className="note-editor-body"><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果<button type="button" onClick={() => setExpandedPreview(true)} aria-label="放大笔记预览"><ExternalLink size={14}/>放大查看</button></header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <button key={tag} title={`删除标签 ${tag}`} onClick={() => onNote(removeNoteTag(note, tag))}>#{tag}<X size={12} /></button>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div><InkNote note={note} onNote={onNote} /></div></details>
+    {expandedPreview && <div className="modal-layer note-preview-layer" onMouseDown={() => setExpandedPreview(false)}><section className="note-preview-dialog" role="dialog" aria-modal="true" aria-label="笔记预览" onMouseDown={event => event.stopPropagation()}><header><h2>📓 笔记预览</h2><button aria-label="关闭笔记预览" onClick={() => setExpandedPreview(false)}><X/></button></header><MarkdownNotePreview value={note}/></section></div>}
   </aside>;
 }
 
@@ -3403,7 +3435,8 @@ function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: 
   return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>跨题库检索 · 按相关度排序</span><h2>搜索全部题库</h2></div><button onClick={onClose} aria-label={returnToQuiz ? "关闭搜索并返回当前题目" : "关闭搜索"}><X /></button></header>{returnToQuiz && <button className="search-return-strip" onClick={onClose}><ChevronLeft size={16} /><span><strong>当前练习已为你保留</strong><small>关闭搜索即可回到刚才的题目与已选答案</small></span></button>}<label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="题库名、疾病、症状或知识点；多个词用空格分隔" /><kbd>{results.length}</kbd></label><div className="search-results">{query.trim() ? results.length ? results.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => void onOpen(bank, question.id)}><span>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b> · {question.category} · 原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight size={17} /></button>) : <div className="search-empty"><CircleHelp /><p>没有找到同时匹配这些关键词的题目。可减少一个词，或改用疾病、症状及题库名称。</p></div> : <div className="search-empty search-guide"><Search /><p>输入关键词后，会同时检索所有题库，并优先显示题库名、分类和题干中的精准命中。</p></div>}</div></section></div>;
 }
 
-function NotesPage({ banks, progress, favorites, favoriteStars, notes, tagCatalog, onManageTag, onOpen, onBack }: {
+function NotesPage({ archives, banks, progress, favorites, favoriteStars, notes, tagCatalog, onManageTag, onOpen, onBack }: {
+  archives: ArchivedBankNotes[];
   banks: SavedQuestionBank[];
   progress: Progress;
   favorites: string[];
@@ -3469,6 +3502,7 @@ function NotesPage({ banks, progress, favorites, favoriteStars, notes, tagCatalo
   return <div className="notes-page">
     <header className="notes-page-header"><button className="icon-button" onClick={onBack} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div><span>PERSONAL KNOWLEDGE BASE</span><h1>我的笔记</h1><p>把题目、解析、批注与标签整理成可检索的个人知识库。</p></div><button className="notes-pdf-export" onClick={exportPdf} disabled={!exportCount}><Download size={16} />导出 PDF <em>{exportCount}</em></button></header>
     {exportMessage && <p className="notes-export-message notes-page-message">{exportMessage}</p>}
+    {archives.length > 0 && <section className="note-archives" aria-label="已归档题库笔记"><strong>📓 已归档笔记</strong>{archives.map(archive => <button key={archive.id} onClick={() => downloadBankNoteArchive(archive)}><Download size={16}/>{archive.name}<small>{archive.questions.length} 题 · 下载 HTML</small></button>)}</section>}
     <section className="notes-dashboard" aria-label="笔记概览"><article><NotebookPen /><div><strong>{allEntries.length}</strong><span>笔记</span></div></article><article><Link2 /><div><strong>{tagCounts.length}</strong><span>标签</span></div></article><article><AlertCircle /><div><strong>{wrongNotes}</strong><span>错题笔记</span></div></article><article><Star /><div><strong>{featuredNotes}</strong><span>精选笔记</span></div></article></section>
     <div className="notes-page-workspace">
       <aside className="notes-tag-library"><div className="notes-tag-library-heading"><div><span>标签组合</span><strong>{activeTags.length ? `已选 ${activeTags.length} 个` : "全部标签"}</strong></div>{activeTags.length > 0 && <button onClick={() => setActiveTags([])}>清空</button>}</div><label><Search size={14} /><input value={tagQuery} onChange={(event) => setTagQuery(event.target.value)} placeholder={`查找 ${tagCounts.length} 个标签`} /></label>{activeTags.length > 1 && <div className="notes-tag-logic"><button className={matchAllTags ? "active" : ""} onClick={() => setMatchAllTags(true)}>同时包含</button><button className={!matchAllTags ? "active" : ""} onClick={() => setMatchAllTags(false)}>任一标签</button></div>}<button className="notes-tag-add" type="button" onClick={()=>openTagAction("add")}><Plus size={15}/>添加标签</button><div className="notes-tag-cloud">{visibleTags.map(([tag, count]) => <div className="notes-tag-row" key={tag}><button type="button" className={activeTags.includes(tag) ? "active" : ""} onClick={() => toggleTag(tag)}><span>#{tag}</span><em>{count}</em></button><button type="button" aria-label={"改名标签 "+tag} title="改名" onClick={()=>openTagAction("rename",tag)}><Pencil size={14}/></button><button type="button" aria-label={"删除标签 "+tag} title="删除标签，保留笔记" onClick={()=>openTagAction("delete",tag)}><Trash2 size={14}/></button></div>)}{!visibleTags.length&&<p className="notes-tag-empty">{tagCounts.length ? "没有匹配的标签" : "添加标签，方便整理笔记 🏷️"}</p>}</div></aside>
