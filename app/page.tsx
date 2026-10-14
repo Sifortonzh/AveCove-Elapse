@@ -611,10 +611,10 @@ export default function HomePage() {
     return {
       all: typedQuestions.length,
       unanswered: typedQuestions.filter((question) => !progress[question.id]).length,
-      wrong: typedQuestions.filter((question) => progress[question.id] === "wrong").length,
+      wrong: typedQuestions.filter((question) => progress[question.id] === "wrong" && (!favorites.includes(question.id) || (favoriteStars[question.id] ?? 1) <= 1)).length,
       favorite: typedQuestions.filter((question) => favorites.includes(question.id)).length,
     };
-  }, [favorites, killedIds, progress, settings.questionTypes, subjectFilteredQuestions]);
+  }, [favorites, favoriteStars, killedIds, progress, settings.questionTypes, subjectFilteredQuestions]);
   const searchableBanks = useMemo(() => {
     const savedCurrent = activeBankId ? questionBanks.find((bank) => bank.id === activeBankId) : undefined;
     const currentBank: SavedQuestionBank = savedCurrent ? { ...savedCurrent, name: bankName, questions } : {
@@ -911,7 +911,7 @@ export default function HomePage() {
       if (killedIds.has(question.id)) return false;
       if (active.questionTypes === "single" && isXQuestion(question)) return false;
       if (active.scope === "unanswered") return !progress[question.id];
-      if (active.scope === "wrong") return progress[question.id] === "wrong";
+      if (active.scope === "wrong") return progress[question.id] === "wrong" && (!favorites.includes(question.id) || (favoriteStars[question.id] ?? 1) <= 1);
       if (active.scope === "favorite") return favorites.includes(question.id);
       return true;
     });
@@ -1092,25 +1092,24 @@ export default function HomePage() {
       ? firstProgress
       : { ...firstProgress, [current.id]: result as "correct" | "wrong" };
     const shouldFavorite = result === "wrong" && (sessionScope === "wrong" || settings.autoFavoriteWrong) && !favorites.includes(current.id);
-    const shouldUnfavorite = sessionScope === "wrong" && result === "correct" && favorites.includes(current.id);
-    const nextFavorites = shouldUnfavorite
-      ? favorites.filter((id) => id !== current.id)
-      : shouldFavorite ? [...favorites, current.id] : favorites;
+    const lowerReviewStars = sessionScope === "wrong" && result === "correct" && favorites.includes(current.id);
+    const nextFavorites = shouldFavorite ? [...favorites, current.id] : favorites;
     // Wrong-question review also strengthens an existing Featured question.
     // A newly featured mistake starts at one star; ordinary practice is unchanged.
     const raiseReviewStars = sessionScope === "wrong" && result === "wrong" && favorites.includes(current.id);
-    const nextStars = raiseReviewStars ? Math.min(99, Math.max(1, favoriteStars[current.id] ?? 1) + 1) : 1;
+    const nextStars = raiseReviewStars ? Math.min(99, Math.max(1, favoriteStars[current.id] ?? 1) + 1)
+      : lowerReviewStars ? Math.max(1, (favoriteStars[current.id] ?? 1) - 1) : 1;
     const nextFavoriteStars = { ...favoriteStars };
-    if (raiseReviewStars || shouldFavorite) nextFavoriteStars[current.id] = nextStars;
-    if (shouldUnfavorite) delete nextFavoriteStars[current.id];
+    if (raiseReviewStars || lowerReviewStars || shouldFavorite) nextFavoriteStars[current.id] = nextStars;
     const nextLedger = stampLearningRecord(recordLedger, current.id, {
       progress: result,
       ...(!firstProgress[current.id] ? { firstProgress: result } : {}),
-      ...(shouldFavorite ? { favorite: true } : shouldUnfavorite ? { favorite: false } : {}),
-      ...(raiseReviewStars || shouldFavorite ? { favoriteStars: nextStars } : shouldUnfavorite ? { favoriteStars: 0 } : {}),
+      ...(shouldFavorite || lowerReviewStars ? { favorite: true } : {}),
+      ...(raiseReviewStars || lowerReviewStars || shouldFavorite ? { favoriteStars: nextStars } : {}),
     });
     persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites: nextFavorites, favoriteStars: nextFavoriteStars, notes, ledger: nextLedger });
     if (raiseReviewStars) setToast(`再次做错，本题精选星级升至 ${nextStars} 星 ★`);
+    if (lowerReviewStars) setToast(`答对降为 ${nextStars} 星，仍保留精选 ★`);
     if (sessionStudyMode === "standard" && settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
   }
 
@@ -1881,12 +1880,13 @@ export default function HomePage() {
           onReset={resetSavedBankProgress}
           progress={progress}
           favorites={favorites}
+          favoriteStars={favoriteStars}
           notes={notes}
         />
       ) : view === "bank-requests" ? (
         <QuestionBankVaultPage banks={questionBanks} account={account} onImport={importPavilionBank} onRequireLogin={() => setShowAccount(true)} onBack={() => setView("banks")} />
       ) : view === "notes" ? (
-        <NotesPage banks={searchableBanks} progress={progress} favorites={favorites} notes={notes} tagCatalog={settings.noteTags ?? []} onManageTag={manageNoteTag} onBack={() => setView("home")} onOpen={async (bank, questionId) => {
+        <NotesPage banks={searchableBanks} progress={progress} favorites={favorites} favoriteStars={favoriteStars} notes={notes} tagCatalog={settings.noteTags ?? []} onManageTag={manageNoteTag} onBack={() => setView("home")} onOpen={async (bank, questionId) => {
           if (bank.id === "__demo__") openQuestion(questionId);
           else await openSavedQuestion(bank, questionId);
         }} />
@@ -1985,7 +1985,7 @@ export default function HomePage() {
       {show306Workbench && <Western306Workbench onClose={() => setShow306Workbench(false)} onSave={save306WorkbenchResult} />}
       {answerTargetBank && <AnswerImportModal bank={answerTargetBank} onMerge={mergeAnswerFile} onClose={() => setAnswerTargetBank(null)} />}
       {showSearch && <SearchModal banks={searchableBanks} returnToQuiz={view === "quiz" && Boolean(current)} onOpen={async (bank, questionId) => { if (bank.id === "__demo__") openQuestion(questionId); else { await openSavedQuestion(bank, questionId); setShowSearch(false); } }} onClose={() => setShowSearch(false)} />}
-      {showNotes && <NotesModal bankName={bankName} questions={questions} progress={progress} favorites={favorites} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
+      {showNotes && <NotesModal bankName={bankName} questions={questions} progress={progress} favorites={favorites} favoriteStars={favoriteStars} notes={notes} onOpen={openQuestion} onClose={() => setShowNotes(false)} />}
       {showAccount && <AccountModal account={account} syncStatus={syncStatus} syncFiles={syncFiles} syncing={manualSyncing} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pushRemoteState(true)} onExport={() => { void exportLearningRecord(); }} onImport={importLearningRecord} />}
       {bankReplacementPrompt && <BankReplacementModal prompt={bankReplacementPrompt} onChoose={resolveBankReplacement} />}
       {incomingBankShare && <IncomingBankShareModal share={incomingBankShare} onImport={() => void importIncomingBankShare()} onClose={clearIncomingBankShare} />}
@@ -2066,13 +2066,14 @@ function reconcileQuestionBankOrder(order: string[], ids: string[]) {
   return [...order.filter((id, index) => available.has(id) && order.indexOf(id) === index), ...ids.filter((id) => !order.includes(id))];
 }
 
-function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, singleOnly, killedQuestions, onHome, onImport, onRequests, onImportAnswers, onSelect, onUpdate, onToggleFeatured, onDelete, onReset }: {
+function QuestionBankPage({ banks, activeBankId, progress, favorites, favoriteStars, notes, singleOnly, killedQuestions, onHome, onImport, onRequests, onImportAnswers, onSelect, onUpdate, onToggleFeatured, onDelete, onReset }: {
   banks: SavedQuestionBank[];
   singleOnly: boolean;
   killedQuestions: string[];
   activeBankId: string | null;
   progress: Progress;
   favorites: string[];
+  favoriteStars: Record<string, number>;
   notes: Record<string, string>;
   onHome: () => void;
   onImport: () => void;
@@ -2300,7 +2301,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, sin
   }
 
   function exportBankNotes(bank: SavedQuestionBank) {
-    const sections = collectNoteExportSections(bank.questions, progress, favorites, notes);
+    const sections = collectNoteExportSections(bank.questions, progress, favorites, notes, favoriteStars);
     if (sections.length) printNotePdf(bank.name, sections, notes);
   }
 
@@ -2332,7 +2333,7 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, notes, sin
         const completedCount = stats.answered;
         const completion = stats.percent;
         const completionLabel = completion.toFixed(2);
-        const noteExportCount = collectNoteExportSections(bank.questions, progress, favorites, notes)
+        const noteExportCount = collectNoteExportSections(bank.questions, progress, favorites, notes, favoriteStars)
           .reduce((sum, section) => sum + section.questions.length, 0);
         return <article className={`bank-card ${isActive ? "active" : ""} ${locatedBankId === bank.id ? "located" : ""}`} data-bank-id={bank.id} key={bank.id}>
           <header><span className="bank-card-icon"><Database /></span><div className="bank-card-head-actions">{pendingAnswerCount > 0 && <button type="button" className="bank-answer-badge" title={`${pendingAnswerCount} 题待答案，点击导入答案`} onClick={() => onImportAnswers(bank)}><CircleHelp size={13} />待答案</button>}{isActive && <em><Check size={13} />当前题库</em>}{sortMode === "custom" && <span className="bank-item-order"><button type="button" aria-label={`上移题库 ${bank.name}`} title="上移题库" disabled={bankIndex === 0} onClick={() => moveBank(group.name, bank.id, -1)}><ArrowUp /></button><button type="button" aria-label={`下移题库 ${bank.name}`} title="下移题库" disabled={bankIndex === group.banks.length - 1} onClick={() => moveBank(group.name, bank.id, 1)}><ArrowDown /></button></span>}<button type="button" className={`bank-feature-toggle ${bank.featured ? "active" : ""}`} aria-label={`${bank.featured ? "取消精选" : "设为精选"} ${bank.name}`} aria-pressed={bank.featured} title={bank.featured ? "移出精选试卷" : "加入精选试卷"} onClick={() => void onToggleFeatured(bank.id, !bank.featured)}><Star fill={bank.featured ? "currentColor" : "none"} /></button></div></header>
@@ -2754,6 +2755,7 @@ function QuizView(props: {
   knownNoteTags: string[];
 }) {
   const chapterStats = practiceStats(props.bankQuestions.filter(q => q.category === props.current.category), props.chapterProgress);
+  const libraryStats = practiceStats(props.bankQuestions, props.chapterProgress);
   const [editingQuestion, setEditingQuestion] = useState(false);
   const [addingQuestion, setAddingQuestion] = useState<QuizQuestion | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
@@ -2789,7 +2791,7 @@ function QuizView(props: {
     medicalQuestionType: "A1",
   });
   return <div className="quiz-shell">
-    <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b title={`已完成 ${props.completed}/${total} · 学习进度 ${progressLabel}% · 正确率 ${props.accuracy.toFixed(2)}%`}>进度 {progressLabel}% · 正确率 {props.accuracy.toFixed(2)}% · 章节 {chapterStats.answered}/{chapterStats.total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
+    <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b title={`已完成 ${props.completed}/${total} · 学习进度 ${progressLabel}% · 正确率 ${props.accuracy.toFixed(2)}%`}>进度 {progressLabel}% · 正确率 {props.accuracy.toFixed(2)}% · 章节 {chapterStats.answered}/{chapterStats.total} · 全库 {libraryStats.answered}/{libraryStats.total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
     <div className="quiz-workspace">
       <section className="question-pane">
         <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span className="question-number" title={currentNumber?.details ?? `原题号 ${current.sourceNumber}`} aria-label={currentNumber?.details ?? `原题号 ${current.sourceNumber}`}>{currentNumber?.label ?? current.sourceNumber}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题" aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题" aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} title="纠错编辑" aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} title="搜索题目" aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => props.onUpdateKilled([current.id], !props.killed)} title="直接斩掉本题；批量斩题请打开答题卡" aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? `精选 ★${favoriteStars}` : "精选"}</button></div></div>
@@ -3008,6 +3010,14 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
 }) {
   const [tagDraft, setTagDraft] = useState("");
   const [notePreview, setNotePreview] = useState(false);
+  const [noteExpanded, setNoteExpanded] = useState(false);
+  const previousNote = useRef({ id: current.id, note });
+  useEffect(() => {
+    const previous = previousNote.current;
+    if (previous.id !== current.id) setNoteExpanded(false);
+    else if (previous.note !== note && note.trim()) setNoteExpanded(true);
+    previousNote.current = { id: current.id, note };
+  }, [current.id, note]);
   const [noteMessage, setNoteMessage] = useState("");
   const [commentDraft, setCommentDraft] = useState("");
   const [commentBusy, setCommentBusy] = useState(false);
@@ -3028,6 +3038,7 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
     if (!writableAiText) return;
     const next = appendAiToNote(note, current, activeModeLabel, writableAiText);
     onNote(next);
+    setNoteExpanded(true);
     setNoteMessage(next === note ? "这段内容已经在笔记里了" : "AI 内容已写入 Markdown 笔记 ✨");
     window.setTimeout(() => setNoteMessage(""), 1_600);
   };
@@ -3073,7 +3084,7 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
     <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? explanationIsAi ? "AI 生成后存入题库 · 与原题解析分开标识" : "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className={`original-explanation-panel ${explanationIsAi ? "ai-saved" : "source-saved"}`}><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“AI 解析”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>}</> : <>{generatedText && <div className="ai-copy"><MarkdownNotePreview value={generatedText} /></div>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "录入解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
     {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={current.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
     <details className="community-card"><summary className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>{bankName} · {comments.length} 条</span></summary><div className="community-body"><p className="comment-scope-note">当前题库独立讨论 · 原题号 {current.sourceNumber}</p>{account ? <div className="comment-identity"><UserRound size={15} /><span>{account.nickname}</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={15} />登录后参与讨论</button>}<div className="comment-form"><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 300))} placeholder="写下你的判断依据、易错点或疑问…" disabled={!account || commentBusy} /><button onClick={() => void publishComment()} disabled={!account || commentBusy || commentDraft.trim().length < 2}><Send size={14} />{commentBusy ? "发布中…" : "发布"}</button></div>{commentMessage && <p className="comment-message">{commentMessage}</p>}<div className="local-comments">{comments.length ? comments.map((comment) => <article key={comment.id}><div><b>{comment.nickname}</b><time>{new Date(comment.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p>{comment.text}</p><div className="comment-tools"><button onClick={() => void runCommentAction(() => onLikeComment(comment.id))}><ThumbsUp size={13} />{comment.likes || "赞"}</button><button onClick={() => void runCommentAction(() => onReportComment(comment.id))}><Flag size={13} />举报</button>{comment.own && <button onClick={() => void runCommentAction(() => onDeleteComment(comment.id))}><Trash2 size={13} />删除</button>}</div></article>) : <p className="empty-comments">还没有讨论，成为这份题库中第一个留下学习线索的人。</p>}</div></div></details>
-    <div className="note-card"><div className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></div><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} /><InkNote note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <button key={tag} title={`删除标签 ${tag}`} onClick={() => onNote(removeNoteTag(note, tag))}>#{tag}<X size={12} /></button>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div>
+    <details className="note-card collapsible-note-card" open={noteExpanded} onToggle={(event) => setNoteExpanded(event.currentTarget.open)}><summary className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></summary><div className="note-editor-body"><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} /><InkNote note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果</header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <button key={tag} title={`删除标签 ${tag}`} onClick={() => onNote(removeNoteTag(note, tag))}>#{tag}<X size={12} /></button>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div></div></details>
   </aside>;
 }
 
@@ -3392,10 +3403,11 @@ function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: 
   return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>跨题库检索 · 按相关度排序</span><h2>搜索全部题库</h2></div><button onClick={onClose} aria-label={returnToQuiz ? "关闭搜索并返回当前题目" : "关闭搜索"}><X /></button></header>{returnToQuiz && <button className="search-return-strip" onClick={onClose}><ChevronLeft size={16} /><span><strong>当前练习已为你保留</strong><small>关闭搜索即可回到刚才的题目与已选答案</small></span></button>}<label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="题库名、疾病、症状或知识点；多个词用空格分隔" /><kbd>{results.length}</kbd></label><div className="search-results">{query.trim() ? results.length ? results.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => void onOpen(bank, question.id)}><span>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b> · {question.category} · 原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight size={17} /></button>) : <div className="search-empty"><CircleHelp /><p>没有找到同时匹配这些关键词的题目。可减少一个词，或改用疾病、症状及题库名称。</p></div> : <div className="search-empty search-guide"><Search /><p>输入关键词后，会同时检索所有题库，并优先显示题库名、分类和题干中的精准命中。</p></div>}</div></section></div>;
 }
 
-function NotesPage({ banks, progress, favorites, notes, tagCatalog, onManageTag, onOpen, onBack }: {
+function NotesPage({ banks, progress, favorites, favoriteStars, notes, tagCatalog, onManageTag, onOpen, onBack }: {
   banks: SavedQuestionBank[];
   progress: Progress;
   favorites: string[];
+  favoriteStars: Record<string, number>;
   notes: Record<string, string>;
   tagCatalog: string[];
   onManageTag: (action: TagAction, tag: string, replacement?: string) => void;
@@ -3432,7 +3444,7 @@ function NotesPage({ banks, progress, favorites, notes, tagCatalog, onManageTag,
     });
   }, [activeTags, allEntries, matchAllTags, query]);
   const allQuestions = useMemo(() => banks.flatMap((bank) => bank.questions), [banks]);
-  const exportSections = useMemo(() => collectNoteExportSections(allQuestions, progress, favorites, notes), [allQuestions, favorites, notes, progress]);
+  const exportSections = useMemo(() => collectNoteExportSections(allQuestions, progress, favorites, notes, favoriteStars), [favoriteStars, allQuestions, favorites, notes, progress]);
   const exportCount = exportSections.reduce((sum, section) => sum + section.questions.length, 0);
   const wrongNotes = allEntries.filter((entry) => progress[entry.question.id] === "wrong").length;
   const featuredNotes = allEntries.filter((entry) => favorites.includes(entry.question.id)).length;
@@ -3466,13 +3478,13 @@ function NotesPage({ banks, progress, favorites, notes, tagCatalog, onManageTag,
   </div>;
 }
 
-function NotesModal({ bankName, questions, progress, favorites, notes, onOpen, onClose }: { bankName: string; questions: QuizQuestion[]; progress: Progress; favorites: string[]; notes: Record<string, string>; onOpen: (id: string) => void; onClose: () => void }) {
+function NotesModal({ bankName, questions, progress, favorites, favoriteStars, notes, onOpen, onClose }: { bankName: string; questions: QuizQuestion[]; progress: Progress; favorites: string[]; favoriteStars: Record<string, number>; notes: Record<string, string>; onOpen: (id: string) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState("");
   const [tagQuery, setTagQuery] = useState("");
   const [exportMessage, setExportMessage] = useState("");
   const allEntries = useMemo(() => questions.filter((question) => notes[question.id]?.trim()), [questions, notes]);
-  const exportSections = useMemo(() => collectNoteExportSections(questions, progress, favorites, notes), [favorites, notes, progress, questions]);
+  const exportSections = useMemo(() => collectNoteExportSections(questions, progress, favorites, notes, favoriteStars), [favoriteStars, favorites, notes, progress, questions]);
   const exportCount = exportSections.reduce((sum, section) => sum + section.questions.length, 0);
   const tags = useMemo(() => [...new Set(allEntries.flatMap((question) => parseNoteTags(notes[question.id] ?? "")))].sort(), [allEntries, notes]);
   const visibleTags = useMemo(() => tags.filter((tag) => tag.toLocaleLowerCase().includes(tagQuery.trim().toLocaleLowerCase())), [tagQuery, tags]);

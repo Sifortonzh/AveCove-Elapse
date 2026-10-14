@@ -13,10 +13,19 @@ export function collectNoteExportSections(
   _progress: Progress,
   favorites: string[],
   notes: Record<string, string>,
+  favoriteStars: Record<string, number> = {},
 ) {
   const favoriteIds = new Set(favorites);
+  const chapterOrder = new Map<string, number>();
+  for (const question of questions) if (!chapterOrder.has(question.category)) chapterOrder.set(question.category, chapterOrder.size);
+  const ordered = questions.map((question, index) => ({ question, index })).sort((a, b) => {
+    const stars = (q: QuizQuestion) => favoriteIds.has(q.id) ? Math.max(1, favoriteStars[q.id] ?? 1) : 0;
+    return stars(b.question) - stars(a.question)
+      || (chapterOrder.get(a.question.category) ?? 0) - (chapterOrder.get(b.question.category) ?? 0)
+      || a.index - b.index;
+  }).map(({ question }) => question);
   const assigned = new Set<string>();
-  const take = (predicate: (question: QuizQuestion) => boolean) => questions.filter((question) => {
+  const take = (predicate: (question: QuizQuestion) => boolean) => ordered.filter((question) => {
     if (assigned.has(question.id) || !predicate(question)) return false;
     assigned.add(question.id);
     return true;

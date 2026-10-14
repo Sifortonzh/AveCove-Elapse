@@ -5,6 +5,34 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("note exports rank stars before chapter order without mutating source banks", async () => {
+  const { collectNoteExportSections } = await loadNotePdfExport();
+  const questions = [{id:"low",category:"第一章"},{id:"high",category:"第二章"},{id:"tie2",category:"第二章"},{id:"tie1",category:"第一章"},{id:"plain2",category:"第二章"},{id:"plain1",category:"第一章"}];
+  const before = structuredClone(questions);
+  const notes = {plain2:"> 选项 A 批注：二章",plain1:"> 选项 A 批注：一章"};
+  const sections = collectNoteExportSections(questions, {}, ["low","high","tie2","tie1"], notes, {low:1,high:4,tie2:2,tie1:2});
+  assert.deepEqual(sections[0].questions.map(q=>q.id), ["high","tie1","tie2","low"]);
+  assert.deepEqual(sections[1].questions.map(q=>q.id), ["plain1","plain2"]);
+  assert.deepEqual(questions, before);
+});
+
+test("wrong review excludes stronger starred questions, shuffles, and shows confirmed library totals", async () => {
+  const page = await text("app/page.tsx");
+  assert.match(page, /if \(active.scope === "wrong"\) return progress\[question.id\] === "wrong" && \(!favorites.includes\(question.id\) \|\| \(favoriteStars\[question.id\] \?\? 1\) <= 1\)/);
+  assert.match(page, /wrong: typedQuestions.filter\([^\n]*favoriteStars\[question.id\][^\n]*<= 1/);
+  assert.match(page, /active.scope === "wrong" \|\| active.scope === "favorite"\) pool = shuffle\(pool\)/);
+  assert.match(page, /全库 \{libraryStats.answered\}\/\{libraryStats.total\}/);
+  assert.match(page, /const libraryStats = practiceStats\(props.bankQuestions, props.chapterProgress\)/);
+  assert.match(page, /const \[noteExpanded, setNoteExpanded\] = useState\(false\)/);
+  assert.match(page, /previous.id !== current.id\) setNoteExpanded\(false\)/);
+  assert.match(page, /previous.note !== note && note.trim\(\)\) setNoteExpanded\(true\)/);
+  assert.match(page, /<details className="note-card collapsible-note-card" open=\{noteExpanded\}/);
+  const predicate = (q, progress, favorites, stars) => progress[q.id] === "wrong" && (!favorites.includes(q.id) || (stars[q.id] ?? 1) <= 1);
+  assert.ok(predicate({id:"one"},{one:"wrong"},["one"],{one:1}));
+  assert.ok(!predicate({id:"two"},{two:"wrong"},["two"],{two:2}));
+  assert.ok(!predicate({id:"pending"},{},[],{}));
+});
+
 test("direct slash skip and answer-sheet batch ranges use visible numbers only", async () => {
   const page = await text("app/page.tsx");
   assert.match(page, /onClick=\{\(\) => props.onUpdateKilled\(\[current.id\], !props.killed\)\}/);
@@ -40,9 +68,9 @@ test("wrong review raises existing Featured stars and desktop confirmation remai
   const page = await text("app/page.tsx"), css = await text("app/globals.css");
   assert.match(page, /raiseReviewStars = sessionScope === "wrong" && result === "wrong" && favorites.includes\(current.id\)/);
   assert.match(page, /Math.min\(99, Math.max\(1, favoriteStars\[current.id\] \?\? 1\) \+ 1\)/);
-  assert.match(page, /raiseReviewStars \|\| shouldFavorite \? \{ favoriteStars: nextStars \}/);
+  assert.match(page, /raiseReviewStars \|\| lowerReviewStars \|\| shouldFavorite \? \{ favoriteStars: nextStars \}/);
   assert.match(page, /favoriteStars: nextFavoriteStars, notes, ledger: nextLedger/);
-  assert.match(page, /if \(shouldUnfavorite\) delete nextFavoriteStars\[current.id\]/);
+  assert.match(page, /lowerReviewStars \? Math.max\(1, \(favoriteStars\[current.id\] \?\? 1\) - 1\)/);
   assert.match(css, /@media \(min-width:621px\)\{[^\n]*\.tablet-quiz-action\{position:fixed/);
   const submit = page.slice(page.indexOf("  function submitAnswer()"), page.indexOf("  function toggleFavorite()"));
   const fixture = `export function run(sessionScope, answer, favorites, favoriteStars) {
@@ -62,7 +90,9 @@ test("wrong review raises existing Featured stars and desktop confirmation remai
   assert.equal(run("wrong", "B", ["q"], { q: 99 }).favoriteStars.q, 99);
   assert.equal(run("wrong", "B", [], {}).favoriteStars.q, 1);
   assert.equal(run("all", "B", ["q"], { q: 2 }).favoriteStars.q, 2);
-  assert.deepEqual(run("wrong", "A", ["q"], { q: 2 }).favorites, []);
+  assert.deepEqual(run("wrong", "A", ["q"], { q: 2 }).favorites, ["q"]);
+  assert.equal(run("wrong", "A", ["q"], { q: 2 }).favoriteStars.q, 1);
+  assert.equal(run("wrong", "A", ["q"], { q: 1 }).favoriteStars.q, 1);
   const featured = run("favorite", "B", ["q"], { q: 2 });
   assert.equal(featured.favoriteStars.q, 3); assert.deepEqual(featured.progress, { q: "wrong" });
 });
@@ -833,7 +863,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1593,7 +1623,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.3.9.7");
+  assert.equal(JSON.parse(packageJson).version, "2.3.9.8");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1992,7 +2022,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2038,7 +2068,7 @@ test("ships the v2.2.0 isolated wrong-review workflow and study refinements", as
   assert.match(page, /active\.questionOrder === "random" \|\| active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /isolatedReviewSession \? reviewProgress : progress/);
   assert.match(page, /setReviewProgress\(\{\}\)/);
-  assert.match(page, /shouldUnfavorite = sessionScope === "wrong" && result === "correct"/);
+  assert.match(page, /lowerReviewStars = sessionScope === "wrong" && result === "correct"/);
   assert.match(page, /AI 解析存档/);
   assert.match(page, /removeNoteTag\(note, tag\)/);
   assert.match(page, /查找 \$\{tags\.length\} 个已存标签/);
@@ -2053,7 +2083,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2071,7 +2101,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2091,7 +2121,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.3.9.7");
+  assert.equal(JSON.parse(manifest).version, "2.3.9.8");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

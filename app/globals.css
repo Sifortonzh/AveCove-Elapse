@@ -769,4 +769,11 @@ input,textarea,select{padding-block:12px}
 .bank-vault-grid footer{flex-wrap:wrap}
 .bank-vault-grid .pavilion-import-button{color:var(--green);background:var(--green-soft);border-color:var(--green)}
 .pavilion-import-button:disabled{opacity:.5;cursor:wait}
+/* v2.3.9.8: keep the note editor clear of persistent answer controls. */
+.collapsible-note-card>summary{display:flex;align-items:center;gap:7px;cursor:pointer;list-style:none;min-height:40px}
+.collapsible-note-card>summary::-webkit-details-marker{display:none}
+.collapsible-note-card>summary::before{content:"▸";color:var(--muted)}
+.collapsible-note-card[open]>summary::before{content:"▾"}
+.collapsible-note-card>summary span{margin-left:auto;color:var(--muted);font-size:.65rem}
+.collapsible-note-card .note-editor-body{display:block}
 @media(max-width:520px){.option-edit-tools{flex-direction:column}.option-edit-tools>button{height:28px;min-height:28px!important}.chapter-directory .chapter-result{font-size:.65rem}.sync-file-list>header{align-items:flex-start;flex-wrap:wrap}}
