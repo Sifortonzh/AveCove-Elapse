@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.1.2" src="https://img.shields.io/badge/version-2.4.1.2-b43d35" />
+    <img alt="版本 2.4.1.3" src="https://img.shields.io/badge/version-2.4.1.3-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.1.2。** 同步保留本机当前题库，忽略过期切换结果，不再被云端旧选择拉回。批量补答案锁定原待答案题目，不覆盖已有答案；有先前作答时立即判题，无需再次确认。DeepSeek 交互请求明确关闭思考模式以保留正文预算；厂商超时仍如实提示，不冒充成功。个人笔记继续按账号隔离。
+> **当前版本：v2.4.1.3。** DeepSeek 默认模型更新为 `deepseek-flash`，交互解析关闭思考模式；连接测试与解析最多等待两分钟，避免有效的排队请求被过早中断。保留本机题库选择、锁定待答案批次、补答案即时判题和账号笔记隔离。API Key 仅在服务器加密保存，不进入代码仓库。
 
 自行部署请先执行 `npm run db:migrate`。自动发布流程会应用增量建表文件 `db/sync-v3.sql`。藏经阁保持独立；英文题库正文暂时仍保存在学习快照，独立图片存储属于后续升级，不包含在本次补丁中。
 

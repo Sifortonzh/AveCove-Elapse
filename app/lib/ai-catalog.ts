@@ -11,7 +11,7 @@ export type ProviderPreset = {
 };
 
 export const providerPresets: ProviderPreset[] = [
-  { id: "deepseek", name: "DeepSeek", region: "国内", protocol: "openai-compatible", baseUrl: "https://api.deepseek.com", model: "deepseek-chat", note: "OpenAI 兼容接口" },
+  { id: "deepseek", name: "DeepSeek", region: "国内", protocol: "openai-compatible", baseUrl: "https://api.deepseek.com", model: "deepseek-flash", note: "OpenAI 兼容接口" },
   { id: "qwen", name: "通义千问", region: "国内", protocol: "openai-compatible", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-plus", note: "阿里云百炼兼容接口" },
   { id: "kimi", name: "Kimi", region: "国内", protocol: "openai-compatible", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-8k", note: "Moonshot 兼容接口" },
   { id: "doubao", name: "豆包", region: "国内", protocol: "openai-compatible", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "请填写推理接入点 ID", note: "火山方舟；模型栏填写接入点 ID" },

@@ -53,7 +53,10 @@ export async function POST(request: Request) {
   ].join("\n");
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45_000);
+  // DeepSeek can keep an accepted request queued for over 45 seconds.
+  // Keep a bounded deadline without aborting valid queued generations early.
+  const timeoutMs = aiConfig.provider === "deepseek" ? 120_000 : 45_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     let explanation = await generateAiText(aiConfig, prompt, { maxTokens: 2_400, signal: controller.signal });
     if (!explanation) {

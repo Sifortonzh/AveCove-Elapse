@@ -92,13 +92,13 @@ export async function POST(request: Request) {
     source: "database",
   };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20_000);
+  const timer = setTimeout(() => controller.abort(), config.provider === "deepseek" ? 120_000 : 20_000);
   try {
     await generateAiText(config, "这是一次连接测试。请只回复：连接成功", { maxTokens: 200, temperature: 0, signal: controller.signal });
     return NextResponse.json({ ok: true, message: `${provider.name} · ${model} 连接成功，可以保存并启用。✅` });
   } catch (error) {
     const detail = error instanceof DOMException && error.name === "AbortError"
-      ? "连接测试超过 20 秒，已自动停止。"
+      ? `连接测试超过 ${config.provider === "deepseek" ? 120 : 20} 秒，已自动停止。`
       : error instanceof Error ? error.message.slice(0, 240) : "AI 厂商没有返回有效响应。";
     return NextResponse.json({ error: `连接失败：${detail}` }, { status: 502 });
   } finally {
