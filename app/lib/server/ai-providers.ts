@@ -121,7 +121,11 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
     method: "POST",
     signal: options.signal,
     headers: { "Authorization": `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: config.model, messages: [{ role: "user", content: prompt }], temperature, max_tokens: maxTokens, stream: false }),
+    // DeepSeek V4 defaults to thinking. Short interactive explanations need
+    // visible output rather than exhausting the deadline on reasoning tokens.
+    body: JSON.stringify({ model: config.model, messages: [{ role: "user", content: prompt }], temperature, max_tokens: maxTokens, stream: false,
+      ...(config.provider === "deepseek" ? { thinking: { type: "disabled" } } : {}),
+    }),
   });
   const data = await readProviderPayload(response);
   if (!response.ok) throw new Error(providerError(data, response));

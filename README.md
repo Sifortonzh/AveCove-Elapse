@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.1.1" src="https://img.shields.io/badge/version-2.4.1.1-b43d35" />
+    <img alt="Version 2.4.1.2" src="https://img.shields.io/badge/version-2.4.1.2-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.1.1.** The sync identity dialog now lets users edit their public nickname; historical Pavilion uploads display the current nickname. Public bank sharing retains source questions and explanations while removing personal notes, draft selections and personal AI explanations. Switching sync accounts in one browser isolates medical study records and personal AI explanations. Before deleting a bank, notes, images and drawings can be archived in one offline HTML file; local archives remain downloadable from My Notes. Slashed questions count toward chapter and bank completion without inflating accuracy. Note exports highlight correct options, question types include answer-sheet numbers, note previews expand, and Pavilion file actions occupy a separate row with current uploader nicknames.
+> **Current release: v2.4.1.2.** Cloud synchronization preserves this device's selected bank and ignores stale navigation results. Batch answer entry locks the original pending targets, leaves known answers unchanged, and immediately grades prior choices without another confirmation. Interactive DeepSeek requests explicitly disable thinking to preserve output budget; upstream timeouts are still surfaced rather than reported as success. Personal notes remain account-isolated.
 
 Self-hosters: run `npm run db:migrate` before starting this release. The deployment workflow applies the additive `db/sync-v3.sql` migration automatically. The Pavilion remains independent. English library bodies still use the learning snapshot; independent media storage is a future upgrade, not included in this patch.
 

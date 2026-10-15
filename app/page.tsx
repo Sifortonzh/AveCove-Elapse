@@ -388,6 +388,7 @@ export default function HomePage() {
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
   const syncedBankRevisionsRef = useRef<Record<string, string>>({});
+  const bankNavigationRef = useRef(0);
   const latestRecordsRef = useRef<LearningRecordsInput>({});
   const latestSettingsRef = useRef<Settings>(defaultSettings);
   useEffect(() => { latestSettingsRef.current = settings; }, [settings]);
@@ -655,10 +656,11 @@ export default function HomePage() {
   }
 
   async function refreshLocalQuestionBanks() {
+    const navigation = bankNavigationRef.current;
     const banks = await listQuestionBanks().catch(() => []);
     const active = await loadActiveBank().catch(() => null);
     setQuestionBanks(banks);
-    if (active?.questions.length) {
+    if (navigation === bankNavigationRef.current && active?.questions.length) {
       setQuestions(active.questions);
       setBankName(active.name);
       setActiveBankId(active.id);
@@ -1515,9 +1517,10 @@ export default function HomePage() {
     if (!response.ok || !result.answers?.length) throw new Error(result.error || "没有找到可关联的答案");
     const patches = new Map(result.answers.map((answer) => [answer.sourceNumber, answer]));
     let checkedDrafts = 0;
-    const nextProgress = { ...progress };
-    const nextFirstProgress = { ...firstProgress };
-    let nextLedger = { ...recordLedger };
+    const latest = normalizeLearningRecords(latestRecordsRef.current);
+    const nextProgress = { ...latest.progress };
+    const nextFirstProgress = { ...latest.firstProgress };
+    let nextLedger = { ...latest.ledger };
     const mergedQuestions = bank.questions.map((question) => {
       const patch = patches.get(question.sourceNumber);
       if (!patch) return question;
@@ -1546,12 +1549,16 @@ export default function HomePage() {
       description: `${bank.description}\n答案已于 ${new Date().toLocaleDateString("zh-CN")} 从“${file.name}”关联。`.trim(),
       updatedAt: new Date().toISOString(),
     }, true);
-    persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites, notes, ledger: nextLedger });
+    persistLearningRecords({ ...latest, progress: nextProgress, firstProgress: nextFirstProgress, ledger: nextLedger });
     setQuestionBanks((banks) => banks.map((candidate) => candidate.id === saved.id ? saved : candidate));
     if (activeBankId === saved.id) {
       setQuestions(saved.questions);
       setBankName(saved.name);
       setSessionQuestions((session) => session.map((question) => saved.questions.find((candidate) => candidate.id === question.id) ?? question));
+      if (current && nextProgress[current.id] && saved.questions.some(question => question.id === current.id && question.answer.length)) {
+        setSubmitted(true);
+        setRevealedAnswers(ids => ids.includes(current.id) ? ids : [...ids, current.id]);
+      }
     }
     onUpdate({ phase: "答案导入完成", progress: 100, detail: `已关联 ${result.answers.length} 题${checkedDrafts ? `，并核对 ${checkedDrafts} 份测试作答` : ""}` });
     setToast(`答案已关联 ${result.answers.length} 题${checkedDrafts ? `，${checkedDrafts} 份测试作答已自动判定` : ""} ✅`);
@@ -1567,8 +1574,10 @@ export default function HomePage() {
   }
 
   async function selectQuestionBank(id: string, destination: View = "home") {
+    const navigation = ++bankNavigationRef.current;
     try {
       const bank = await activateQuestionBank(id);
+      if (navigation !== bankNavigationRef.current) return;
       setQuestions(bank.questions);
       setBankName(bank.name);
       setActiveBankId(bank.id);
@@ -1653,9 +1662,12 @@ export default function HomePage() {
   }
 
   async function saveBatchAnswerEntries(entries: BatchAnswerEntry[]) {
+    const lockedSelections = { ...answerSelections, ...reviewSelections, ...(current && selected.length ? { [current.id]: [...selected] } : {}) };
     const bank = activeBankId ? questionBanks.find((candidate) => candidate.id === activeBankId) : undefined;
     const sourceQuestions = bank?.questions ?? questions;
-    const applied = applyBatchAnswers(sourceQuestions, entries);
+    const pendingTargets = new Set(pendingAnswerQuestions(sourceQuestions).map(question => question.id));
+    const pendingEntries = entries.filter(entry => pendingTargets.has(entry.questionId));
+    const applied = applyBatchAnswers(sourceQuestions, pendingEntries);
     if (!applied.updatedCount) throw new Error("本组题目还没有可保存的有效答案");
 
     let saved: SavedQuestionBank;
@@ -1680,13 +1692,14 @@ export default function HomePage() {
     setQuestions(saved.questions);
     setSessionQuestions((session) => session.map((question) => replacement.get(question.id) ?? question));
 
-    const nextProgress = { ...progress };
-    const nextFirstProgress = { ...firstProgress };
-    let nextLedger = { ...recordLedger };
+    const latest = normalizeLearningRecords(latestRecordsRef.current);
+    const nextProgress = { ...latest.progress };
+    const nextFirstProgress = { ...latest.firstProgress };
+    let nextLedger = { ...latest.ledger };
     let checkedDrafts = 0;
-    for (const entry of entries) {
+    for (const entry of pendingEntries) {
       const question = replacement.get(entry.questionId);
-      const draft = answerSelections[entry.questionId] ?? question?.draftAnswer ?? [];
+      const draft = lockedSelections[entry.questionId] ?? question?.draftAnswer ?? [];
       if (!question?.answer.length || !draft.length) continue;
       const status = [...draft].sort().join("") === [...question.answer].sort().join("") ? "correct" : "wrong";
       nextProgress[question.id] = status;
@@ -1697,8 +1710,14 @@ export default function HomePage() {
         ...(firstWasMissing ? { firstProgress: status } : {}),
       });
       checkedDrafts += 1;
+      if (isolatedReviewSession) setReviewProgress(value => ({ ...value, [question.id]: status }));
+      if (current?.id === question.id) {
+        setSelected([...draft]);
+        setSubmitted(true);
+        setRevealedAnswers(ids => ids.includes(question.id) ? ids : [...ids, question.id]);
+      }
     }
-    if (checkedDrafts) persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites, notes, killed: killedQuestions, ledger: nextLedger });
+    if (checkedDrafts) persistLearningRecords({ ...latest, progress: nextProgress, firstProgress: nextFirstProgress, ledger: nextLedger });
     setToast(`已补录 ${applied.updatedCount} 题答案${checkedDrafts ? `，并核对 ${checkedDrafts} 份先前作答` : ""} ✅`);
   }
 
@@ -3155,13 +3174,14 @@ function AnswerSheet({ questions, progress, favorites, favoriteStars, notes, kil
 }
 
 function BatchAnswerModal({ questions, onSave, onClose }: { questions: QuizQuestion[]; onSave: (entries: BatchAnswerEntry[]) => Promise<void>; onClose: () => void }) {
-  const [pendingIds, setPendingIds] = useState(() => pendingAnswerQuestions(questions).map((question) => question.id));
+  const [lockedQuestions] = useState(() => questions);
+  const [pendingIds, setPendingIds] = useState(() => pendingAnswerQuestions(lockedQuestions).map((question) => question.id));
   const [offset, setOffset] = useState(0);
   const [jumpValue, setJumpValue] = useState("");
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const currentBatch = pendingIds.slice(offset, offset + 10).map((id) => questions.find((question) => question.id === id)).filter((question): question is QuizQuestion => Boolean(question));
+  const currentBatch = pendingIds.slice(offset, offset + 10).map((id) => lockedQuestions.find((question) => question.id === id)).filter((question): question is QuizQuestion => Boolean(question));
   const selectedEntries = currentBatch.filter((question) => answers[question.id]?.length).map((question) => ({ questionId: question.id, answer: answers[question.id] }));
   const complete = selectedEntries.length > 0;
   const toggle = (question: QuizQuestion, label: string) => setAnswers((current) => {
@@ -3189,7 +3209,7 @@ function BatchAnswerModal({ questions, onSave, onClose }: { questions: QuizQuest
     const target = jumpValue.trim();
     if (!target) return;
     const answerSheetIndex = Number(target) - 1;
-    const targetQuestion = Number.isInteger(answerSheetIndex) && answerSheetIndex >= 0 ? questions[answerSheetIndex] : undefined;
+    const targetQuestion = Number.isInteger(answerSheetIndex) && answerSheetIndex >= 0 ? lockedQuestions[answerSheetIndex] : undefined;
     const index = targetQuestion ? pendingIds.indexOf(targetQuestion.id) : -1;
     if (index < 0) return setError(`答题卡第 ${target} 题不存在或已经有答案`);
     setOffset(index); setError("");

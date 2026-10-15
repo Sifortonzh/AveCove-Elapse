@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.1.1" src="https://img.shields.io/badge/version-2.4.1.1-b43d35" />
+    <img alt="版本 2.4.1.2" src="https://img.shields.io/badge/version-2.4.1.2-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.1.1。** 同步身份窗口支持修改公开昵称，藏经阁历史上传使用当前昵称。 公共分享仅保留题目与原资料解析，过滤个人笔记、未确认选择和个人 AI 解析；同一浏览器切换同步账号时隔离笔记、作答与个人 AI 解析。删除题库前可把相关笔记、图片与手绘归档为一份离线 HTML，并从“我的笔记”重新下载本机归档。斩题计入章节、全库和完成率，不计入正确率；笔记导出用背景色标出正确选项。题型显示答题卡题号，笔记预览可放大，藏经阁显示当前上传昵称并把文件管理按钮放在独立一行。
+> **当前版本：v2.4.1.2。** 同步保留本机当前题库，忽略过期切换结果，不再被云端旧选择拉回。批量补答案锁定原待答案题目，不覆盖已有答案；有先前作答时立即判题，无需再次确认。DeepSeek 交互请求明确关闭思考模式以保留正文预算；厂商超时仍如实提示，不冒充成功。个人笔记继续按账号隔离。
 
 自行部署请先执行 `npm run db:migrate`。自动发布流程会应用增量建表文件 `db/sync-v3.sql`。藏经阁保持独立；英文题库正文暂时仍保存在学习快照，独立图片存储属于后续升级，不包含在本次补丁中。
 

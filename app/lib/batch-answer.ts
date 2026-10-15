@@ -11,7 +11,7 @@ export function applyBatchAnswers(questions: QuizQuestion[], entries: BatchAnswe
   let updatedCount = 0;
   const next = questions.map((question) => {
     const requested = answers.get(question.id);
-    if (!requested?.length) return question;
+    if (!requested?.length || (question.answer.length && !question.answerPending)) return question;
     const optionLabels = new Set(question.options.map((option) => option.label.toUpperCase()));
     const answer = requested.filter((label) => optionLabels.has(label)).sort();
     if (!answer.length) return question;

@@ -618,8 +618,11 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
     merged += 1;
   }
   await writeValues([[DELETED_BANKS_KEY, mergedDeletions]], false);
-  const activeBankId = typeof bundle.activeBankId === "string" && (await loadQuestionBank(bundle.activeBankId)) ? bundle.activeBankId : null;
   const localActiveBankId = await readValue<string>(ACTIVE_ID_KEY) ?? null;
+  // Navigation belongs to this device. A delayed sync must not reopen the
+  // bank another device last used, or undo a switch made during the download.
+  const activeBankId = localActiveBankId && await loadQuestionBank(localActiveBankId) ? localActiveBankId
+    : typeof bundle.activeBankId === "string" && (await loadQuestionBank(bundle.activeBankId)) ? bundle.activeBankId : null;
   if (activeBankId && activeBankId !== localActiveBankId) await activateQuestionBank(activeBankId);
   const localPreferencesUpdatedAt = await readValue<string>(PREFERENCES_UPDATED_AT_KEY) ?? new Date(0).toISOString();
   const remotePreferencesUpdatedAt = typeof bundle.preferencesUpdatedAt === "string" ? bundle.preferencesUpdatedAt : new Date(0).toISOString();
