@@ -44,6 +44,7 @@ export type PavilionQuestionBank = {
   uploadedAt: string;
   package?: SharedQuestionBankPackage;
   uploaderNickname?: string;
+  annotation?: string;
   own?: boolean;
 };
 

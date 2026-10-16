@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.1.3" src="https://img.shields.io/badge/version-2.4.1.3-b43d35" />
+    <img alt="Version 2.4.1.4" src="https://img.shields.io/badge/version-2.4.1.4-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.1.3.** DeepSeek uses the current `deepseek-flash` model preset, explicitly disables thinking for interactive explanations, and allows up to two minutes for queued generation in both connection tests and explanations. Device-local bank selection, locked pending-answer batches, immediate grading, and account-isolated notes are retained. API keys stay encrypted on the server and never enter source control.
+> **Current release: v2.4.1.4.** Pavilion uploads support an optional public annotation of up to 50 characters, shown on each shared bank card and kept separate from private notes. Batch uploads apply the same annotation to the selected banks. Existing AI, synchronization and privacy fixes are retained.
 
 Self-hosters: run `npm run db:migrate` before starting this release. The deployment workflow applies the additive `db/sync-v3.sql` migration automatically. The Pavilion remains independent. English library bodies still use the learning snapshot; independent media storage is a future upgrade, not included in this patch.
 
