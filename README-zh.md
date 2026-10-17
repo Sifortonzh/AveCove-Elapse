@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.1.4" src="https://img.shields.io/badge/version-2.4.1.4-b43d35" />
+    <img alt="版本 2.4.1.5" src="https://img.shields.io/badge/version-2.4.1.5-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.1.4。** 藏经阁上传支持选填 50 字以内的公开批注，在公共题库卡片展示，与个人笔记独立保存。批量上传时，同一批注应用于本次选择的题库。保留已有 AI、同步及隐私修复。
+> **当前版本：v2.4.1.5。** 模拟考试按各章节可练题量占比抽取最多 100 题，再打乱题序及选项。Markdown 笔记放大预览改为适配屏幕的原生弹窗，支持字号调整与独立滚动。藏经阁上传可设置 1–5 星上传者自评，与公开批注一起显示；旧题库不凭空补评分。DeepSeek V4.1 采用官方 `deepseek-flash` 接口，并兼容旧 Flash 名称。
+
+模拟考试在应用练习筛选、排除已斩题之后，使用最大余数法分配章节题数；可练题不足 100 道时全部使用。星级是上传者自评，不代表社区平均评分。[DeepSeek 官方更新日志](https://api-docs.deepseek.com/updates/)确认：`deepseek-flash` 自动调用最新 V4.1 Flash。
 
 自行部署请先执行 `npm run db:migrate`。自动发布流程会应用增量建表文件 `db/sync-v3.sql`。藏经阁保持独立；英文题库正文暂时仍保存在学习快照，独立图片存储属于后续升级，不包含在本次补丁中。
 

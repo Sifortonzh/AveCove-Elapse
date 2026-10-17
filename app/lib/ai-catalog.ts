@@ -11,7 +11,7 @@ export type ProviderPreset = {
 };
 
 export const providerPresets: ProviderPreset[] = [
-  { id: "deepseek", name: "DeepSeek", region: "国内", protocol: "openai-compatible", baseUrl: "https://api.deepseek.com", model: "deepseek-flash", note: "OpenAI 兼容接口" },
+  { id: "deepseek", name: "DeepSeek", region: "国内", protocol: "openai-compatible", baseUrl: "https://api.deepseek.com", model: "deepseek-flash", note: "V4.1 Flash · 官方最新版本" },
   { id: "qwen", name: "通义千问", region: "国内", protocol: "openai-compatible", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-plus", note: "阿里云百炼兼容接口" },
   { id: "kimi", name: "Kimi", region: "国内", protocol: "openai-compatible", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-8k", note: "Moonshot 兼容接口" },
   { id: "doubao", name: "豆包", region: "国内", protocol: "openai-compatible", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "请填写推理接入点 ID", note: "火山方舟；模型栏填写接入点 ID" },
@@ -24,4 +24,11 @@ export const providerPresets: ProviderPreset[] = [
 
 export function findProvider(id: string) {
   return providerPresets.find((provider) => provider.id === id);
+}
+
+/** Official V4.1 endpoint stays `deepseek-flash`; tolerate descriptive/legacy Flash names. */
+export function currentProviderModel(provider: ProviderId, model: string) {
+  const value = model.trim();
+  if (provider === "deepseek" && /^(?:deepseek-v4-flash(?:-vision-exp)?|deepseek-v4\.1-flash(?:-1017)?)$/i.test(value)) return "deepseek-flash";
+  return value;
 }

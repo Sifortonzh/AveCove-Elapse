@@ -97,7 +97,7 @@ export default function PersonalAiPage() {
       <div className="provider-grid">{personalProviders.map((provider) => <button type="button" key={provider.id} className={provider.id === providerId ? "active" : ""} onClick={() => chooseProvider(provider)}><span>{provider.region}</span><strong>{provider.name}</strong><small>{provider.note}</small></button>)}</div>
       <div className="ai-fields">
         <label><span>当前厂商</span><input value={selectedProvider.name} readOnly /></label>
-        <label><span>模型名称 / 接入点 ID</span><input value={model} onChange={(event) => setModel(event.target.value)} placeholder="例如 deepseek-chat" /></label>
+        <label><span>模型名称 / 接入点 ID</span><input value={model} onChange={(event) => setModel(event.target.value)} placeholder="例如 deepseek-flash（V4.1）" /></label>
         <label className="wide"><span>官方接口地址</span><input value={selectedProvider.baseUrl} readOnly /></label>
         <label className="wide"><span>个人 API Key <em>{savedKey ? "已保存在当前浏览器；留空则保持不变" : "首次配置必填"}</em></span><div className="secret-field"><KeyRound /><input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={savedKey ? "••••••••（留空不修改）" : "粘贴你自己的 API Key"} autoComplete="new-password" /></div></label>
       </div>

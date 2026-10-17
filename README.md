@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.1.4" src="https://img.shields.io/badge/version-2.4.1.4-b43d35" />
+    <img alt="Version 2.4.1.5" src="https://img.shields.io/badge/version-2.4.1.5-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.1.4.** Pavilion uploads support an optional public annotation of up to 50 characters, shown on each shared bank card and kept separate from private notes. Batch uploads apply the same annotation to the selected banks. Existing AI, synchronization and privacy fixes are retained.
+> **Current release: v2.4.1.5.** Mock exams allocate up to 100 eligible questions proportionally across chapters, then shuffle questions and options. Enlarged Markdown notes use a viewport-sized native dialog with adjustable type and independent scrolling. Pavilion uploads include a 1–5-star uploader rating alongside the public annotation; older unrated banks remain unrated. DeepSeek V4.1 uses the official `deepseek-flash` endpoint, with legacy Flash-name compatibility.
+
+Exam quotas use largest-remainder rounding on the eligible pool after practice filters (including skipped questions). Banks with fewer than 100 eligible questions use all of them. Ratings are uploader self-assessments, not community averages. [DeepSeek's official release notes](https://api-docs.deepseek.com/updates/) confirm that `deepseek-flash` follows the latest V4.1 Flash release.
 
 Self-hosters: run `npm run db:migrate` before starting this release. The deployment workflow applies the additive `db/sync-v3.sql` migration automatically. The Pavilion remains independent. English library bodies still use the learning snapshot; independent media storage is a future upgrade, not included in this patch.
 

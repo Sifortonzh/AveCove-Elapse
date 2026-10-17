@@ -45,6 +45,7 @@ export type PavilionQuestionBank = {
   package?: SharedQuestionBankPackage;
   uploaderNickname?: string;
   annotation?: string;
+  rating?: number | null;
   own?: boolean;
 };
 

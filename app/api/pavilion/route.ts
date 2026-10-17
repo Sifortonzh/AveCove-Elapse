@@ -17,6 +17,7 @@ type PavilionRow = {
   multiple_count: number;
   uploader_nickname: string;
   annotation: string;
+  rating: number | null;
   updated_at: Date;
   own: boolean;
 };
@@ -47,6 +48,7 @@ function ensurePavilionTable() {
       await query("CREATE INDEX IF NOT EXISTS pavilion_question_banks_stage_idx ON pavilion_question_banks(study_stage, updated_at DESC)");
       await query("ALTER TABLE pavilion_question_banks ADD COLUMN IF NOT EXISTS single_count INTEGER, ADD COLUMN IF NOT EXISTS multiple_count INTEGER");
       await query("ALTER TABLE pavilion_question_banks ADD COLUMN IF NOT EXISTS annotation VARCHAR(100) NOT NULL DEFAULT ''");
+      await query("ALTER TABLE pavilion_question_banks ADD COLUMN IF NOT EXISTS rating SMALLINT CHECK (rating BETWEEN 1 AND 5)");
       await query(`UPDATE pavilion_question_banks p SET multiple_count = counts.x, single_count = counts.total - counts.x
         FROM (SELECT id, count(*)::int AS total,
           count(*) FILTER (WHERE q->>'multiple'='true' OR upper(trim(q->>'questionType')) IN ('X','多','多选')
@@ -73,6 +75,7 @@ function publicEntry(row: PavilionRow) {
     multipleCount: row.multiple_count,
     uploaderNickname: row.uploader_nickname,
     annotation: row.annotation || "",
+    rating: row.rating ?? null,
     uploadedAt: row.updated_at.toISOString(),
     own: row.own,
   };
@@ -91,7 +94,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ package: sanitizeSharedQuestionBankPackage(rows[0].payload) }, { headers: { "Cache-Control": "private, no-store" } });
     }
     const rows = await query<PavilionRow>(
-      `SELECT p.id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, p.annotation,
+      `SELECT p.id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, p.annotation, p.rating,
         COALESCE(NULLIF(u.nickname, ''), p.uploader_nickname) AS uploader_nickname, p.updated_at,
         (p.user_id = $1) AS own
        FROM pavilion_question_banks p LEFT JOIN users u ON u.id = p.user_id
@@ -110,10 +113,12 @@ export async function POST(request: Request) {
   if (!allowRequest(`pavilion:upload:${session.userId}`, 30, 60 * 60_000)) return NextResponse.json({ error: "上传得有点频繁，请稍后再试。" }, { status: 429 });
   const raw = await request.text();
   if (Buffer.byteLength(raw, "utf8") > 10_000_000) return NextResponse.json({ error: "单份题库不能超过 10 MB。" }, { status: 413 });
-  let body: { sourceBankId?: unknown; package?: unknown; annotation?: unknown };
+  let body: { sourceBankId?: unknown; package?: unknown; annotation?: unknown; rating?: unknown };
   try { body = JSON.parse(raw) as typeof body; } catch { return NextResponse.json({ error: "题库内容不是有效 JSON。" }, { status: 400 }); }
   const annotation = typeof body.annotation === "string" ? body.annotation.trim() : "";
   if (Array.from(annotation).length > 50) return NextResponse.json({ error: "📝 公开批注最多 50 字，请精简后上传。" }, { status: 400 });
+  const rating = body.rating ?? null;
+  if (rating !== null && (typeof rating !== "number" || !Number.isInteger(rating) || rating < 1 || rating > 5)) return NextResponse.json({ error: "🌟 上传者自评请选择 1–5 星。" }, { status: 400 });
   let parsed;
   try { parsed = parseSharedQuestionBankPackage(body.package); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "无法识别题库。" }, { status: 400 }); }
   const sourceBankId = String(body.sourceBankId ?? parsed.id ?? "").trim().slice(0, 160);
@@ -125,15 +130,16 @@ export async function POST(request: Request) {
     await ensurePavilionTable();
     const rows = await query<PavilionRow>(
       `INSERT INTO pavilion_question_banks
-        (id, user_id, source_bank_id, name, group_name, study_stage, question_count, payload, uploader_nickname, single_count, multiple_count, annotation)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12)
+        (id, user_id, source_bank_id, name, group_name, study_stage, question_count, payload, uploader_nickname, single_count, multiple_count, annotation, rating)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13)
        ON CONFLICT (user_id, source_bank_id) DO UPDATE SET
         name = EXCLUDED.name, group_name = EXCLUDED.group_name, study_stage = EXCLUDED.study_stage,
         question_count = EXCLUDED.question_count, payload = EXCLUDED.payload,
         single_count = EXCLUDED.single_count, multiple_count = EXCLUDED.multiple_count, annotation = EXCLUDED.annotation,
+        rating = COALESCE(EXCLUDED.rating, pavilion_question_banks.rating),
         uploader_nickname = EXCLUDED.uploader_nickname, updated_at = NOW()
-       RETURNING id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, uploader_nickname, annotation, updated_at, true AS own`,
-      [randomUUID(), session.userId, sourceBankId, parsed.name.slice(0, 160), groupName, stage, parsed.questions.length, JSON.stringify(payload), session.nickname.slice(0, 30), parsed.questions.filter(q => !isXQuestion(q)).length, parsed.questions.filter(isXQuestion).length, annotation],
+       RETURNING id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, uploader_nickname, annotation, rating, updated_at, true AS own`,
+      [randomUUID(), session.userId, sourceBankId, parsed.name.slice(0, 160), groupName, stage, parsed.questions.length, JSON.stringify(payload), session.nickname.slice(0, 30), parsed.questions.filter(q => !isXQuestion(q)).length, parsed.questions.filter(isXQuestion).length, annotation, rating],
     );
     return NextResponse.json({ entry: publicEntry(rows[0]) });
   } catch {

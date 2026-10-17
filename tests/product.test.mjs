@@ -5,6 +5,47 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("exam sampling allocates exact chapter shares without duplicates or mutation", async () => {
+  const output = ts.transpileModule(await text("app/lib/exam-sampling.ts"), {compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {sampleExamByChapter} = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const questions=Array.from({length:200},(_,i)=>({id:String(i),category:i<120?"甲":i<180?"乙":"丙"}));
+  const before=structuredClone(questions);
+  const result=sampleExamByChapter(questions,100,()=>0.42);
+  assert.equal(result.length,100); assert.equal(new Set(result.map(q=>q.id)).size,100);
+  assert.deepEqual(["甲","乙","丙"].map(c=>result.filter(q=>q.category===c).length),[60,30,10]);
+  assert.deepEqual(questions,before);
+  assert.equal(sampleExamByChapter(questions.slice(0,8),100).length,8);
+  assert.equal(sampleExamByChapter([],100).length,0);
+  assert.equal(sampleExamByChapter(questions,0).length,0);
+  assert.equal(sampleExamByChapter([questions[0],questions[0]],100).length,1);
+  for(let count=1;count<100;count++) {
+    const sample=sampleExamByChapter(questions,count);
+    assert.equal(sample.length,count);
+    for(const [c,share] of [["甲",.6],["乙",.3],["丙",.1]]) assert.ok(Math.abs(sample.filter(q=>q.category===c).length-count*share)<1.00001);
+  }
+  const page=await text("app/page.tsx");
+  assert.match(page,/proportionalExam\) pool = sampleExamByChapter/);
+  assert.match(page,/100, true\)/);
+});
+
+test("V4.1 model names canonicalize only DeepSeek Flash aliases", async () => {
+  const output=ts.transpileModule(await text("app/lib/ai-catalog.ts"),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {currentProviderModel}=await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  for(const model of ["deepseek-flash","deepseek-v4.1-flash","deepseek-v4.1-flash-1017","deepseek-v4-flash","deepseek-v4-flash-vision-exp"])assert.equal(currentProviderModel("deepseek",model),"deepseek-flash");
+  assert.equal(currentProviderModel("deepseek","deepseek-v4-pro"),"deepseek-v4-pro");
+  assert.equal(currentProviderModel("openai","deepseek-v4.1-flash"),"deepseek-v4.1-flash");
+});
+
+test("pavilion uploader ratings are bounded and preview uses the native top layer", async () => {
+  const route=await text("app/api/pavilion/route.ts"),page=await text("app/page.tsx"),dialog=await text("app/components/NotePreviewDialog.tsx"),css=await text("app/globals.css");
+  assert.match(route,/rating BETWEEN 1 AND 5/); assert.match(route,/!Number.isInteger\(rating\)/);
+  assert.match(route,/rating < 1 \|\| rating > 5/);
+  assert.match(route,/rating = COALESCE\(EXCLUDED.rating, pavilion_question_banks.rating\)/);
+  assert.match(page,/rating: uploadRating/); assert.match(page,/上传者自评/);
+  assert.match(dialog,/dialog\?\.showModal\(\)/);assert.match(dialog,/onClose=\{onClose\}/);
+  assert.match(dialog,/放大笔记字号/);assert.match(css,/height:calc\(100dvh - 16px\)/);
+});
+
 test("public pavilion annotations are limited and isolated from private notes", async () => {
   const route = await text("app/api/pavilion/route.ts"), page = await text("app/page.tsx");
   assert.match(route, /Array.from\(annotation\).length > 50/);
@@ -900,7 +941,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.4");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1660,7 +1701,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.4.1.4");
+  assert.equal(JSON.parse(packageJson).version, "2.4.1.5");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2059,7 +2100,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.4.1.4");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2120,7 +2161,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.4");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2138,7 +2179,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.4");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2158,7 +2199,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.4");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
