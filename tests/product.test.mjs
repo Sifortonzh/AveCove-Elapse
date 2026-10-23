@@ -5,6 +5,14 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("library cards use two coherent columns only on wide screens", async () => {
+  const css=await text("app/globals.css");
+  assert.match(css,/\.bank-page \.bank-card-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.bank-page \.bank-card\{display:flex;flex-direction:column/);
+  assert.match(css,/@media\(max-width:1099px\)\{\.bank-page \.bank-card-grid\{grid-template-columns:minmax\(0,1fr\)/);
+  assert.doesNotMatch(css,/\.bank-card:has\(\.bank-description\)/);
+});
+
 test("mock exam grades isolated choices only after submission and preserves source records", async () => {
   const output=ts.transpileModule(await text("app/lib/mock-exam.ts"),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
   const {gradeMockExam}=await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
@@ -957,7 +965,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1717,7 +1725,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.4.1.6");
+  assert.equal(JSON.parse(packageJson).version, "2.4.1.7");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2116,7 +2124,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2177,7 +2185,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2195,7 +2203,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2215,7 +2223,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.1.6" src="https://img.shields.io/badge/version-2.4.1.6-b43d35" />
+    <img alt="Version 2.4.1.7" src="https://img.shields.io/badge/version-2.4.1.7-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.1.6.** Proportional mock exams now start with clean, temporary blind-exam records and are graded together on submission, without changing everyday progress, accuracy or first-attempt scores. The library uses one wide card per bank, with responsive descriptions. Shared JSON preserves original author/source metadata and includes explicit Elapse software provenance; this is attribution, not copy protection or a claim to third-party questions.
+> **Current release: v2.4.1.7.** The library shows two coherent cards per row on wide screens and one below 1100px. Each card keeps its title, source and description in a single reading column, with aligned actions and no squeezed internal split. Independent mock exams, export provenance and privacy behavior are unchanged.
 
 Visit the [Elapse introduction](https://avecove.com/projects/elapse/) and the separate [release history](https://avecove.com/updates/elapse/).
 
