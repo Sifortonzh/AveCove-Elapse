@@ -78,6 +78,7 @@ export type SharedQuestionBankPackage = {
   format: "hongdou-question-bank";
   version: 1;
   exportedAt: string;
+  provenance?: { software: string; softwareAuthor: string; homepage: string; repository: string; notice: string };
   bank: {
     id?: string;
     name: string;
@@ -662,6 +663,7 @@ export function createSharedQuestionBankPackage(bank: QuestionBankInput): Shared
     format: "hongdou-question-bank",
     version: 1,
     exportedAt: new Date().toISOString(),
+    provenance: { software: "Elapse · 红豆生南国", softwareAuthor: "Sifortonzh", homepage: "https://avecove.com/projects/elapse/", repository: "https://github.com/Sifortonzh/AveCove-Elapse", notice: "本署名标识软件与导出工具来源，不替代题目原作者、教材编者及题库整理者的版权。请保留 bank.author、sourceTitle 与 copyrightNotice。" },
     bank: {
       id: bank.id,
       name: bank.name,

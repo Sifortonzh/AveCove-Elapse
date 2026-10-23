@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.1.5" src="https://img.shields.io/badge/version-2.4.1.5-b43d35" />
+    <img alt="Version 2.4.1.6" src="https://img.shields.io/badge/version-2.4.1.6-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.1.5.** Mock exams allocate up to 100 eligible questions proportionally across chapters, then shuffle questions and options. Enlarged Markdown notes use a viewport-sized native dialog with adjustable type and independent scrolling. Pavilion uploads include a 1–5-star uploader rating alongside the public annotation; older unrated banks remain unrated. DeepSeek V4.1 uses the official `deepseek-flash` endpoint, with legacy Flash-name compatibility.
+> **Current release: v2.4.1.6.** Proportional mock exams now start with clean, temporary blind-exam records and are graded together on submission, without changing everyday progress, accuracy or first-attempt scores. The library uses one wide card per bank, with responsive descriptions. Shared JSON preserves original author/source metadata and includes explicit Elapse software provenance; this is attribution, not copy protection or a claim to third-party questions.
+
+Visit the [Elapse introduction](https://avecove.com/projects/elapse/) and the separate [release history](https://avecove.com/updates/elapse/).
 
 Exam quotas use largest-remainder rounding on the eligible pool after practice filters (including skipped questions). Banks with fewer than 100 eligible questions use all of them. Ratings are uploader self-assessments, not community averages. [DeepSeek's official release notes](https://api-docs.deepseek.com/updates/) confirm that `deepseek-flash` follows the latest V4.1 Flash release.
 

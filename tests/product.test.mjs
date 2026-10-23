@@ -5,6 +5,22 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("mock exam grades isolated choices only after submission and preserves source records", async () => {
+  const output=ts.transpileModule(await text("app/lib/mock-exam.ts"),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {gradeMockExam}=await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const questions=[{id:"a",answer:["A"]},{id:"b",answer:["B","C"],points:2},{id:"c",answer:["D"]},{id:"p",answer:[]}];
+  const choices={a:["A"],b:["B"],p:["A"]}; const original=structuredClone({questions,choices});
+  const result=gradeMockExam(questions,choices);
+  assert.deepEqual([result.correct,result.wrong,result.unanswered,result.pending,result.earned,result.maximum],[1,1,1,1,1,4]);
+  assert.deepEqual({questions,choices},original);assert.deepEqual(result.progress,{a:"correct",b:"wrong"});
+  assert.equal(gradeMockExam(questions,{b:["C","B"]}).progress.b,"correct");
+  const page=await text("app/page.tsx");
+  const finish=page.slice(page.indexOf("  function finishMockExam"),page.indexOf("  function submitAnswer"));
+  assert.doesNotMatch(finish,/persistLearningRecords|setQuestions|setAnswerSelections/);
+  assert.match(page,/sessionIsExam \|\| sessionScope/);assert.match(page,/if \(sessionIsExam\) \{ finishMockExam\(\); return; \}/);
+  const bank=await text("app/lib/local-bank.ts");assert.match(bank,/softwareAuthor: "Sifortonzh"/);assert.match(bank,/author: bank.author/);
+});
+
 test("exam sampling allocates exact chapter shares without duplicates or mutation", async () => {
   const output = ts.transpileModule(await text("app/lib/exam-sampling.ts"), {compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
   const {sampleExamByChapter} = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
@@ -153,7 +169,7 @@ test("wrong review raises existing Featured stars and desktop confirmation remai
   const submit = page.slice(page.indexOf("  function submitAnswer()"), page.indexOf("  function toggleFavorite()"));
   const fixture = `export function run(sessionScope, answer, favorites, favoriteStars) {
     const current = { id: "q", answer: ["A"] }, selected = [answer];
-    const isolatedReviewSession = false, sessionStudyMode = "standard", settings = { autoNext: false, autoFavoriteWrong: false };
+    const sessionIsExam = false, isolatedReviewSession = false, sessionStudyMode = "standard", settings = { autoNext: false, autoFavoriteWrong: false };
     const progress = { q: "wrong" }, firstProgress = { q: "wrong" }, notes = {}, recordLedger = {};
     let saved; const setAnswerSelections = () => {}, setSubmitted = () => {}, setToast = () => {};
     const stampLearningRecord = (ledger, id, patch) => ({ [id]: patch });
@@ -289,7 +305,7 @@ test("v2.3.9 sync feedback does not classify success as failed and preserves act
   assert.match(page, /navigator.clipboard.writeText\(originalText\)/);
   assert.match(page, /await navigator.clipboard.writeText[\s\S]*setOptions/);
   assert.match(page, /MarkdownNotePreview value=\{generatedText\}/);
-  assert.match(page, /chapterProgress=\{progress\}/);
+  assert.match(page, /chapterProgress=\{sessionIsExam \? reviewProgress : progress\}/);
   assert.match(await text("app/components/PracticeExtras.tsx"), /已做对[\s\S]*已做错/);
 });
 
@@ -941,7 +957,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1701,7 +1717,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.4.1.5");
+  assert.equal(JSON.parse(packageJson).version, "2.4.1.6");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2100,7 +2116,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2161,7 +2177,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2179,7 +2195,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2199,7 +2215,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.5");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.6");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

@@ -44,6 +44,7 @@ import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 import { compactQuestionNumbers } from "./lib/question-number";
 import { isXQuestion, practiceStats, newerPreferences } from "./lib/practice-stats";
 import { sampleExamByChapter } from "./lib/exam-sampling";
+import { gradeMockExam } from "./lib/mock-exam";
 import NotePreviewDialog from "./components/NotePreviewDialog";
 import { sharedCaseDraft, removeSharedPrefix, reviseSharedCase } from "./lib/shared-case";
 import { changeNoteTags, cleanNoteTag, noteTagCatalog, type TagAction } from "./lib/note-tags";
@@ -337,6 +338,8 @@ export default function HomePage() {
   const [submitted, setSubmitted] = useState(false);
   const [sessionStudyMode, setSessionStudyMode] = useState<StudyMode>("standard");
   const [sessionScope, setSessionScope] = useState<Scope>("all");
+  const [sessionIsExam, setSessionIsExam] = useState(false);
+  const [examFinished, setExamFinished] = useState(false);
   const [reviewProgress, setReviewProgress] = useState<Progress>({});
   const [reviewSelections, setReviewSelections] = useState<Record<string, string[]>>({});
   const [revealedAnswers, setRevealedAnswers] = useState<string[]>([]);
@@ -566,7 +569,7 @@ export default function HomePage() {
   }, [account, currentDiscussionId]);
 
   const killedIds = useMemo(() => new Set(killedQuestions), [killedQuestions]);
-  const isolatedReviewSession = sessionScope === "wrong" || sessionScope === "favorite";
+  const isolatedReviewSession = sessionIsExam || sessionScope === "wrong" || sessionScope === "favorite";
   const displayedProgress = isolatedReviewSession ? reviewProgress : progress;
   const displayedAnswerSelections = isolatedReviewSession ? reviewSelections : answerSelections;
   const statsQuestions = settings.western306Subject === "all" || !questions.some(q => q.examProfile === "western-medicine-306") ? questions : questions.filter((q) => western306SubjectForQuestion(q) === settings.western306Subject);
@@ -580,7 +583,7 @@ export default function HomePage() {
     ? western306Score(sessionQuestions.filter((question) => !killedIds.has(question.id)), progress, firstProgress)
     : undefined;
   const sessionAnswered = sessionQuestions.filter((question) => !killedIds.has(question.id) && Boolean(displayedProgress[question.id])).length;
-  const sessionCompleted = sessionQuestions.filter((question) => killedIds.has(question.id) || Boolean(displayedProgress[question.id])).length;
+  const sessionCompleted = sessionQuestions.filter((question) => sessionIsExam ? Boolean(displayedAnswerSelections[question.id]?.length) : killedIds.has(question.id) || Boolean(displayedProgress[question.id])).length;
   const sessionCorrect = sessionQuestions.filter((question) => !killedIds.has(question.id) && displayedProgress[question.id] === "correct").length;
   const sessionAccuracy = sessionAnswered ? (sessionCorrect / sessionAnswered) * 100 : 0;
   const isFavorite = current ? favorites.includes(current.id) : false;
@@ -922,7 +925,9 @@ export default function HomePage() {
   }
 
   function buildSession(custom?: Partial<Settings>, limit?: number, proportionalExam = false) {
-    const active = { ...settings, ...custom };
+    const active = { ...settings, ...custom, ...(proportionalExam ? { studyMode: "blind" as const } : {}) };
+    setSessionIsExam(proportionalExam);
+    setExamFinished(false);
     const sourceQuestions = questions;
     const sourceHasModernWestern306 = sourceQuestions.some((question) => question.examProfile === "western-medicine-306"
       && (question.examFormat === "modern-165" || (question.examYear ?? 0) >= 2017));
@@ -1009,6 +1014,7 @@ export default function HomePage() {
   }
 
   function updateKilledQuestions(questionIds: string[], killed: boolean) {
+    if (sessionIsExam) { setToast("模拟考试不更改日常斩题记录"); return; }
     const validIds = [...new Set(questionIds)].filter((id) => [...questions, ...sessionQuestions].some((question) => question.id === id));
     if (!validIds.length) return;
     const nextKilled = killed
@@ -1034,6 +1040,8 @@ export default function HomePage() {
     setSessionQuestions(questions);
     setSessionStudyMode("standard");
     setSessionScope("all");
+    setSessionIsExam(false);
+    setExamFinished(false);
     setRevealedAnswers([]);
     setCurrentIndex(index);
     setSelected([...(answerSelections[questionId] ?? questions[index].draftAnswer ?? [])]);
@@ -1074,7 +1082,21 @@ export default function HomePage() {
     });
   }
 
+  function finishMockExam() {
+    if (examFinished) return;
+    if (!window.confirm("📝 确定交卷评分吗？未作答题不计分，交卷后可核对答案。本场不影响日常进度和正确率。")) return;
+    const choices = { ...reviewSelections, ...(current ? { [current.id]: [...selected] } : {}) };
+    const result = gradeMockExam(sessionQuestions, choices);
+    setReviewSelections(choices);
+    setReviewProgress(result.progress);
+    setRevealedAnswers(sessionQuestions.map(question => question.id));
+    setExamFinished(true);
+    setSubmitted(true);
+    setToast(`📋 本场得分 ${result.earned}/${result.maximum} · 正确 ${result.correct} · 错误 ${result.wrong} · 未答 ${result.unanswered} · 待答案 ${result.pending}。不计入日常统计。`);
+  }
+
   function submitAnswer() {
+    if (sessionIsExam) { finishMockExam(); return; }
     if (!current || !selected.length) return;
     if (isolatedReviewSession) setReviewSelections((value) => ({ ...value, [current.id]: [...selected] }));
     else setAnswerSelections((value) => ({ ...value, [current.id]: [...selected] }));
@@ -1870,6 +1892,8 @@ export default function HomePage() {
     setSessionQuestions(bank.questions);
     setSessionStudyMode("standard");
     setSessionScope("all");
+    setSessionIsExam(false);
+    setExamFinished(false);
     setRevealedAnswers([]);
     setCurrentIndex(Math.max(0, index));
     setSelected([...(answerSelections[questionId] ?? bank.questions[index]?.draftAnswer ?? [])]);
@@ -1943,11 +1967,11 @@ export default function HomePage() {
         <CopyrightPage bankName={bankName} onHome={() => setView("home")} onRestoreDemo={restoreDemoBank} />
       ) : current ? (
         <QuizView
-          killedQuestions={killedQuestions}
-          chapterProgress={progress}
+          killedQuestions={sessionIsExam ? [] : killedQuestions}
+          chapterProgress={sessionIsExam ? reviewProgress : progress}
           bankName={bankName}
-          bankQuestions={bankStats.available}
-          onOpenQuestion={openQuestion}
+          bankQuestions={sessionIsExam ? sessionQuestions : bankStats.available}
+          onOpenQuestion={sessionIsExam ? id => resetQuestion(sessionQuestions.findIndex(question => question.id === id)) : openQuestion}
           onSearchNotes={() => setShowNotes(true)}
           current={current}
           currentIndex={currentIndex}
@@ -1959,6 +1983,9 @@ export default function HomePage() {
           excluded={excludedOptions[current.id] ?? []}
           submitted={submitted}
           studyMode={sessionStudyMode}
+          mockExam={sessionIsExam}
+          examFinished={examFinished}
+          mockExamSummary={sessionIsExam && examFinished ? gradeMockExam(sessionQuestions, reviewSelections) : undefined}
           result={displayedProgress[current.id]}
           killed={killedIds.has(current.id)}
           relatedQuestions={currentGroupQuestions}
@@ -2009,7 +2036,7 @@ export default function HomePage() {
         <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} western306SubjectCounts={western306SubjectCounts} showWestern306Subjects={hasModernWestern306} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
-        <AnswerSheet questions={sessionQuestions} progress={displayedProgress} favorites={favorites} favoriteStars={favoriteStars} notes={notes} killed={killedQuestions} answerSelections={displayedAnswerSelections} currentIndex={currentIndex} onBatchAnswers={saveBatchAnswerEntries} onUpdateKilled={updateKilledQuestions} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
+        <AnswerSheet questions={sessionQuestions} progress={displayedProgress} favorites={sessionIsExam ? [] : favorites} favoriteStars={sessionIsExam ? {} : favoriteStars} notes={sessionIsExam && !examFinished ? {} : notes} killed={sessionIsExam ? [] : killedQuestions} answerSelections={displayedAnswerSelections} currentIndex={currentIndex} onBatchAnswers={sessionIsExam ? async () => { setToast("模拟考试内不修改题库答案"); } : saveBatchAnswerEntries} onUpdateKilled={sessionIsExam ? () => { setToast("模拟考试不更改斩题记录"); } : updateKilledQuestions} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
       )}
       {showImport && (
         <ImportModal
@@ -2785,6 +2812,7 @@ function IncomingBankShareModal({ share, onImport, onClose }: {
 }
 
 function QuizView(props: {
+  mockExam?: boolean; examFinished?: boolean; mockExamSummary?: ReturnType<typeof gradeMockExam>;
   chapterProgress: Progress;
   killedQuestions: string[];
   bankName: string; bankQuestions: QuizQuestion[]; onOpenQuestion: (id: string) => void; onSearchNotes: () => void;
@@ -2827,7 +2855,7 @@ function QuizView(props: {
   const memorizing = studyMode === "memorize";
   const blind = studyMode === "blind";
   const explanationIsAi = /AI/i.test(current.explanationSource ?? "");
-  const modeSuffix = blind ? " · 盲刷" : memorizing ? " · 背题" : "";
+  const modeSuffix = props.mockExam ? " · 模拟考试" : blind ? " · 盲刷" : memorizing ? " · 背题" : "";
   const questionKind = `${props.currentIndex + 1}•${current.medicalQuestionType || current.questionType || (current.multiple ? "多" : "单")}${answerAvailable ? modeSuffix : " · 测试模式"}`;
   const chooseHint = memorizing
     ? answerAvailable ? "标准答案已直接展开；结合题干与原资料解析快速记忆" : "当前题库没有提供标准答案，暂时只能查看题干与选项"
@@ -2848,6 +2876,7 @@ function QuizView(props: {
   });
   return <div className="quiz-shell">
     <header className="quiz-header"><button className="icon-button" onClick={props.onHome} aria-label="返回首页"><ChevronLeft /></button><Brand compact /><div className="quiz-header-progress"><button className="chapter-trigger" onClick={() => setShowChapters(true)} title="打开章节目录">{props.bankName}{examScore ? ` · 首次得分 ${examScore.earned}/${examScore.total}` : ""} ▾</button><div><i style={{ width: `${progress}%` }} /></div><b title={`已完成 ${props.completed}/${total} · 学习进度 ${progressLabel}% · 正确率 ${props.accuracy.toFixed(2)}%`}>进度 {progressLabel}% · 正确率 {props.accuracy.toFixed(2)}% · 章节 {chapterStats.answered}/{chapterStats.total} · 全库 {libraryStats.answered}/{libraryStats.total}</b></div><button className="icon-button" onClick={props.onSettings} aria-label="练习设置"><Settings2 /></button></header>
+    {props.mockExam && <div className="mock-exam-banner" role="status">{props.mockExamSummary ? `📋 本场 ${props.mockExamSummary.earned}/${props.mockExamSummary.maximum} 分 · 正确 ${props.mockExamSummary.correct} · 错误 ${props.mockExamSummary.wrong} · 未答 ${props.mockExamSummary.unanswered} · 待答案 ${props.mockExamSummary.pending}` : "📝 独立模拟考试 · 选择自动保存在本场，交卷后统一核对 · 不影响日常统计"}</div>}
     <div className="quiz-workspace">
       <section className="question-pane">
         <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span className="question-number" title={currentNumber?.details ?? `原题号 ${current.sourceNumber}`} aria-label={currentNumber?.details ?? `原题号 ${current.sourceNumber}`}>{currentNumber?.label ?? current.sourceNumber}</span>{(current.questionType === "B" || current.questionType === "C") && <span>{current.questionType === "C" ? "两陈述判定" : "共用备选项"}{current.sharedOptionGroup ? " · 同组题" : ""}</span>}</div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题" aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题" aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} title="纠错编辑" aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} title="搜索题目" aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => props.onUpdateKilled([current.id], !props.killed)} title="直接斩掉本题；批量斩题请打开答题卡" aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? `精选 ★${favoriteStars}` : "精选"}</button></div></div>
@@ -2865,8 +2894,8 @@ function QuizView(props: {
         {!memorizing && submitted && answerAvailable && <div className={`result-strip ${result}`}><span>{result === "correct" ? <CheckCircle2 /> : <AlertCircle />}</span><div><strong>{result === "correct" ? "√ 正确 · 知识点已加深" : "× 错误 · 这道题值得加入复盘"}</strong><p>你的答案：{selected.join("、")} · 题库答案：{current.answer.join("、")}</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
         {submitted && !answerAvailable && <div className="result-strip pending-answer"><span><Clock3 /></span><div><strong>{memorizing ? "本题暂无标准答案" : "本题选择已锁定，等待答案"}</strong><p>{memorizing ? "导入答案后再使用背题模式，即可直接查看。" : `你的选择：${selected.join("、")} · 导入答案后会自动核对`}</p></div></div>}
         {submitted && current.explanation && <section className="source-explanation" data-explanation-kind={explanationIsAi ? "ai" : "source"}><header><span>{explanationIsAi ? <BrainCircuit size={17} /> : <FileText size={17} />}</span><div><strong>{explanationIsAi ? "AI 解析" : "原题解析"}</strong><small>{explanationIsAi ? "AI 生成并手动保存 · 不能替代教材原文" : "来自导入文件 · 请结合教材版本核对"}</small></div></header><MarkdownNotePreview value={current.explanation} /><QuestionImages images={current.explanationImages} label="解析图片" /><footer>解析来源：{current.explanationSource || current.answerSource || "导入文件中的答案或解析部分"}</footer></section>}
-        {!memorizing && !submitted && <div className={`mobile-submit-bar ${blind ? "blind" : ""}`}><button onClick={props.onSubmit} disabled={!selected.length}>{blind ? <Eye size={18} /> : <CheckCircle2 size={18} />}{blind && answerAvailable ? "对答案" : answerAvailable ? "确认答案" : "锁定作答"}</button><small>{selected.length ? `已选择 ${selected.join("、")}` : blind ? "可先选答案并继续做题" : "选择答案后再确认"}</small></div>}
-        <div className={`quiz-actions ${blind && !submitted ? "blind-actions" : ""}`}>{blind && !submitted ? <button className="blind-check-action" onClick={props.onSubmit} disabled={!selected.length}><Eye size={17} />{answerAvailable ? "对答案" : "锁定作答"}</button> : <button className="subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>}{submitted || memorizing || blind ? <button className="primary-action" onClick={props.onNext}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length}>{answerAvailable ? "提交答案" : "锁定作答"}<ArrowRight size={17} /></button>}</div>
+        {!memorizing && !submitted && <div className={`mobile-submit-bar ${blind ? "blind" : ""}`}><button onClick={props.onSubmit} disabled={!selected.length && !props.mockExam}>{blind ? <Eye size={18} /> : <CheckCircle2 size={18} />}{props.mockExam ? "交卷评分" : blind && answerAvailable ? "对答案" : answerAvailable ? "确认答案" : "锁定作答"}</button><small>{selected.length ? `已选择 ${selected.join("、")}` : blind ? "可先选答案并继续做题" : "选择答案后再确认"}</small></div>}
+        <div className={`quiz-actions ${blind && !submitted ? "blind-actions" : ""}`}>{blind && !submitted ? <button className="blind-check-action" onClick={props.onSubmit} disabled={!selected.length && !props.mockExam}><Eye size={17} />{props.mockExam ? "交卷评分" : answerAvailable ? "对答案" : "锁定作答"}</button> : <button className="subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>}{submitted || memorizing || blind ? <button className="primary-action" onClick={props.onNext}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length && !props.mockExam}>{answerAvailable ? "提交答案" : "锁定作答"}<ArrowRight size={17} /></button>}</div>
       </section>
       <LearningPanel bankName={props.bankName} onSearchNotes={props.onSearchNotes} current={current} submitted={submitted && answerAvailable} note={note} knownNoteTags={props.knownNoteTags} aiMode={aiMode} aiTexts={aiTexts} aiLoading={aiLoading} account={props.account} comments={props.comments} onNote={props.onNote} onAi={props.onAi} onSaveAiExplanation={props.onSaveAiExplanation} onComment={props.onComment} onLikeComment={props.onLikeComment} onReportComment={props.onReportComment} onDeleteComment={props.onDeleteComment} onRequireLogin={props.onRequireLogin} />
     </div>

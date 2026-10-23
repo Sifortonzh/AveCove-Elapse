@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.1.5" src="https://img.shields.io/badge/version-2.4.1.5-b43d35" />
+    <img alt="版本 2.4.1.6" src="https://img.shields.io/badge/version-2.4.1.6-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.1.5。** 模拟考试按各章节可练题量占比抽取最多 100 题，再打乱题序及选项。Markdown 笔记放大预览改为适配屏幕的原生弹窗，支持字号调整与独立滚动。藏经阁上传可设置 1–5 星上传者自评，与公开批注一起显示；旧题库不凭空补评分。DeepSeek V4.1 采用官方 `deepseek-flash` 接口，并兼容旧 Flash 名称。
+> **当前版本：v2.4.1.6。** 模拟考试按章节比例组卷后，以独立、无历史记录的盲考开始，交卷统一评分，不改变日常进度、正确率和首次成绩。题库改为一行一份的宽卡片，简介按屏幕宽度展开。分享 JSON 保留题目原作者与来源，新增 Elapse 软件署名及项目出处；署名不等于防复制，也不表示第三方题目由软件作者原创。
+
+主站提供独立的 [Elapse 介绍](https://avecove.com/projects/elapse/)与[更新日志](https://avecove.com/updates/elapse/)，博客文章保持独立。
 
 模拟考试在应用练习筛选、排除已斩题之后，使用最大余数法分配章节题数；可练题不足 100 道时全部使用。星级是上传者自评，不代表社区平均评分。[DeepSeek 官方更新日志](https://api-docs.deepseek.com/updates/)确认：`deepseek-flash` 自动调用最新 V4.1 Flash。
 
