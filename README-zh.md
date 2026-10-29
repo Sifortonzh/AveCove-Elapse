@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.1.7" src="https://img.shields.io/badge/version-2.4.1.7-b43d35" />
+    <img alt="版本 2.4.1.8" src="https://img.shields.io/badge/version-2.4.1.8-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,11 +27,11 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.1.7。** 题库在宽屏下一行两份，低于 1100px 自动改为一行一份。卡片内部恢复统一阅读顺序：标题、来源、简介依次展示，取消挤窄内容的左右分栏，底部操作对齐。独立模拟考试、导出署名和隐私逻辑保持不变。
+> **当前版本：v2.4.1.8。** 待答案题的测试模式在锁定作答后立即跳到下一题；在答题卡批量补答案后自动判定先前作答。模拟考试仅从普通练习已确认作答的题中按章节占比抽题，仍使用独立记录，不影响日常正确率。
 
 主站提供独立的 [Elapse 介绍](https://avecove.com/projects/elapse/)与[更新日志](https://avecove.com/updates/elapse/)，博客文章保持独立。
 
-模拟考试在应用练习筛选、排除已斩题之后，使用最大余数法分配章节题数；可练题不足 100 道时全部使用。星级是上传者自评，不代表社区平均评分。[DeepSeek 官方更新日志](https://api-docs.deepseek.com/updates/)确认：`deepseek-flash` 自动调用最新 V4.1 Flash。
+模拟考试仅抽普通练习中有已确认正误记录的题，排除未做、仅选未确认、待答案和已斩题，再按章节比例分配；不足 100 道时全部使用，没有符合条件的题时提示先做普通练习。星级是上传者自评，不代表社区平均评分。[DeepSeek 官方更新日志](https://api-docs.deepseek.com/updates/)确认：`deepseek-flash` 自动调用最新 V4.1 Flash。
 
 自行部署请先执行 `npm run db:migrate`。自动发布流程会应用增量建表文件 `db/sync-v3.sql`。藏经阁保持独立；英文题库正文暂时仍保存在学习快照，独立图片存储属于后续升级，不包含在本次补丁中。
 

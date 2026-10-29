@@ -1,5 +1,11 @@
 import type { QuizQuestion } from "./question-parser";
 
+/** Only confirmed ordinary-practice results qualify; selections and drafts do not. */
+export function completedPracticeQuestions(questions: readonly QuizQuestion[], progress: Readonly<Record<string, unknown>>): QuizQuestion[] {
+  return questions.filter(question => question.answer.length > 0 && !question.answerPending
+    && (progress[question.id] === "correct" || progress[question.id] === "wrong"));
+}
+
 function shuffled<T>(items: readonly T[], random: () => number): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {

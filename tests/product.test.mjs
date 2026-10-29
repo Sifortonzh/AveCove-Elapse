@@ -48,8 +48,37 @@ test("exam sampling allocates exact chapter shares without duplicates or mutatio
     for(const [c,share] of [["甲",.6],["乙",.3],["丙",.1]]) assert.ok(Math.abs(sample.filter(q=>q.category===c).length-count*share)<1.00001);
   }
   const page=await text("app/page.tsx");
-  assert.match(page,/proportionalExam\) pool = sampleExamByChapter/);
+  assert.match(page,/sampleExamByChapter\(completedPracticeQuestions\(pool, progress\)/);
   assert.match(page,/100, true\)/);
+});
+
+test("mock exams exclude unconfirmed selections, drafts and unanswered questions", async () => {
+  const output=ts.transpileModule(await text("app/lib/exam-sampling.ts"),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {completedPracticeQuestions,sampleExamByChapter}=await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const questions=[{id:"right",category:"甲",answer:["A"]},{id:"wrong",category:"乙",answer:["A"]},{id:"selected",category:"甲",answer:["A"]},{id:"draft",category:"甲",answer:[],draftAnswer:["A"]},{id:"new",category:"乙",answer:["A"]},{id:"pending",category:"乙",answer:["A"],answerPending:true}];
+  const progress={right:"correct",wrong:"wrong",selected:undefined,draft:"correct",pending:"correct"};
+  const original=structuredClone({questions,progress});
+  const eligible=completedPracticeQuestions(questions,progress);
+  assert.deepEqual(eligible.map(q=>q.id),["right","wrong"]);
+  assert.equal(sampleExamByChapter(eligible,100).length,2);
+  assert.deepEqual(completedPracticeQuestions(questions,{}),[]);
+  assert.deepEqual({questions,progress},original);
+  const page=await text("app/page.tsx");
+  const build=page.slice(page.indexOf("  function buildSession"),page.indexOf("  function openPractice"));
+  assert.ok(build.indexOf("if (!pool.length)") < build.indexOf("setSessionIsExam"));
+});
+
+test("pending-answer locks advance immediately and queued drafts cannot overwrite new answers", async () => {
+  const page=await text("app/page.tsx");
+  const submit=page.slice(page.indexOf("  function submitAnswer()"),page.indexOf("  function toggleFavorite()"));
+  const pending=submit.slice(submit.indexOf("    if (!current.answer.length)"),submit.indexOf("    const result ="));
+  assert.match(pending,/goNextQuestion\(\)/);
+  assert.match(pending,/draftSaveQueueRef.current = draftSaveQueueRef.current.then/);
+  assert.match(pending,/await loadQuestionBank\(bankId\)/);
+  assert.doesNotMatch(pending,/persistLearningRecords|, true\)/);
+  const batch=page.slice(page.indexOf("  async function saveBatchAnswerEntries"),page.indexOf("  async function insertQuestionAfterCurrent"));
+  assert.ok(batch.indexOf("await draftSaveQueueRef.current") < batch.indexOf("applyBatchAnswers"));
+  assert.match(batch,/nextProgress\[question.id\] = status/);
 });
 
 test("V4.1 model names canonicalize only DeepSeek Flash aliases", async () => {
@@ -965,7 +994,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.8");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1725,7 +1754,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.4.1.7");
+  assert.equal(JSON.parse(packageJson).version, "2.4.1.8");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2124,7 +2153,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.8");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2185,7 +2214,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.8");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2203,7 +2232,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.8");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2223,7 +2252,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.7");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.8");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

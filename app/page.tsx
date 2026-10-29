@@ -21,7 +21,7 @@ import { AI_SOURCE_CONVERSION_PROMPT, downloadAiSourcePackage } from "./lib/ai-s
 import {
   activateQuestionBank, archiveBankNotes, listArchivedBankNotes, switchLocalLearningAccount, clearActiveBank, createSharedQuestionBankPackage, deleteQuestionBank,
   exportQuestionBankSyncBundle, listQuestionBanks, loadActiveBank, loadLocalAnswerSelections, loadLocalLearningRecords, loadQuestionBankGroupOrder, loadQuestionBankOrder,
-  loadQuestionBankSortMode, mergeQuestionBankSyncBundle, parseSharedQuestionBankPackage, saveActiveBank,
+  loadQuestionBank, loadQuestionBankSortMode, mergeQuestionBankSyncBundle, parseSharedQuestionBankPackage, saveActiveBank,
   saveQuestionBank, saveQuestionBankGroupOrder, saveQuestionBankOrder, saveQuestionBankSortMode, saveLocalAnswerSelections, saveLocalLearningRecords,
   updateQuestionBankDetails, PAVILION_STUDY_STAGES, type PavilionQuestionBank, type PavilionStudyStage, type QuestionBankInput, type QuestionBankSortMode, type SavedQuestionBank, type ArchivedBankNotes,
 } from "./lib/local-bank";
@@ -43,7 +43,7 @@ import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
 import { compactQuestionNumbers } from "./lib/question-number";
 import { isXQuestion, practiceStats, newerPreferences } from "./lib/practice-stats";
-import { sampleExamByChapter } from "./lib/exam-sampling";
+import { completedPracticeQuestions, sampleExamByChapter } from "./lib/exam-sampling";
 import { gradeMockExam } from "./lib/mock-exam";
 import NotePreviewDialog from "./components/NotePreviewDialog";
 import { sharedCaseDraft, removeSharedPrefix, reviseSharedCase } from "./lib/shared-case";
@@ -389,6 +389,7 @@ export default function HomePage() {
   const [incomingBankShare, setIncomingBankShare] = useState<IncomingBankShare | null>(null);
   const [bankReplacementPrompt, setBankReplacementPrompt] = useState<BankReplacementPrompt | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const draftSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const importAbortRef = useRef<AbortController | null>(null);
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
@@ -926,8 +927,6 @@ export default function HomePage() {
 
   function buildSession(custom?: Partial<Settings>, limit?: number, proportionalExam = false) {
     const active = { ...settings, ...custom, ...(proportionalExam ? { studyMode: "blind" as const } : {}) };
-    setSessionIsExam(proportionalExam);
-    setExamFinished(false);
     const sourceQuestions = questions;
     const sourceHasModernWestern306 = sourceQuestions.some((question) => question.examProfile === "western-medicine-306"
       && (question.examFormat === "modern-165" || (question.examYear ?? 0) >= 2017));
@@ -942,13 +941,21 @@ export default function HomePage() {
       if (active.scope === "favorite") return favorites.includes(question.id);
       return true;
     });
-    if (proportionalExam) pool = sampleExamByChapter(pool, limit ?? 100);
+    if (proportionalExam) {
+      pool = sampleExamByChapter(completedPracticeQuestions(pool, progress), limit ?? 100);
+      if (!pool.length) {
+        setToast("📝 暂无已确认作答的可抽题目。先完成普通练习，再来模拟考试；仅选未确认、待答案和已斩题不会抽入。");
+        return;
+      }
+    }
     else {
       if (active.questionOrder === "random" || active.scope === "wrong" || active.scope === "favorite") pool = shuffle(pool);
       if (limit && limit > 0) pool = pool.slice(0, limit);
     }
     if (active.shuffleOptions) pool = pool.map((question) => ({ ...question, options: shuffle(question.options) }));
     const firstQuestion = pool[0];
+    setSessionIsExam(proportionalExam);
+    setExamFinished(false);
     const memorizing = active.studyMode === "memorize";
     setSessionQuestions(pool);
     setSessionStudyMode(active.studyMode);
@@ -1108,15 +1115,18 @@ export default function HomePage() {
       setSessionQuestions((value) => value.map((question) => question.id === current.id ? { ...question, draftAnswer: [...selected] } : question));
       setQuestions((value) => value.map((question) => question.id === current.id ? { ...question, draftAnswer: [...selected] } : question));
       if (activeBankId) {
-        const bank = questionBanks.find((candidate) => candidate.id === activeBankId);
-        if (bank) {
-          const pendingQuestions = bank.questions.map((question) => question.id === current.id ? { ...question, draftAnswer: [...selected] } : question);
-          void saveQuestionBank({ ...bank, questions: pendingQuestions, updatedAt: new Date().toISOString() }, true)
-            .then((saved) => setQuestionBanks((banks) => banks.map((candidate) => candidate.id === saved.id ? saved : candidate)))
-            .catch(() => setToast("作答已保留在当前页面，但暂时没有写入题库。"));
-        }
+        const bankId = activeBankId, questionId = current.id, draft = [...selected];
+        // Serialize quick locks and read the latest bank so earlier writes cannot erase later drafts.
+        draftSaveQueueRef.current = draftSaveQueueRef.current.then(async () => {
+          const bank = await loadQuestionBank(bankId);
+          if (!bank) return;
+          const pendingQuestions = bank.questions.map(question => question.id === questionId ? { ...question, draftAnswer: draft } : question);
+          await saveQuestionBank({ ...bank, questions: pendingQuestions, updatedAt: new Date().toISOString() });
+        }).catch(() => { setToast("作答已保留，但暂时没有写入题库；请先导出学习记录备份。⚠️"); });
+        setQuestionBanks(banks => banks.map(bank => bank.id === bankId ? { ...bank, questions: bank.questions.map(question => question.id === questionId ? { ...question, draftAnswer: draft } : question) } : bank));
       }
-      setToast("测试模式已记录本题选择；导入答案后可一键核对 ✍️");
+      goNextQuestion();
+      setToast(currentIndex < sessionQuestions.length - 1 ? "✍️ 已锁定并进入下一题；在答题卡补答案后自动判分。" : "✍️ 本轮最后一题已锁定；打开答题卡补答案后自动判分。");
       return;
     }
     const result = [...selected].sort().join("") === [...current.answer].sort().join("") ? "correct" : "wrong";
@@ -1690,7 +1700,8 @@ export default function HomePage() {
 
   async function saveBatchAnswerEntries(entries: BatchAnswerEntry[]) {
     const lockedSelections = { ...answerSelections, ...reviewSelections, ...(current && selected.length ? { [current.id]: [...selected] } : {}) };
-    const bank = activeBankId ? questionBanks.find((candidate) => candidate.id === activeBankId) : undefined;
+    await draftSaveQueueRef.current;
+    const bank = activeBankId ? await loadQuestionBank(activeBankId) : undefined;
     const sourceQuestions = bank?.questions ?? questions;
     const pendingTargets = new Set(pendingAnswerQuestions(sourceQuestions).map(question => question.id));
     const pendingEntries = entries.filter(entry => pendingTargets.has(entry.questionId));
@@ -2111,7 +2122,7 @@ function HomeView({ bankName, questions, answered, wrong, noteCount, accuracy, p
             <button className="mode-card red" onClick={() => onPractice({ scope: "unanswered", questionOrder: "sequential" })}><span><BookOpen size={20} /></span><div><strong>顺序练习</strong><p>按原题顺序稳步推进，适合系统完成第一遍。</p></div><ChevronRight size={18} /></button>
             <button className="mode-card green" onClick={() => onPractice({ scope: "all", questionOrder: "random" }, 20)}><span><Shuffle size={20} /></span><div><strong>随机挑战</strong><p>从当前题库随机抽取 20 道，检验真正掌握而非顺序记忆。</p></div><ChevronRight size={18} /></button>
             <button className="mode-card gold" onClick={() => onPractice({ scope: "wrong", questionOrder: "random" })}><span><RotateCcw size={20} /></span><div><strong>错题复盘</strong><p>{wrong ? `${wrong} 道错题集中回炉，把薄弱点逐个拿下。` : "当前没有错题，可以先完成一组新练习。"}</p></div><ChevronRight size={18} /></button>
-            <button className="mode-card blue" onClick={() => onPractice({ scope: "all", questionOrder: "random", shuffleOptions: true }, 100, true)}><span><Clock3 size={20} /></span><div><strong>模拟考试</strong><p>按各章节可练题量占比抽取 100 题，题序与选项随机；不足 100 题时使用全部。</p></div><ChevronRight size={18} /></button>
+            <button className="mode-card blue" onClick={() => onPractice({ scope: "all", questionOrder: "random", shuffleOptions: true }, 100, true)}><span><Clock3 size={20} /></span><div><strong>模拟考试</strong><p>仅从普通练习已确认作答的题中，按章节占比抽取 100 题；不足时使用全部，未做题不抽取。</p></div><ChevronRight size={18} /></button>
           </section>
         </article>
         <article className="bento-library-card">
@@ -2861,7 +2872,7 @@ function QuizView(props: {
     ? answerAvailable ? "标准答案已直接展开；结合题干与原资料解析快速记忆" : "当前题库没有提供标准答案，暂时只能查看题干与选项"
     : blind
       ? answerAvailable ? "选择后不会立即判题；可继续下一题，想核对时再点“对答案”" : "答案尚未导入：选择会先保留，之后可导入答案统一核对"
-      : answerAvailable ? current.multiple ? "本题有多个正确答案，请选择所有符合项" : "请选择一个最符合题意的答案" : "答案尚未导入：先按测试模式作答，之后可在“我的题库”导入答案并一键核对";
+      : answerAvailable ? current.multiple ? "本题有多个正确答案，请选择所有符合项" : "请选择一个最符合题意的答案" : "答案尚未导入：锁定作答后自动下一题；在答题卡批量补答案后自动核对";
   const beginAddingQuestion = () => setAddingQuestion({
     id: "manual-draft",
     sourceNumber: "待自动编号",

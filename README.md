@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.1.7" src="https://img.shields.io/badge/version-2.4.1.7-b43d35" />
+    <img alt="Version 2.4.1.8" src="https://img.shields.io/badge/version-2.4.1.8-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,11 +27,11 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.1.7.** The library shows two coherent cards per row on wide screens and one below 1100px. Each card keeps its title, source and description in a single reading column, with aligned actions and no squeezed internal split. Independent mock exams, export provenance and privacy behavior are unchanged.
+> **Current release: v2.4.1.8.** Pending-answer test questions advance immediately after locking a choice; entering answers in the answer sheet automatically grades those choices. Mock exams now sample only questions with confirmed ordinary-practice results, preserving proportional chapter quotas and isolated exam scores.
 
 Visit the [Elapse introduction](https://avecove.com/projects/elapse/) and the separate [release history](https://avecove.com/updates/elapse/).
 
-Exam quotas use largest-remainder rounding on the eligible pool after practice filters (including skipped questions). Banks with fewer than 100 eligible questions use all of them. Ratings are uploader self-assessments, not community averages. [DeepSeek's official release notes](https://api-docs.deepseek.com/updates/) confirm that `deepseek-flash` follows the latest V4.1 Flash release.
+Exam quotas use largest-remainder rounding on confirmed ordinary-practice questions after practice filters, excluding skipped questions. Unconfirmed selections and pending-answer drafts are not eligible; an empty pool prompts you to practice first. Fewer than 100 eligible questions means all are used. Ratings are uploader self-assessments, not community averages. [DeepSeek's official release notes](https://api-docs.deepseek.com/updates/) confirm that `deepseek-flash` follows the latest V4.1 Flash release.
 
 Self-hosters: run `npm run db:migrate` before starting this release. The deployment workflow applies the additive `db/sync-v3.sql` migration automatically. The Pavilion remains independent. English library bodies still use the learning snapshot; independent media storage is a future upgrade, not included in this patch.
 
