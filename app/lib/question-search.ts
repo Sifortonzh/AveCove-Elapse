@@ -9,15 +9,18 @@ export type QuestionSearchMatch = {
   matchedOption?: string;
 };
 
-function normalize(value: string) {
-  return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+function normalize(value: string, joinChinese = false) {
+  const text = value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  return joinChinese ? text.replace(/(?<=[\p{Script=Han}]) (?=[\p{Script=Han}])/gu, "") : text;
 }
+
+export type QuestionSearchScope = "all" | "stem" | "options";
 
 export function getSearchTerms(query: string) {
   return [...new Set(normalize(query).split(" ").filter(Boolean))].slice(0, 8);
 }
 
-export function searchQuestionBanks(banks: SavedQuestionBank[], query: string, limit = 100): QuestionSearchMatch[] {
+export function searchQuestionBanks(banks: SavedQuestionBank[], query: string, limit = 100, scope: QuestionSearchScope = "all"): QuestionSearchMatch[] {
   const terms = getSearchTerms(query);
   if (!terms.length) return [];
   const fullQuery = normalize(query);
@@ -28,12 +31,15 @@ export function searchQuestionBanks(banks: SavedQuestionBank[], query: string, l
     const groupName = normalize(bank.groupName);
     for (const question of bank.questions) {
       const category = normalize(question.category);
-      const stem = normalize(question.stem);
+      const stem = normalize(`${question.sharedStem ?? ""} ${question.stem}`, true);
       const sourceNumber = normalize(String(question.sourceNumber));
-      const options = question.options.map((option) => ({ label: option.label, text: normalize(option.text), raw: option.text }));
+      const options = question.options.map((option) => ({ label: option.label, text: normalize(option.text, true), raw: option.text }));
       const matchedFields = new Set<QuestionSearchMatch["matchedFields"][number]>();
       let score = 0;
       let rejected = false;
+
+      const scopedText = scope === "options" ? options.map(option => option.text).join(" ") : stem;
+      if (scope !== "all" && !terms.every(term => scopedText.includes(term))) continue;
 
       for (const term of terms) {
         let best = 0;
@@ -41,7 +47,7 @@ export function searchQuestionBanks(banks: SavedQuestionBank[], query: string, l
         if (groupName.includes(term) && best < 120) { best = groupName === term ? 150 : 120; matchedFields.add("分组"); }
         if (category.includes(term) && best < 105) { best = category === term ? 125 : 105; matchedFields.add("分类"); }
         if (stem.includes(term) && best < 95) { best = stem === term ? 130 : stem.startsWith(term) ? 115 : 95; matchedFields.add("题干"); }
-        if (options.some((option) => option.text.includes(term)) && best < 55) { best = 55; matchedFields.add("选项"); }
+        if (options.some((option) => option.text.includes(term))) { best = Math.max(best, 55); matchedFields.add("选项"); }
         if (sourceNumber === term && best < 80) { best = 80; matchedFields.add("题号"); }
         if (!best) { rejected = true; break; }
         score += best;

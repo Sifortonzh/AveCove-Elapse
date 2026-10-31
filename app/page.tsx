@@ -40,7 +40,7 @@ import {
 } from "./lib/medical-ai-import";
 import { suggestQuestionBankGroup } from "./lib/bank-grouping";
 import { readPersonalAiConfig } from "./lib/personal-ai";
-import { getSearchTerms, searchQuestionBanks } from "./lib/question-search";
+import { getSearchTerms, searchQuestionBanks, type QuestionSearchScope } from "./lib/question-search";
 import { compactQuestionNumbers } from "./lib/question-number";
 import { isXQuestion, practiceStats, newerPreferences } from "./lib/practice-stats";
 import { completedPracticeQuestions, sampleExamByChapter } from "./lib/exam-sampling";
@@ -3511,8 +3511,9 @@ function AccountModal({ account, syncStatus, syncFiles, syncing, nickname: initi
 
 function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: SavedQuestionBank[]; returnToQuiz?: boolean; onOpen: (bank: SavedQuestionBank, id: string) => Promise<void> | void; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const results = useMemo(() => query.trim() ? searchQuestionBanks(banks, query, 60) : [], [banks, query]);
-  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>跨题库检索 · 按相关度排序</span><h2>搜索全部题库</h2></div><button onClick={onClose} aria-label={returnToQuiz ? "关闭搜索并返回当前题目" : "关闭搜索"}><X /></button></header>{returnToQuiz && <button className="search-return-strip" onClick={onClose}><ChevronLeft size={16} /><span><strong>当前练习已为你保留</strong><small>关闭搜索即可回到刚才的题目与已选答案</small></span></button>}<label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="题库名、疾病、症状或知识点；多个词用空格分隔" /><kbd>{results.length}</kbd></label><div className="search-results">{query.trim() ? results.length ? results.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => void onOpen(bank, question.id)}><span>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b> · {question.category} · 原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight size={17} /></button>) : <div className="search-empty"><CircleHelp /><p>没有找到同时匹配这些关键词的题目。可减少一个词，或改用疾病、症状及题库名称。</p></div> : <div className="search-empty search-guide"><Search /><p>输入关键词后，会同时检索所有题库，并优先显示题库名、分类和题干中的精准命中。</p></div>}</div></section></div>;
+  const [scope, setScope] = useState<QuestionSearchScope>("all");
+  const results = useMemo(() => query.trim() ? searchQuestionBanks(banks, query, 60, scope) : [], [banks, query, scope]);
+  return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>跨题库检索 · 按相关度排序</span><h2>搜索全部题库</h2></div><button onClick={onClose} aria-label={returnToQuiz ? "关闭搜索并返回当前题目" : "关闭搜索"}><X /></button></header>{returnToQuiz && <button className="search-return-strip" onClick={onClose}><ChevronLeft size={16} /><span><strong>当前练习已为你保留</strong><small>关闭搜索即可回到刚才的题目与已选答案</small></span></button>}<label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="题干或选项关键词；多个词用空格分隔" /><kbd>{results.length}</kbd></label><label className="search-field"><span>检索范围</span><select aria-label="检索范围" value={scope} onChange={event => setScope(event.target.value as QuestionSearchScope)}><option value="all">全部内容</option><option value="stem">只搜题干（含共用题干）</option><option value="options">只搜选项</option></select></label><div className="search-results">{query.trim() ? results.length ? results.map(({ bank, question, matchedFields, matchedOption }) => <button key={`${bank.id}-${question.id}`} onClick={() => void onOpen(bank, question.id)}><span>{question.multiple ? "多选" : "单选"}</span><div><strong><HighlightMatches text={question.stem} query={query} /></strong><small className="search-result-location"><Database size={13} />题库：<b><HighlightMatches text={bank.name} query={query} /></b> · {question.category} · 原题号 {question.sourceNumber}</small>{matchedOption && <p className="search-match-snippet">命中选项：<HighlightMatches text={matchedOption} query={query} /></p>}<em className="search-match-fields">命中 {matchedFields.join("、")}</em></div><ChevronRight size={17} /></button>) : <div className="search-empty"><CircleHelp /><p>没有找到同时匹配这些关键词的题目。可减少一个词，或改用疾病、症状及题库名称。</p></div> : <div className="search-empty search-guide"><Search /><p>同时检索题干、共用题干与选项；也可切换“只搜选项”，查看命中选项。</p></div>}</div></section></div>;
 }
 
 function NotesPage({ archives, banks, progress, favorites, favoriteStars, notes, tagCatalog, onManageTag, onOpen, onBack }: {
@@ -3658,7 +3659,7 @@ function CopyrightPage({ bankName, onHome, onRestoreDemo }: { bankName: string; 
         </section>
 
         <section className="copyright-grid" aria-label="核心使用边界">
-          <article><b>01</b><h2>产品与品牌</h2><p>产品名称、界面设计、蛇杖红豆标识及相关视觉资产由本项目保留。未经书面许可，不得冒用品牌、移除权利标识，或复制成同名、近似且足以造成混淆的产品。</p></article>
+          <article><b>01</b><h2>产品与品牌</h2><p>Elapse · 红豆生南国由 Sifortonzh 创作与维护。公开源码不代表开放授权，未经许可不得照搬代码、页面或视觉资产。获书面许可复用时，须保留原作者、版权声明及原项目链接；二开或同构部署须使用独立名称并标明修改，不得冒充官方。仅署名或改名不等于已获授权；第三方题库及依赖仍归原权利人。</p></article>
           <article><b>02</b><h2>题库内容</h2><p>演示题仅用于功能展示。用户导入或分享的 Word、PDF、JSON、教材与课程内容版权归原权利人所有；你应在操作前确认拥有合法的学习、整理、复制与传播权限。</p></article>
           <article><b>03</b><h2>医学与 AI 声明</h2><p>题目答案、AI 总结与讨论内容可能存在错误、遗漏或时效差异，仅用于学习辅助，不构成医疗服务，不能替代现行教材、指南、执业判断、诊断或治疗建议。</p></article>
           <article><b>04</b><h2>隐私与数据</h2><p>原始学号只用于生成不可逆同步标识。普通题库导入不自动调用 AI；识别失败时，可自行下载提取文字 JSON 并决定是否交给外部 AI。严禁导入可识别患者身份的资料。</p></article>

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.1.8" src="https://img.shields.io/badge/version-2.4.1.8-b43d35" />
+    <img alt="版本 2.4.1.9" src="https://img.shields.io/badge/version-2.4.1.9-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.1.8。** 待答案题的测试模式在锁定作答后立即跳到下一题；在答题卡批量补答案后自动判定先前作答。模拟考试仅从普通练习已确认作答的题中按章节占比抽题，仍使用独立记录，不影响日常正确率。
+> **当前版本：v2.4.1.9。** 搜索新增“只搜选项”和“只搜题干（含共用题干）”，兼容 OCR 中文断行，准确标记选项命中。站内与仓库同步署名、二开命名和授权边界；SMTP 增加缺项提示与 465/587 TLS 适配。小更新不再新建标签。
 
 主站提供独立的 [Elapse 介绍](https://avecove.com/projects/elapse/)与[更新日志](https://avecove.com/updates/elapse/)，博客文章保持独立。
 
@@ -276,6 +276,8 @@ Forge 与稳定刷题主程序相互隔离。基础版 `0.2.0` 已加强分章�
 
 ## 权利与责任
 
-© 2026 AveCove Elapse / 红豆生南国。保留相关权利。
+© 2026 Sifortonzh · Elapse / 红豆生南国。保留相关权利。复用须获书面许可；获准二开须保留作者与原仓库链接、使用独立名称并说明修改。仅署名或改名不代表获得许可，第三方权利不变。详见[版权说明](COPYRIGHT.md)。
+
+小修只递增补丁版本，不新建 Git 标签；重点更新才打标签。历史标签保留用于追溯，不批量删除。
 
 仓库只内置少量演示题。使用者应确保导入、同步或分享的资料已经获得授权；不得上传患者信息、保密试题、非法复制的出版物或个人密钥。AI 与评论区内容不得代替教材、现行指南、执业判断或临床诊疗。

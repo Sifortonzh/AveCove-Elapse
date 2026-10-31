@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { smtpConfig } from "./smtp-config";
 
 type SmtpDeliveryError = Error & {
   code?: string;
@@ -7,30 +8,12 @@ type SmtpDeliveryError = Error & {
 };
 
 export async function sendLoginCode(email: string, code: string) {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!host || !user || !pass) {
-    if (process.env.NODE_ENV !== "production") return { delivered: false, debugCode: code };
-    throw new Error("邮箱验证码服务尚未配置");
-  }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port: Number(process.env.SMTP_PORT || 465),
-    secure: process.env.SMTP_SECURE !== "false",
-    auth: { user, pass },
-    connectionTimeout: 15_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 20_000,
-    tls: {
-      minVersion: "TLSv1.2",
-      servername: host,
-    },
-  });
+  if (process.env.NODE_ENV !== "production" && (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS)) return { delivered: false, debugCode: code };
+  const config = smtpConfig(process.env);
+  const transporter = nodemailer.createTransport(config);
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || `红豆生南国 <${user}>`,
+      from: process.env.SMTP_FROM || `红豆生南国 <${config.auth.user}>`,
       to: email,
       subject: "红豆生南国登录验证码",
       text: `你的登录验证码是 ${code}，10 分钟内有效。若非本人操作，请忽略本邮件。`,
