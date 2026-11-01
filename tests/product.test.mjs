@@ -5,6 +5,20 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("blind exams always expose submission and final Next opens grading confirmation", async () => {
+  const page=await text("app/page.tsx"),css=await text("app/globals.css");
+  assert.match(page,/examActive \? props.onSubmit : submitted/);
+  assert.match(page,/examActive && <button className="exam-submit-top"/);
+  assert.match(page,/lastExamQuestion \? "交卷评分" : "下一题"/);
+  assert.match(css,/\.quiz-shell \.tablet-quiz-action\.exam-submit-floating\{display:flex;position:fixed/);
+  assert.match(page,/questionOrder: "random" \}, 20, true\)/);
+  const next=page.slice(page.indexOf("  function goNextQuestion()"),page.indexOf("  function updateKilledQuestions"));
+  const fixture=`export function run(examFinished){const currentIndex=0,sessionQuestions=[{id:"one"}],killedIds=new Set(),sessionIsExam=true;let finish=0,toast=0;const finishMockExam=()=>finish++,setToast=()=>toast++;${next};goNextQuestion();return {finish,toast};}`;
+  const output=ts.transpileModule(fixture,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {run}=await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  assert.deepEqual(run(false),{finish:1,toast:0});assert.deepEqual(run(true),{finish:0,toast:1});
+});
+
 test("search finds option-only phrases, OCR line breaks and shared stems", async () => {
   const output=ts.transpileModule(await text("app/lib/question-search.ts"),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
   const {searchQuestionBanks,getSearchTerms}=await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
@@ -1019,7 +1033,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.9");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.10");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1779,7 +1793,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.4.1.9");
+  assert.equal(JSON.parse(packageJson).version, "2.4.1.10");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1974,7 +1988,7 @@ test("keeps touch practice controls, in-quiz search, and reusable note tags disc
 
   assert.match(page, /onDoubleClick=.*onExcludeOption/);
   assert.match(page, /单击选择或取消 · 双击排除干扰项/);
-  assert.match(page, /className="tablet-quiz-action"/);
+  assert.match(page, /tablet-quiz-action.*exam-submit-floating/);
   assert.doesNotMatch(page, /question-previous-top/);
   assert.match(page, /returnToQuiz=\{view === "quiz"/);
   assert.match(page, /关闭搜索即可回到刚才的题目与已选答案/);
@@ -2178,7 +2192,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.4.1.9");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.10");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2239,7 +2253,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.9");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.10");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2257,7 +2271,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.9");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.10");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2277,7 +2291,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.9");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.10");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

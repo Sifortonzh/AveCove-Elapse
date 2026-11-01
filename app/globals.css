@@ -150,7 +150,9 @@ input,textarea,select{padding-block:12px}
 .bank-page .bank-card>footer button{width:100%;min-width:0}
 .bank-page .bank-card::after{content:"Elapse · Sifortonzh · avecove.com";color:var(--muted);font-size:.65rem}
 .question-body::after{content:"Elapse · 红豆生南国 · Sifortonzh";display:block;margin-top:18px;color:var(--muted);font-size:.65rem;opacity:.7}
-.mock-exam-banner{padding:12px 20px;background:var(--green-soft);color:var(--green);font-size:.85rem}
+.mock-exam-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 20px;background:var(--green-soft);color:var(--green);font-size:.85rem}
+.exam-submit-top{flex-shrink:0;min-height:44px;padding:10px 18px;border:0;border-radius:12px;background:var(--green);color:var(--surface);cursor:pointer}
+.quiz-shell .tablet-quiz-action.exam-submit-floating{display:flex;position:fixed;right:20px;bottom:calc(88px + env(safe-area-inset-bottom,0px));z-index:45;align-items:center;gap:8px;min-height:48px;padding:12px 20px;border:1px solid var(--green);border-radius:24px;background:var(--green);color:var(--surface);box-shadow:0 5px 20px #0002;cursor:pointer}
 @media(max-width:1099px){.bank-page .bank-card-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:620px){.bank-page .bank-card{padding:18px 15px}.bank-page .bank-card>footer{grid-template-columns:repeat(5,minmax(0,1fr))}.bank-page .bank-card>footer .bank-open{grid-column:1/-1}}
 .pavilion-rating-editor{display:grid;gap:8px;margin:18px 0;color:var(--ink)}.pavilion-rating-editor select{width:min(100%,260px);padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit}.pavilion-rating-editor small{color:var(--muted)}.pavilion-rating-display{color:var(--gold,#9f732a);font-size:.82rem;overflow-wrap:anywhere}

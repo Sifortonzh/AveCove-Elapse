@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.1.9" src="https://img.shields.io/badge/version-2.4.1.9-b43d35" />
+    <img alt="Version 2.4.1.10" src="https://img.shields.io/badge/version-2.4.1.10-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.1.9.** Search can target options or stems (including shared cases), handles Chinese OCR line breaks and labels option hits accurately. Copyright and derivative attribution rules are aligned across the site and repository. SMTP reports missing configuration and selects TLS appropriately for ports 465/587. Minor fixes no longer create Git tags.
+> **Current release: v2.4.1.10.** Blind exams keep a visible Submit & Grade button above the questions and a floating button on every screen size. Next on the final question also opens submission confirmation. The 20-question random challenge now uses the same isolated blind-exam and proportional completed-question sampling workflow, without changing daily accuracy.
 
 Visit the [Elapse introduction](https://avecove.com/projects/elapse/) and the separate [release history](https://avecove.com/updates/elapse/).
 
