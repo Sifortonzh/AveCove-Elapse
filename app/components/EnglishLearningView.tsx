@@ -14,7 +14,6 @@ import {
   renameEnglishTest, replaceEnglishTestContent, sanitizeEnglishPassage, saveEnglishTest, type EnglishStage, type EnglishTestQuestion, type EnglishTestSection,
   type SavedEnglishTest,
 } from "@/app/lib/english-test";
-import { readPersonalAiConfig } from "@/app/lib/personal-ai";
 import {
   clearEnglishPractice, hasEnglishPractice, readEnglishPractice, saveEnglishPractice,
   type ImportedResponse,
@@ -58,12 +57,13 @@ async function requestEnglishAiImport(
     usedOcr: boolean;
   },
   signal: AbortSignal,
+  accountId?: string,
 ) {
   const response = await fetch("/api/import-english-ai", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-elapse-account-id": accountId ?? "" },
     signal,
-    body: JSON.stringify({ ...input, personalAi: readPersonalAiConfig() ?? undefined }),
+    body: JSON.stringify(input),
   });
   const result = await response.json().catch(() => ({})) as {
     test?: Omit<SavedEnglishTest, "id" | "importedAt" | "updatedAt">;
@@ -626,7 +626,7 @@ function AnswerCompanionModal({ testName, busy, onChoose, onSkip }: { testName: 
   </div>;
 }
 
-export default function EnglishLearningView({ onExit }: { onExit: () => void }) {
+export default function EnglishLearningView({ onExit, accountId }: { onExit: () => void; accountId?: string }) {
   const [stage, setStage] = useState<Stage>("cet");
   const [task, setTask] = useState<EnglishTask>("overview");
   const [importing, setImporting] = useState(false);
@@ -741,7 +741,7 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
           answerFileName: answer?.name,
           answerText: answerExtracted?.text,
           usedOcr: sourceExtracted.usedOcr || Boolean(answerExtracted?.usedOcr),
-        }, fileController.signal);
+        }, fileController.signal, accountId);
         if (fileController.signal.aborted) throw new DOMException("Import cancelled", "AbortError");
         const savedTest = await saveEnglishTest(result.test);
         saved.push(savedTest);
@@ -803,7 +803,7 @@ export default function EnglishLearningView({ onExit }: { onExit: () => void }) 
         answerFileName: answerFile.name,
         answerText: answerExtracted.text,
         usedOcr: pendingCompanion.usedOcr || answerExtracted.usedOcr,
-      }, controller.signal);
+      }, controller.signal, accountId);
       const updated = await replaceEnglishTestContent(pendingCompanion.test.id, result.test);
       setTests(await listEnglishTests());
       setActiveTest(updated);

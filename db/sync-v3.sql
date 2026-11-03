@@ -12,3 +12,11 @@ CREATE TABLE IF NOT EXISTS learning_sync_banks (
   content_bytes BIGINT NOT NULL,
   PRIMARY KEY (user_id, bank_id)
 );
+
+CREATE TABLE IF NOT EXISTS user_ai_settings (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  verified_email TEXT NOT NULL,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, verified_email)
+);

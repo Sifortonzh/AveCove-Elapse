@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
-import { readPersonalAiConfig } from "../lib/personal-ai";
 import { appendOptionAnnotationImage, readOptionAnnotation, removeOptionAnnotationImage, updateOptionAnnotationText } from "../lib/note-annotations";
 import type { QuizQuestion } from "../lib/question-parser";
 
@@ -40,7 +39,7 @@ export function ChapterDirectory({ questions, currentQuestionId, progress, kille
   return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal chapter-directory" role="dialog" aria-modal="true" aria-label="章节目录" onMouseDown={(e) => e.stopPropagation()}><header><h2>章节目录 · {questions.length} 题</h2><button aria-label="关闭章节目录" onClick={onClose}>×</button></header><p>已自动展开并定位当前题所在章节；当前章节标题会保持可见，可随时收起或展开。</p><div className="chapter-directory-list">{[...groups].map(([name, items]) => { const containsCurrent = items.some((question) => question.id === currentQuestionId); return <details key={name} className={containsCurrent ? "current-chapter" : ""} open={containsCurrent}><summary>{name}<span>{items.filter(q => killed.includes(q.id) || Boolean(progress[q.id])).length}/{items.length} 题</span></summary>{items.map((q) => <button ref={q.id === currentQuestionId ? currentButton : undefined} className={q.id === currentQuestionId ? "current" : ""} aria-current={q.id === currentQuestionId ? "true" : undefined} key={q.id} onClick={() => { onOpen(q.id); onClose(); }}><b>{q.sourceNumber}</b><span>{q.stem}</span>{killed.includes(q.id) ? <em className="chapter-result" aria-label="已斩">✂️</em> : progress[q.id] && <em className={`chapter-result ${progress[q.id]}`} aria-label={progress[q.id] === "correct" ? "已做对" : "已做错"}>{progress[q.id] === "correct" ? "✅" : "❌"}</em>}</button>)}</details>; })}</div></section></div>;
 }
 
-export function AiDialogue({ question, onSave }: { question: QuizQuestion; onSave: (text: string) => void }) {
+export function AiDialogue({ question, accountId, onSave }: { question: QuizQuestion; accountId?: string; onSave: (text: string) => void }) {
   const guidedPrompts = [
     ["1 基础", "请用一句话复述本题考查的核心概念，并解释正确答案为什么成立"],
     ["2 辨析", "请逐项比较本题选项，指出每个错误选项错在哪里"],
@@ -60,7 +59,7 @@ export function AiDialogue({ question, onSave }: { question: QuizQuestion; onSav
     const controller = new AbortController(); request.current = controller;
     const timer = window.setTimeout(() => controller.abort(), 60000);
     try {
-      const response = await fetch("/api/explain", { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal, body: JSON.stringify({ question, mode: "companion", followUp: text, history: messages.slice(-6), personalAi: readPersonalAiConfig() ?? undefined }) });
+      const response = await fetch("/api/explain", { method: "POST", headers: { "Content-Type": "application/json", "x-elapse-account-id": accountId ?? "" }, signal: controller.signal, body: JSON.stringify({ question, mode: "companion", followUp: text, history: messages.slice(-6) }) });
       if (!response.headers.get("content-type")?.includes("application/json")) throw new Error("AI 服务暂时不可用，请稍后重试");
       const data = await response.json();
       if (!response.ok || !data.explanation) throw new Error(data.error || "没有收到 AI 回复");

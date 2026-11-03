@@ -1033,7 +1033,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.11");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1213,7 +1213,7 @@ test("tests personal and public AI connections without exposing saved keys", asy
   assert.match(personalPage, /\/api\/ai-test/);
   assert.match(adminPage, /测试连接/);
   assert.match(adminPage, /method: "POST"/);
-  assert.match(personalRoute, /resolvePersonalAiConfig/);
+  assert.match(personalRoute, /resolveAccountAiInput/);
   assert.match(personalRoute, /20_000/);
   assert.match(adminRoute, /export async function POST/);
   assert.match(adminRoute, /当前厂商没有可复用的已保存密钥/);
@@ -1522,8 +1522,8 @@ test("uses AI to pair English source and answer papers with exam-aware structure
   assert.equal(parsed.sections[0].passage, "Campus volunteers were [[26]] by an environmental project.");
   assert.equal(parsed.sections[0].questions[0].answer, "J");
   assert.match(route, /buildEnglishImportPrompt/);
-  assert.match(route, /English imports require AI/);
-  assert.match(route, /personalAi/);
+  assert.match(route, /loadRequestAiConfig\(request\)/);
+  assert.doesNotMatch(route, /personalAi/);
   assert.match(english, /Add the answer or analysis file\?/);
   assert.match(english, /No duplicate test/);
   assert.match(english, /replaceEnglishTestContent/);
@@ -1793,7 +1793,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.4.1.11");
+  assert.equal(JSON.parse(packageJson).version, "2.4.1.12");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -1954,33 +1954,45 @@ Part IV Translation
   assert.match(parsed.sections[5].title, /Chinese to English/);
 });
 
-test("separates personal BYOK AI from administrator-wide AI", async () => {
-  const [page, personalPage, personalStore, explainRoute, importRoute, providers, adminPage, testRoute] = await Promise.all([
+test("gates every user AI route on the verified account and never falls back to the legacy key", async () => {
+  const [page, personalPage, accountStore, accountRoute, auth, login, providers, schema, migration, ...routes] = await Promise.all([
     text("app/page.tsx"),
     text("app/custom-ai/page.tsx"),
-    text("app/lib/personal-ai.ts"),
-    text("app/api/explain/route.ts"),
-    text("app/api/import-ai/route.ts"),
+    text("app/lib/server/account-ai.ts"),
+    text("app/api/account/ai/route.ts"),
+    text("app/lib/server/auth.ts"),
+    text("app/api/auth/session/route.ts"),
     text("app/lib/server/ai-providers.ts"),
-    text("app/admin/ai/page.tsx"),
-    text("app/api/ai-test/route.ts"),
+    text("db/init.sql"),
+    text("db/sync-v3.sql"),
+    ...["explain", "import-ai", "import-answers", "import-english-ai"].map(route => text(`app/api/${route}/route.ts`)),
   ]);
-
-  assert.doesNotMatch(personalPage, /adminKey/);
+  assert.doesNotMatch(personalPage, /localStorage|adminKey/);
   assert.match(personalPage, /不需要管理员批准/);
-  assert.match(personalPage, /配置保存在此浏览器/);
-  assert.match(personalPage, /连接成功.*已自动保存/);
-  assert.match(personalStore, /localStorage/);
-  assert.match(page, /readPersonalAiConfig/);
-  assert.match(explainRoute, /personalAi/);
-  assert.match(importRoute, /personalAi/);
+  assert.match(personalPage, /保存到当前账号/);
+  assert.match(page, /x-elapse-account-id/);
+  assert.doesNotMatch(page, /readPersonalAiConfig|personalAi:/);
+  assert.match(accountStore, /x-elapse-account-id/);
+  assert.match(accountStore, /x-elapse-ai-scope/);
+  assert.match(accountStore, /users\.email = settings\.verified_email/);
+  assert.match(accountStore, /encryptSecret\(config\.apiKey\)/);
+  assert.doesNotMatch(accountRoute, /apiKeyCipher|decryptSecret/);
+  assert.match(auth, /session\?\.emailVerified !== true/);
+  assert.match(login, /consumeEmailCode/);
+  assert.match(login, /COALESCE\(users\.email, EXCLUDED\.email\)/);
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS user_ai_settings/);
+    assert.match(sql, /PRIMARY KEY \(user_id, verified_email\)/);
+  }
+  for (const route of routes) {
+    assert.match(route, /loadRequestAiConfig\(request\)/);
+    assert.doesNotMatch(route, /loadLegacyAdminAiConfig|loadActiveAiConfig|personalAi:|resolvePersonalAiConfig/);
+  }
   assert.match(providers, /resolvePersonalAiConfig/);
   assert.match(providers, /publicAiErrorMessage/);
   assert.match(providers, /readProviderPayload/);
-  assert.match(explainRoute, /45_000/);
-  assert.match(testRoute, /publicAiErrorMessage/);
   assert.match(providers, /provider\.id === "custom"/);
-  assert.match(adminPage, /公共 AI 配置/);
+  assert.match(routes[0], /45_000/);
 });
 
 test("keeps touch practice controls, in-quiz search, and reusable note tags discoverable", async () => {
@@ -2192,7 +2204,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.4.1.11");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2253,7 +2265,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.11");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2271,7 +2283,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.11");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2291,7 +2303,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.11");
+  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

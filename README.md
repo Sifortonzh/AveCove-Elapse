@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.1.11" src="https://img.shields.io/badge/version-2.4.1.11-b43d35" />
+    <img alt="Version 2.4.1.12" src="https://img.shields.io/badge/version-2.4.1.12-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.1.11.** Phone layouts keep all six practice controls within reach, wrap progress stats, and give answer-card buttons more room. Import workbenches and dialogs fit narrow screens, and text inputs no longer trigger Safari’s automatic zoom on focus.
+> **Current release: v2.4.1.12.** AI requests use only the signed-in, email-verified account’s encrypted provider configuration. Guest and unconfigured accounts cannot use the former site-wide key.
 
 Visit the [Elapse introduction](https://avecove.com/projects/elapse/) and the separate [release history](https://avecove.com/updates/elapse/).
 
@@ -109,8 +109,8 @@ flowchart LR
 
 ### AI and notes
 
-- Configure personal AI in the browser or an administrator-managed site provider on the server.
-- Use any compatible provider by setting its base URL, model, and API key.
+- Verify your bound email and configure your own AI provider in Custom AI. The configuration is available on your other verified devices.
+- Choose a supported provider and enter your model and API key. The legacy site-wide fallback has been retired.
 - Generate a concise summary, common pitfalls, related concepts, or a follow-up answer only when needed.
 - Write useful AI output into Markdown notes with the question source and reusable tags.
 - Original-file explanations remain visible after submission and coexist with AI output.
@@ -173,10 +173,10 @@ docker compose up -d --force-recreate app
 </details>
 
 <details>
-<summary><strong>Personal and site AI</strong></summary>
+<summary><strong>Account-scoped AI</strong></summary>
 
-- `/custom-ai`: personal provider details stay in the user's browser and do not require administrator approval.
-- `/admin/ai`: the deployment administrator manages the optional site provider with `ADMIN_KEY`.
+- `/custom-ai`: verify the email bound to your account, then save a personal key once. Existing browser and site keys are not automatically assigned to any account.
+- `/admin/ai`: legacy configuration diagnostics only, protected by `ADMIN_KEY`; it does not provide a fallback for users.
 
 Use independent random secrets:
 
@@ -198,8 +198,7 @@ ADMIN_KEY=replace-with-another-long-random-secret
 | Local answers, notes, and settings | Browser storage |
 | Optional synchronized banks and records | Self-hosted PostgreSQL |
 | Original Word/PDF/image files | User device; not retained by sync |
-| Personal AI key | User browser |
-| Site AI key | Server configuration or encrypted database |
+| Personal AI key | Encrypted PostgreSQL record scoped to the verified account; never returned to the browser |
 
 The student ID is converted into an irreversible sync identifier; the original value is not stored. Email is optional and is used only for verification-code login or identity protection. Read [Data and Privacy](docs/数据与隐私说明.md), [Security](SECURITY.md), [Terms](TERMS.md), and [Copyright](COPYRIGHT.md) before operating a public instance. These documents contain the project disclaimer and responsible-use terms.
 

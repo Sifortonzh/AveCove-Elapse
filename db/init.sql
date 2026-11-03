@@ -71,6 +71,14 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS user_ai_settings (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  verified_email TEXT NOT NULL,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, verified_email)
+);
+
 CREATE TABLE IF NOT EXISTS shared_question_banks (
   token VARCHAR(64) PRIMARY KEY,
   payload JSONB NOT NULL,

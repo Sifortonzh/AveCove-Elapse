@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { findProvider } from "@/app/lib/ai-catalog";
-import { generateAiText, publicAiErrorMessage, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
+import { generateAiText, publicAiErrorMessage, type ActiveAiConfig } from "@/app/lib/server/ai-providers";
+import { aiAccountError, requireAiAccount, resolveAccountAiInput } from "@/app/lib/server/account-ai";
+import { allowRequest } from "@/app/lib/server/rate-limit";
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null) as { personalAi?: unknown } | null;
-  const config = resolvePersonalAiConfig(body?.personalAi);
+  const account = requireAiAccount(request, true);
+  if (account instanceof Response) return account;
+  if (!allowRequest(`ai-test:${account.userId}`, 10, 60_000)) return aiAccountError(429, "测试过于频繁，请稍后再试。");
+  let config: ActiveAiConfig | null;
+  try {
+    config = await resolveAccountAiInput(account, await request.json().catch(() => null));
+  } catch {
+    return aiAccountError(503, "暂时无法读取个人 AI 配置。");
+  }
   if (!config) return NextResponse.json({ error: "个人 AI 配置不完整，请检查厂商、模型与 API Key。" }, { status: 400 });
 
   const controller = new AbortController();

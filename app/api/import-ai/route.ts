@@ -1,4 +1,5 @@
-import { generateAiText, loadActiveAiConfig, publicAiErrorMessage, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
+import { generateAiText, publicAiErrorMessage, type ActiveAiConfig } from "@/app/lib/server/ai-providers";
+import { loadRequestAiConfig } from "@/app/lib/server/account-ai";
 import { allowRequest, requestFingerprint } from "@/app/lib/server/rate-limit";
 import {
   buildMedicalImportPrompt,
@@ -35,7 +36,7 @@ function mergeQuestions(questions: QuizQuestion[]) {
 }
 
 async function recognizeChunk(input: {
-  aiConfig: NonNullable<Awaited<ReturnType<typeof loadActiveAiConfig>>>;
+  aiConfig: ActiveAiConfig;
   fileName: string;
   category: string;
   profile: MedicalExamProfile;
@@ -64,12 +65,9 @@ export async function POST(request: Request) {
   if (!allowRequest(`ai-import:${requestFingerprint(request)}`, 8, 60 * 60_000)) {
     return Response.json({ error: "AI 文件识别请求过于频繁，请稍后再试。" }, { status: 429 });
   }
-  const body = await request.json() as { fileName?: unknown; text?: unknown; answerText?: unknown; personalAi?: unknown };
-  const personalRequested = body.personalAi !== undefined;
-  const personalConfig = resolvePersonalAiConfig(body.personalAi);
-  if (personalRequested && !personalConfig) return Response.json({ error: "个人 AI 配置无效，请回到“自定义AI”重新保存。" }, { status: 400 });
-  const aiConfig = personalConfig ?? await loadActiveAiConfig();
-  if (!aiConfig) return Response.json({ error: "尚未配置 AI。你可以从首页左下角进入“自定义AI”，填写自己的 API Key，无需管理员批准。" }, { status: 503 });
+  const aiConfig = await loadRequestAiConfig(request);
+  if (aiConfig instanceof Response) return aiConfig;
+  const body = await request.json() as { fileName?: unknown; text?: unknown; answerText?: unknown };
 
   const fileName = typeof body.fileName === "string" ? body.fileName.slice(0, 180) : "导入题库";
   const text = typeof body.text === "string" ? body.text.trim().slice(0, 480_000) : "";

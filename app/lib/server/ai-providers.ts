@@ -28,7 +28,8 @@ export async function readStoredAiConfig() {
   return rows[0]?.value ?? null;
 }
 
-export async function loadActiveAiConfig(): Promise<ActiveAiConfig | null> {
+/** Legacy credentials are accessible only to the authenticated admin diagnostics. */
+export async function loadLegacyAdminAiConfig(): Promise<ActiveAiConfig | null> {
   try {
     const stored = await readStoredAiConfig();
     if (stored?.apiKeyCipher) {

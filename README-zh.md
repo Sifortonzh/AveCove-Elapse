@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.1.11" src="https://img.shields.io/badge/version-2.4.1.11-b43d35" />
+    <img alt="版本 2.4.1.12" src="https://img.shields.io/badge/version-2.4.1.12-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.1.11。** 手机刷题底栏保留六个完整可点的操作，进度与正确率可换行，答题卡题号更易点按。导入工作台和弹窗适应窄屏，输入框也避免 Safari 聚焦时自动放大。
+> **当前版本：v2.4.1.12。** AI 只使用当前已验证邮箱账号的加密配置。游客和未配置账号不再使用原全站共享密钥。
 
 主站提供独立的 [Elapse 介绍](https://avecove.com/projects/elapse/)与[更新日志](https://avecove.com/updates/elapse/)，博客文章保持独立。
 
@@ -109,8 +109,8 @@ flowchart LR
 
 ### AI 与学习笔记
 
-- 可在浏览器设置个人 AI，也可由管理员在服务器配置全站 AI。
-- 通过 Base URL、模型名和 API Key 接入兼容 OpenAI 协议的服务商。
+- 通过绑定邮箱验证后，在“自定义AI”保存自己的厂商、模型和 Key；同一账号可跨设备使用。
+- 已关闭全站共享回退。每个账号只能使用自己的 AI 配置。
 - 按需生成简要总结、易错点、同类考点或继续追问，不必每题强制调用。
 - 有价值的 AI 内容可快速写入 Markdown 笔记，同时保留题目来源并复用已有标签。
 - 原文件自带解析在答题后独立显示，不会被 AI 内容覆盖。
@@ -173,10 +173,10 @@ docker compose up -d --force-recreate app
 </details>
 
 <details>
-<summary><strong>个人 AI 与全站 AI</strong></summary>
+<summary><strong>账号独立 AI</strong></summary>
 
-- `/custom-ai`：个人配置保存在使用者浏览器，不需要管理员批准。
-- `/admin/ai`：部署者使用 `ADMIN_KEY` 管理可选的全站 AI。
+- `/custom-ai`：验证账号绑定邮箱后，保存个人配置即可使用，无需管理员批准。旧浏览器和全站配置不会自动归到任一账号。
+- `/admin/ai`：仅供部署者使用 `ADMIN_KEY` 诊断旧版配置，不再为普通用户提供回退。
 
 请分别生成互不相同的随机密钥：
 
@@ -198,8 +198,7 @@ ADMIN_KEY=管理员专用长随机密钥
 | 本机答案、笔记与设置 | 浏览器本地存储 |
 | 可选同步的题库结构与学习记录 | 自行部署的 PostgreSQL |
 | 原始 Word/PDF/图片 | 使用者设备，不由同步服务保存 |
-| 个人 AI Key | 使用者浏览器 |
-| 全站 AI Key | 服务器配置或加密数据库 |
+| 个人 AI Key | 按已验证账号隔离的 PostgreSQL 加密记录，不回传浏览器 |
 
 学号只用于生成不可逆的同步标识，原始学号不会写入数据库；邮箱为可选项，仅用于验证码登录或身份保护。公开运营前请阅读[数据与隐私说明](docs/数据与隐私说明.md)、[安全说明](SECURITY.md)、[使用条款](TERMS.md)和[版权说明](COPYRIGHT.md)。这些文档包含项目的免责声明与使用协议。
 

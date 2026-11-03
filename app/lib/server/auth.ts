@@ -6,6 +6,7 @@ export type SessionUser = {
   userId: string;
   nickname: string;
   email?: string;
+  emailVerified?: boolean;
   expiresAt: number;
 };
 
@@ -67,4 +68,11 @@ export function publicSession(user: SessionUser) {
   const email = user.email;
   const maskedEmail = email ? email.replace(/^(.{1,2}).*(@.*)$/, "$1•••$2") : undefined;
   return { id: user.userId, nickname: user.nickname, email: maskedEmail, expiresAt: user.expiresAt };
+}
+
+export function verifiedAiAccount(request: Request) {
+  const session = readSession(request);
+  if (session?.emailVerified !== true || !session.email) return null;
+  const { userId, email } = session;
+  return { userId, email, scope: sign(JSON.stringify(["account-ai", userId, email])) };
 }

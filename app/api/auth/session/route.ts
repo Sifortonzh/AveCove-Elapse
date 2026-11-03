@@ -1,28 +1,16 @@
 import { NextResponse } from "next/server";
 import {
-  SESSION_COOKIE, createSessionToken, deriveUserId, hashLoginCode, normalizeStudentId,
+  SESSION_COOKIE, createSessionToken, deriveUserId, normalizeStudentId,
   publicSession, readSession, validateStudentId, type SessionUser,
 } from "@/app/lib/server/auth";
 import { query } from "@/app/lib/server/db";
 import { allowRequest, requestFingerprint } from "@/app/lib/server/rate-limit";
+import { consumeEmailCode } from "@/app/lib/server/login-code";
 
 type UserRow = { id: string; email: string | null; nickname: string };
 
-async function verifyEmailCode(email: string, code: string) {
-  const rows = await query<{ code_hash: string; expires_at: Date; attempts: number }>(
-    "SELECT code_hash, expires_at, attempts FROM login_codes WHERE email = $1",
-    [email],
-  );
-  const row = rows[0];
-  if (!row || new Date(row.expires_at).getTime() < Date.now() || row.attempts >= 5) return false;
-  await query("UPDATE login_codes SET attempts = attempts + 1 WHERE email = $1", [email]);
-  if (row.code_hash !== hashLoginCode(email, code)) return false;
-  await query("DELETE FROM login_codes WHERE email = $1", [email]);
-  return true;
-}
-
-function sessionResponse(user: UserRow) {
-  const session: Omit<SessionUser, "expiresAt"> = { userId: user.id, nickname: user.nickname, ...(user.email ? { email: user.email } : {}) };
+function sessionResponse(user: UserRow, emailVerified = false) {
+  const session: Omit<SessionUser, "expiresAt"> = { userId: user.id, nickname: user.nickname, ...(user.email ? { email: user.email, emailVerified } : {}) };
   const response = NextResponse.json({ ok: true, user: publicSession({ ...session, expiresAt: Date.now() + 30 * 24 * 60 * 60_000 }) });
   response.cookies.set(SESSION_COOKIE, createSessionToken(session), {
     httpOnly: true,
@@ -52,17 +40,17 @@ export async function POST(request: Request) {
     const nickname = String(body.nickname ?? "红豆同学").trim().slice(0, 20) || "红豆同学";
 
     if (!studentId && email) {
-      if (!code || !(await verifyEmailCode(email, code))) return NextResponse.json({ error: "邮箱验证码无效或已过期。" }, { status: 401 });
+      if (!code || !(await consumeEmailCode(email, code))) return NextResponse.json({ error: "邮箱验证码无效或已过期。" }, { status: 401 });
       const users = await query<UserRow>("SELECT id, email, nickname FROM users WHERE email = $1", [email]);
       if (!users[0]) return NextResponse.json({ error: "该邮箱尚未绑定学号，请先使用学号建立同步身份。" }, { status: 404 });
       await query("UPDATE users SET last_seen_at = NOW() WHERE id = $1", [users[0].id]);
-      return sessionResponse(users[0]);
+      return sessionResponse(users[0], true);
     }
 
     if (!validateStudentId(studentId)) {
       return NextResponse.json({ error: "学号需为 4–32 位数字、字母、短横线或下划线。" }, { status: 400 });
     }
-    if (email && (!code || !(await verifyEmailCode(email, code)))) {
+    if (email && (!code || !(await consumeEmailCode(email, code)))) {
       return NextResponse.json({ error: "绑定邮箱前，请先获取并填写验证码。" }, { status: 401 });
     }
 
@@ -71,13 +59,15 @@ export async function POST(request: Request) {
       `INSERT INTO users (id, email, nickname, last_seen_at)
        VALUES ($1, NULLIF($2, ''), $3, NOW())
        ON CONFLICT (id) DO UPDATE SET
-         email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
+         email = COALESCE(users.email, EXCLUDED.email),
          nickname = EXCLUDED.nickname,
          last_seen_at = NOW()
+       WHERE EXCLUDED.email IS NULL OR users.email IS NULL OR users.email = EXCLUDED.email
        RETURNING id, email, nickname`,
       [userId, email, nickname],
     );
-    return sessionResponse(users[0]);
+    if (!users[0]) return NextResponse.json({ error: "该账号已有绑定邮箱，请用原邮箱验证码登录。" }, { status: 409 });
+    return sessionResponse(users[0], Boolean(email));
   } catch (error) {
     if ((error as { code?: string }).code === "23505") {
       return NextResponse.json({ error: "该邮箱已绑定另一同步身份。" }, { status: 409 });

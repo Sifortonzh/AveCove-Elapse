@@ -1,23 +1,20 @@
 import { buildMedicalAnswerPrompt, parseMedicalAnswerResponse } from "@/app/lib/medical-ai-import";
 import type { QuizQuestion } from "@/app/lib/question-parser";
-import { generateAiText, loadActiveAiConfig, publicAiErrorMessage, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
+import { generateAiText, publicAiErrorMessage } from "@/app/lib/server/ai-providers";
+import { loadRequestAiConfig } from "@/app/lib/server/account-ai";
 import { allowRequest, requestFingerprint } from "@/app/lib/server/rate-limit";
 
 export async function POST(request: Request) {
   if (!allowRequest(`ai-answer-import:${requestFingerprint(request)}`, 12, 60 * 60_000)) {
     return Response.json({ error: "答案关联请求过于频繁，请稍后再试。" }, { status: 429 });
   }
+  const aiConfig = await loadRequestAiConfig(request);
+  if (aiConfig instanceof Response) return aiConfig;
   const body = await request.json() as {
     fileName?: unknown;
     text?: unknown;
     questions?: unknown;
-    personalAi?: unknown;
   };
-  const personalRequested = body.personalAi !== undefined;
-  const personalConfig = resolvePersonalAiConfig(body.personalAi);
-  if (personalRequested && !personalConfig) return Response.json({ error: "个人 AI 配置无效，请重新保存。" }, { status: 400 });
-  const aiConfig = personalConfig ?? await loadActiveAiConfig();
-  if (!aiConfig) return Response.json({ error: "请先在“自定义AI”中配置可用的模型。" }, { status: 503 });
 
   const fileName = typeof body.fileName === "string" ? body.fileName.slice(0, 180) : "答案文件";
   const text = typeof body.text === "string" ? body.text.trim().slice(0, 480_000) : "";

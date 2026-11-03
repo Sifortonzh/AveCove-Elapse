@@ -39,7 +39,6 @@ import {
   western306SubjectForQuestion, type Western306Subject,
 } from "./lib/medical-ai-import";
 import { suggestQuestionBankGroup } from "./lib/bank-grouping";
-import { readPersonalAiConfig } from "./lib/personal-ai";
 import { getSearchTerms, searchQuestionBanks, type QuestionSearchScope } from "./lib/question-search";
 import { compactQuestionNumbers } from "./lib/question-number";
 import { isXQuestion, practiceStats, newerPreferences } from "./lib/practice-stats";
@@ -1201,8 +1200,8 @@ export default function HomePage() {
     try {
       const response = await fetch("/api/explain", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: current, mode, personalAi: readPersonalAiConfig() ?? undefined }),
+        headers: { "Content-Type": "application/json", "x-elapse-account-id": account?.id ?? "" },
+        body: JSON.stringify({ question: current, mode }),
       });
       const result = await response.json() as { explanation?: string; error?: string };
       if (!response.ok || !result.explanation?.trim()) throw new Error(result.error || "AI 本次没有返回正文，请重试");
@@ -1532,7 +1531,7 @@ export default function HomePage() {
     onUpdate({ phase: "AI 关联答案", progress: 72, detail: "正在按原题号匹配答案、解析与题目" });
     const response = await fetch("/api/import-answers", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-elapse-account-id": account?.id ?? "" },
       signal: controller.signal,
       body: JSON.stringify({
         fileName: file.name,
@@ -1545,7 +1544,6 @@ export default function HomePage() {
           options: question.options,
           questionType: question.questionType,
         })),
-        personalAi: readPersonalAiConfig() ?? undefined,
       }),
     });
     const result = await response.json() as {
@@ -1916,7 +1914,7 @@ export default function HomePage() {
   const resolvedDark = settings.themeMode === "system" ? systemDark : settings.themeMode === "dark";
 
   if (learningMode === "english") {
-    return <main className={`product english-product ${resolvedDark ? "dark" : ""}`}><EnglishLearningView onExit={() => switchLearningMode("medical")} /></main>;
+    return <main className={`product english-product ${resolvedDark ? "dark" : ""}`}><EnglishLearningView accountId={account?.id} onExit={() => switchLearningMode("medical")} /></main>;
   }
 
   return (
@@ -3182,7 +3180,7 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
   };
   return <aside className="learning-panel"><div className="learning-heading"><h2>解析与考点</h2><button className="note-search-trigger" onClick={onSearchNotes}><Search size={16} />搜索笔记</button></div><div className="learning-tabs">{modes.map((mode) => <button key={mode.id} className={aiMode === mode.id ? "active" : ""} onClick={() => onAi(mode.id)}>{mode.icon}{mode.displayLabel ?? mode.label}</button>)}</div>
     <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? explanationIsAi ? "AI 生成后存入题库 · 与原题解析分开标识" : "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className={`original-explanation-panel ${explanationIsAi ? "ai-saved" : "source-saved"}`}><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“AI 解析”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>}</> : <>{generatedText && <div className="ai-copy"><MarkdownNotePreview value={generatedText} /></div>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "录入解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
-    {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={current.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
+    {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={`${account?.id ?? "guest"}:${current.id}`} accountId={account?.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
     <details className="community-card"><summary className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>{bankName} · {comments.length} 条</span></summary><div className="community-body"><p className="comment-scope-note">当前题库独立讨论 · 原题号 {current.sourceNumber}</p>{account ? <div className="comment-identity"><UserRound size={15} /><span>{account.nickname}</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={15} />登录后参与讨论</button>}<div className="comment-form"><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 300))} placeholder="写下你的判断依据、易错点或疑问…" disabled={!account || commentBusy} /><button onClick={() => void publishComment()} disabled={!account || commentBusy || commentDraft.trim().length < 2}><Send size={14} />{commentBusy ? "发布中…" : "发布"}</button></div>{commentMessage && <p className="comment-message">{commentMessage}</p>}<div className="local-comments">{comments.length ? comments.map((comment) => <article key={comment.id}><div><b>{comment.nickname}</b><time>{new Date(comment.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p>{comment.text}</p><div className="comment-tools"><button onClick={() => void runCommentAction(() => onLikeComment(comment.id))}><ThumbsUp size={13} />{comment.likes || "赞"}</button><button onClick={() => void runCommentAction(() => onReportComment(comment.id))}><Flag size={13} />举报</button>{comment.own && <button onClick={() => void runCommentAction(() => onDeleteComment(comment.id))}><Trash2 size={13} />删除</button>}</div></article>) : <p className="empty-comments">还没有讨论，成为这份题库中第一个留下学习线索的人。</p>}</div></div></details>
     <details className="note-card collapsible-note-card" open={noteExpanded} onToggle={(event) => setNoteExpanded(event.currentTarget.open)}><summary className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></summary><div className="note-editor-body"><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果<button type="button" onClick={() => setExpandedPreview(true)} aria-label="放大笔记预览"><ExternalLink size={14}/>放大查看</button></header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <button key={tag} title={`删除标签 ${tag}`} onClick={() => onNote(removeNoteTag(note, tag))}>#{tag}<X size={12} /></button>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div><InkNote note={note} onNote={onNote} /></div></details>
     {expandedPreview && <NotePreviewDialog onClose={() => setExpandedPreview(false)}><MarkdownNotePreview value={note}/></NotePreviewDialog>}

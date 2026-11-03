@@ -1,6 +1,9 @@
-import { generateAiText, loadActiveAiConfig, publicAiErrorMessage, resolvePersonalAiConfig } from "@/app/lib/server/ai-providers";
+import { generateAiText, publicAiErrorMessage } from "@/app/lib/server/ai-providers";
+import { loadRequestAiConfig } from "@/app/lib/server/account-ai";
 
 export async function POST(request: Request) {
+  const aiConfig = await loadRequestAiConfig(request);
+  if (aiConfig instanceof Response) return aiConfig;
   const body = await request.json() as {
     question?: {
       stem?: string;
@@ -14,13 +17,7 @@ export async function POST(request: Request) {
     mode?: "summary" | "pitfall" | "companion";
     followUp?: string;
     history?: Array<{ role?: "user" | "assistant"; text?: string }>;
-    personalAi?: unknown;
   };
-  const personalRequested = body.personalAi !== undefined;
-  const personalConfig = resolvePersonalAiConfig(body.personalAi);
-  if (personalRequested && !personalConfig) return Response.json({ error: "个人 AI 配置无效，请回到“自定义AI”重新保存。" }, { status: 400 });
-  const aiConfig = personalConfig ?? await loadActiveAiConfig();
-  if (!aiConfig) return Response.json({ error: "AI 解析尚未启用。你可以从首页左下角进入“自定义AI”，填写自己的 API Key，无需管理员批准。" }, { status: 503 });
 
   const question = body.question;
   if (!question?.stem || !question.options?.length || !question.answer?.length) {
