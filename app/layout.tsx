@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "katex/dist/katex.min.css";
 import "./globals.css";
+import "./mobile.css";
 
 // The application shell changes frequently while the product is evolving.
 // Render it dynamically so returning devices always revalidate the current

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.1.10" src="https://img.shields.io/badge/version-2.4.1.10-b43d35" />
+    <img alt="版本 2.4.1.11" src="https://img.shields.io/badge/version-2.4.1.11-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.1.10。** 模拟考试新增题目上方交卷按钮与全尺寸悬浮“交卷评分”，不受长题目影响；最后一题点击下一题也会进入交卷确认。20 题随机挑战复用同一独立盲考、已做题按章节比例抽样及统一评分流程，不影响日常正确率。
+> **当前版本：v2.4.1.11。** 手机刷题底栏保留六个完整可点的操作，进度与正确率可换行，答题卡题号更易点按。导入工作台和弹窗适应窄屏，输入框也避免 Safari 聚焦时自动放大。
 
 主站提供独立的 [Elapse 介绍](https://avecove.com/projects/elapse/)与[更新日志](https://avecove.com/updates/elapse/)，博客文章保持独立。
 
