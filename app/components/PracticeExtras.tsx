@@ -2,10 +2,14 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
+import { CircleSlash2 } from "lucide-react";
 import { appendOptionAnnotationImage, readOptionAnnotation, removeOptionAnnotationImage, updateOptionAnnotationText } from "../lib/note-annotations";
 import type { QuizQuestion } from "../lib/question-parser";
 
-export function AnnotatedOption({ label, note, submitted, onNote, children }: { label: string; note: string; submitted: boolean; onNote: (value: string) => void; children: ReactNode }) {
+export function AnnotatedOption({ label, note, submitted, excluded, onExclude, onNote, choice, children }: {
+  label: string; note: string; submitted: boolean; excluded: boolean; onExclude: () => void;
+  onNote: (value: string) => void; choice: ReactNode; children: ReactNode;
+}) {
   const annotation = readOptionAnnotation(note, label);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -23,7 +27,14 @@ export function AnnotatedOption({ label, note, submitted, onNote, children }: { 
     } finally { setBusy(false); }
   };
   return <div className="annotated-option">
-    {children}<button className="option-annotation-toggle" aria-label={`${editing ? "收起" : "编辑"}选项 ${label} 批注`} title={annotation.text || annotation.images.length ? "已保存批注，点击查看" : "添加批注"} onClick={() => setEditing(!editing)}>{editing ? "×" : "✎"}{Boolean(annotation.text || annotation.images.length) && <i aria-hidden="true" />}</button>
+    <div className="option-choice-row">
+      {choice}
+      <div className="option-choice-actions">
+        {!submitted && <button type="button" className="option-exclude-toggle" aria-label={`排除选项 ${label}`} aria-pressed={excluded} title={excluded ? "恢复选项" : "排除选项"} onClick={onExclude}><CircleSlash2 size={18} aria-hidden="true" /></button>}
+        <button type="button" className="option-annotation-toggle" aria-label={`${editing ? "收起" : "编辑"}选项 ${label} 批注`} aria-expanded={editing} title={annotation.text || annotation.images.length ? "已保存批注，点击查看" : "添加批注"} onClick={() => setEditing(!editing)}>{editing ? "×" : "✎"}{Boolean(annotation.text || annotation.images.length) && <i aria-hidden="true" />}</button>
+      </div>
+    </div>
+    {children}
     {editing ? <section className="option-annotation-editor" tabIndex={0} aria-label={`选项 ${label} 批注编辑区，可粘贴图片`} onPaste={(event) => { const file = [...event.clipboardData.files].find((item) => item.type.startsWith("image/")); if (file && !busy) { event.preventDefault(); void addImage(file); } }}><textarea aria-label={`选项 ${label} 批注`} value={annotation.text} maxLength={500} onChange={(event) => onNote(updateOptionAnnotationText(note, label, event.target.value))} placeholder="输入文字批注，也可在此粘贴截图" /><div className="option-annotation-image-tools"><label>{busy ? "正在保存…" : "上传图片"}<input type="file" accept="image/*" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void addImage(file); event.target.value = ""; }} /></label><small>支持粘贴或上传书本截图</small></div>{error && <p role="alert">{error}</p>}{annotation.images.map((image, index) => <figure key={`${image.slice(-20)}-${index}`}><Image unoptimized src={image} alt={`选项 ${label} 批注图片 ${index + 1}`} width={1000} height={750} style={{ height: "auto" }} /><button onClick={() => onNote(removeOptionAnnotationImage(note, label, index))}>删除图片</button></figure>)}</section> : submitted && Boolean(annotation.text || annotation.images.length) && <div className="option-annotation-text">{annotation.text && <p>✎ {annotation.text}</p>}{annotation.images.map((image, index) => <Image key={index} unoptimized src={image} alt={`选项 ${label} 批注图片 ${index + 1}`} width={1000} height={750} style={{ height: "auto" }} />)}</div>}
   </div>;
 }

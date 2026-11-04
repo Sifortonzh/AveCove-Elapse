@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.2.0" src="https://img.shields.io/badge/version-2.4.2.0-b43d35" />
+    <img alt="版本 2.4.2.1" src="https://img.shields.io/badge/version-2.4.2.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.2.0。** 藏经阁在培养阶段下支持科目分组；电脑刷题可直接在选项下方确认答案。红豆 JSON 导入可归并不相邻的 A3 同组题，仅去除内容等同的重复题。
+> **当前版本：v2.4.2.1。** 选项批注前新增排除标记，可直接排除或恢复。双击选项仍然可用，不会改变其他已选项。
 
 主站提供独立的 [Elapse 介绍](https://avecove.com/projects/elapse/)与[更新日志](https://avecove.com/updates/elapse/)，博客文章保持独立。
 
@@ -90,7 +90,7 @@ flowchart LR
 - **标准模式：** 每题确认后立即判定。
 - **盲刷模式：** 连续保留选择，不立即显示对错，需要时再统一对答案。
 - **背题模式：** 直接展开原文件答案，不改变刷题统计。
-- 单击选项选择或取消，双击排除干扰项。
+- 单击选项选择或取消；点选项旁的排除标记或双击选项，可排除或恢复干扰项。
 - 刷题时搜索全部题库，关闭搜索后回到原题并保留已选答案。
 - 支持答题卡、组内错题、精选题、标签、Markdown 笔记、图片笔记和选项批注。
 - 可斩当前题或输入 `1-31` 等原题号范围批量斩题；答题卡以 `/` 标记，且不计入正确率和 306 得分。

@@ -1071,20 +1071,24 @@ export default function HomePage() {
     else setAnswerSelections((answers) => ({ ...answers, [current.id]: next }));
   }
 
-  function toggleExcludedOption(label: string) {
+  function toggleExcludedOption(label: string, beforeClick?: { selected: string[]; excluded: boolean }) {
     if (!current || submitted) return;
-    setSelected((value) => value.filter((item) => item !== label));
+    // A native double-click follows its first click. Restore other selections
+    // from before that click, while keeping single-click response immediate.
+    const nextSelection = (beforeClick?.selected ?? selected).filter((item) => item !== label);
+    setSelected(nextSelection);
     const removeSelection = (answers: Record<string, string[]>) => ({
       ...answers,
-      [current.id]: (answers[current.id] ?? []).filter((item) => item !== label),
+      [current.id]: nextSelection,
     });
     if (isolatedReviewSession) setReviewSelections(removeSelection);
     else setAnswerSelections(removeSelection);
     setExcludedOptions((value) => {
       const currentExcluded = value[current.id] ?? [];
-      const next = currentExcluded.includes(label)
-        ? currentExcluded.filter((item) => item !== label)
-        : [...currentExcluded, label];
+      const remaining = currentExcluded.filter((item) => item !== label);
+      const next = (beforeClick?.excluded ?? currentExcluded.includes(label))
+        ? remaining
+        : [...remaining, label];
       return { ...value, [current.id]: next };
     });
   }
@@ -2852,7 +2856,7 @@ function QuizView(props: {
   aiTexts: Partial<Record<AiMode, string>>; aiLoading: boolean; mobilePanel: boolean;
   account: AccountSession | null;
   comments: SharedComment[];
-  onHome: () => void; onToggleOption: (label: string) => void; onExcludeOption: (label: string) => void; onSubmit: () => void;
+  onHome: () => void; onToggleOption: (label: string) => void; onExcludeOption: (label: string, beforeClick?: { selected: string[]; excluded: boolean }) => void; onSubmit: () => void;
   onPrevious: () => void; onNext: () => void; onFavorite: () => void; onAnswerSheet: () => void;
   onSettings: () => void; onNote: (value: string) => void; onAi: (mode: AiMode) => void;
   onSaveAiExplanation: (text: string) => Promise<void>;
@@ -2876,6 +2880,7 @@ function QuizView(props: {
   const [deleteError, setDeleteError] = useState("");
   const [showChapters, setShowChapters] = useState(false);
   const { current, total, selected, excluded, submitted, studyMode, result, favorite, favoriteStars, note, aiMode, aiTexts, aiLoading, examScore } = props;
+  const firstOptionClick = useRef<{ questionId: string; label: string; selected: string[]; excluded: boolean } | null>(null);
   const questionNumbers = useMemo(() => compactQuestionNumbers(props.bankQuestions, props.bankName), [props.bankQuestions, props.bankName]);
   const currentNumber = questionNumbers.get(current.id);
   const progress = libraryStats.percent;
@@ -2919,7 +2924,7 @@ function QuizView(props: {
           const ruledOut = excluded.includes(option.label);
           const isAnswer = submitted && current.answer.includes(option.label);
           const isWrong = submitted && picked && !current.answer.includes(option.label);
-          return <AnnotatedOption key={`${current.id}-${option.label}`} label={option.label} submitted={submitted} note={note} onNote={props.onNote}><button className={`answer-option ${picked ? "selected" : ""} ${ruledOut ? "excluded" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} aria-pressed={picked} title={ruledOut ? "已排除；单击可重新选择，双击取消排除" : "单击选择或取消，双击排除"} onClick={() => props.onToggleOption(option.label)} onDoubleClick={(event) => { event.preventDefault(); props.onExcludeOption(option.label); }}><span>{option.label}</span><p><MathText text={option.text} /></p>{ruledOut && !submitted ? <em className="answer-state-label excluded-label"><X size={16} />已排除</em> : isAnswer ? <em className="answer-state-label correct-label"><Check size={16} />正确</em> : isWrong ? <em className="answer-state-label wrong-label"><X size={16} />错误</em> : null}</button><QuestionImages images={option.sourceImages} extraImages={option.images} label={`${option.label} 选项图片`} /></AnnotatedOption>;
+          return <AnnotatedOption key={`${current.id}-${option.label}`} label={option.label} submitted={submitted} excluded={ruledOut} onExclude={() => props.onExcludeOption(option.label)} note={note} onNote={props.onNote} choice={<button type="button" className={`answer-option ${picked ? "selected" : ""} ${ruledOut ? "excluded" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} aria-pressed={picked} title={ruledOut ? "已排除；单击可重新选择，双击取消排除" : "单击选择或取消，双击排除"} onClick={(event) => { if (submitted || event.detail > 1) return; firstOptionClick.current = event.detail === 1 ? { questionId: current.id, label: option.label, selected, excluded: ruledOut } : null; props.onToggleOption(option.label); }} onDoubleClick={(event) => { event.preventDefault(); const first = firstOptionClick.current; firstOptionClick.current = null; props.onExcludeOption(option.label, first?.questionId === current.id && first.label === option.label ? first : undefined); }}><span>{option.label}</span><p><MathText text={option.text} /></p>{ruledOut && !submitted ? <em className="answer-state-label excluded-label"><X size={16} />已排除</em> : isAnswer ? <em className="answer-state-label correct-label"><Check size={16} />正确</em> : isWrong ? <em className="answer-state-label wrong-label"><X size={16} />错误</em> : null}</button>}><QuestionImages images={option.sourceImages} extraImages={option.images} label={`${option.label} 选项图片`} /></AnnotatedOption>;
         })}</div></article>
         <div className={`quiz-actions ${blind && !submitted ? "blind-actions" : ""}`}>{blind && !submitted ? <button className="blind-check-action" onClick={props.onSubmit} disabled={!selected.length && !props.mockExam}><Eye size={17} />{props.mockExam ? "交卷评分" : answerAvailable ? "对答案" : "锁定作答"}</button> : <button className="subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>}{submitted || memorizing || blind ? <button className="primary-action" onClick={props.onNext}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length && !props.mockExam}>{answerAvailable ? "确认答案" : "锁定作答"}<ArrowRight size={17} /></button>}</div>
         {memorizing && answerAvailable && <div className="result-strip memorize-answer"><span><Eye /></span><div><strong>标准答案已展开</strong><p>题库答案：{current.answer.join("、")} · 背题模式不会计入对错记录</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
