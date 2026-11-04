@@ -27,7 +27,7 @@ export function AnnotatedOption({ label, note, submitted, excluded, onExclude, o
     } finally { setBusy(false); }
   };
   return <div className="annotated-option">
-    <div className="option-choice-row">
+    <div className="option-choice-row" data-exclusion-available={!submitted}>
       {choice}
       <div className="option-choice-actions">
         {!submitted && <button type="button" className="option-exclude-toggle" aria-label={`排除选项 ${label}`} aria-pressed={excluded} title={excluded ? "恢复选项" : "排除选项"} onClick={onExclude}><CircleSlash2 size={18} aria-hidden="true" /></button>}

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.2.1" src="https://img.shields.io/badge/version-2.4.2.1-b43d35" />
+    <img alt="版本 2.4.2.2" src="https://img.shields.io/badge/version-2.4.2.2-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.2.1。** 选项批注前新增排除标记，可直接排除或恢复。双击选项仍然可用，不会改变其他已选项。
+> **当前版本：v2.4.2.2。** 排除和批注按钮都放在选项框内，可分别点击；双击排除仍可使用。
 
 主站提供独立的 [Elapse 介绍](https://avecove.com/projects/elapse/)与[更新日志](https://avecove.com/updates/elapse/)，博客文章保持独立。
 

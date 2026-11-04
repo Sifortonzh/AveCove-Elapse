@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.2.1" src="https://img.shields.io/badge/version-2.4.2.1-b43d35" />
+    <img alt="Version 2.4.2.2" src="https://img.shields.io/badge/version-2.4.2.2-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.2.1.** Each answer choice has an exclude/restore control before its annotation button. Double-clicking the choice still works and no longer disturbs other selections.
+> **Current release: v2.4.2.2.** The exclude and annotation buttons sit inside the answer-choice border. Each is independently clickable, and double-click exclusion still works.
 
 Visit the [Elapse introduction](https://avecove.com/projects/elapse/) and the separate [release history](https://avecove.com/updates/elapse/).
 

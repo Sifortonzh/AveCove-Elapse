@@ -715,19 +715,19 @@ dialog.note-preview-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-
 
 @media(max-width:620px){.question-top-actions{flex-direction:row!important;flex-wrap:wrap;justify-content:flex-end}.question-kill-trigger,.question-search-trigger,.question-add-trigger,.question-edit-trigger,.question-delete-trigger{padding:6px 8px!important;font-size:.7rem!important}.linked-question-group button span{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.kill-question-modal{padding:21px 16px}}
 .note-images{padding:14px;border:1px solid var(--line);border-radius:12px}.note-images label{display:flex;flex-wrap:wrap;gap:10px}.note-images input{max-width:100%}.note-images figure{margin:12px 0}.note-images img{display:block;max-width:100%;max-height:380px;object-fit:contain}.note-images button{padding:8px}.optional-ai-dialogue>summary{cursor:pointer;padding:12px}
-.option-choice-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px}
-.option-choice-row>.answer-option{min-width:0;grid-template-columns:34px minmax(0,1fr) auto}
+.option-choice-row{--option-tools-space:60px;display:grid;grid-template-columns:minmax(0,1fr) auto;isolation:isolate}
+.option-choice-row[data-exclusion-available="true"]{--option-tools-space:108px}
+.option-choice-row>.answer-option{grid-area:1/1/2/-1;min-width:0;grid-template-columns:34px minmax(0,1fr) auto;padding-inline-end:var(--option-tools-space)}
 .option-choice-row>.answer-option p{overflow-wrap:anywhere}
-.option-choice-actions{display:flex;gap:4px;align-items:center;align-self:start;margin-top:10px}
+.option-choice-actions{grid-area:1/2;z-index:1;display:flex;gap:4px;align-items:center;align-self:center;margin-inline:8px}
 .option-choice-actions>button{position:relative;display:grid;place-items:center;margin:0;padding:0;width:44px;height:44px;border:1px solid transparent;border-radius:12px;background:var(--surface-2);color:var(--muted);line-height:1;cursor:pointer;touch-action:manipulation}
 .option-choice-actions>button:hover{border-color:var(--line);color:var(--ink)}
 .option-choice-actions>button:focus-visible{outline:2px solid var(--bean);outline-offset:2px}
 .option-choice-actions>.option-exclude-toggle[aria-pressed="true"]{color:var(--bean);border-color:var(--bean);background:var(--bean-soft)}
 @media(max-width:620px){
-  .option-choice-row{gap:5px}
-  .option-choice-row>.answer-option{grid-template-columns:34px minmax(0,1fr);gap:5px 8px;padding-inline:8px}
+  .option-choice-row>.answer-option{grid-template-columns:34px minmax(0,1fr);gap:5px 8px;padding-inline-start:8px}
   .option-choice-row>.answer-option>.answer-state-label{grid-column:2;justify-self:start}
-  .option-choice-actions{gap:2px;margin-top:8px}
+  .option-choice-actions{gap:2px}
 }
 .option-annotation-toggle i{position:absolute;right:6px;top:6px;width:6px;height:6px;background:var(--bean);border-radius:50%}
 .annotated-option>input{margin-top:8px}
