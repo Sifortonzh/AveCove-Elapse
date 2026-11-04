@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { inferPavilionStudyStage, parseSharedQuestionBankPackage, sanitizeSharedQuestionBankPackage, type SharedQuestionBankPackage } from "@/app/lib/local-bank";
+import { createSharedQuestionBankPackage, inferPavilionStudyStage, parseSharedQuestionBankPackage, sanitizeSharedQuestionBankPackage, type SharedQuestionBankPackage } from "@/app/lib/local-bank";
 import { readSession } from "@/app/lib/server/auth";
 import { query } from "@/app/lib/server/db";
 import { allowRequest } from "@/app/lib/server/rate-limit";
 import { isXQuestion } from "@/app/lib/practice-stats";
+import { normalizeQuestionBankGroup, pavilionSubject } from "@/app/lib/bank-grouping";
 
 type PavilionRow = {
   id: string;
@@ -68,7 +69,7 @@ function publicEntry(row: PavilionRow) {
     id: row.id,
     sourceBankId: row.source_bank_id,
     name: row.name,
-    groupName: row.group_name,
+    groupName: pavilionSubject(row.name, row.group_name),
     studyStage: row.study_stage,
     questionCount: row.question_count,
     singleCount: row.single_count,
@@ -91,7 +92,10 @@ export async function GET(request: Request) {
     if (id) {
       const rows = await query<{ payload: SharedQuestionBankPackage }>("SELECT payload FROM pavilion_question_banks WHERE id = $1", [id]);
       if (!rows[0]) return NextResponse.json({ error: "这份题库已被移出藏经阁。" }, { status: 404 });
-      return NextResponse.json({ package: sanitizeSharedQuestionBankPackage(rows[0].payload) }, { headers: { "Cache-Control": "private, no-store" } });
+      const payload = sanitizeSharedQuestionBankPackage(rows[0].payload);
+      const subject = pavilionSubject(payload.bank.name, payload.bank.groupName, payload.bank.sourceTitle);
+      payload.bank.groupName = subject === "未分组" ? "" : subject;
+      return NextResponse.json({ package: payload }, { headers: { "Cache-Control": "private, no-store" } });
     }
     const rows = await query<PavilionRow>(
       `SELECT p.id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, p.annotation, p.rating,
@@ -113,7 +117,7 @@ export async function POST(request: Request) {
   if (!allowRequest(`pavilion:upload:${session.userId}`, 30, 60 * 60_000)) return NextResponse.json({ error: "上传得有点频繁，请稍后再试。" }, { status: 429 });
   const raw = await request.text();
   if (Buffer.byteLength(raw, "utf8") > 10_000_000) return NextResponse.json({ error: "单份题库不能超过 10 MB。" }, { status: 413 });
-  let body: { sourceBankId?: unknown; package?: unknown; annotation?: unknown; rating?: unknown };
+  let body: { sourceBankId?: unknown; package?: unknown; annotation?: unknown; rating?: unknown; subject?: unknown };
   try { body = JSON.parse(raw) as typeof body; } catch { return NextResponse.json({ error: "题库内容不是有效 JSON。" }, { status: 400 }); }
   const annotation = typeof body.annotation === "string" ? body.annotation.trim() : "";
   if (Array.from(annotation).length > 50) return NextResponse.json({ error: "📝 公开批注最多 50 字，请精简后上传。" }, { status: 400 });
@@ -123,9 +127,12 @@ export async function POST(request: Request) {
   try { parsed = parseSharedQuestionBankPackage(body.package); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "无法识别题库。" }, { status: 400 }); }
   const sourceBankId = String(body.sourceBankId ?? parsed.id ?? "").trim().slice(0, 160);
   if (!sourceBankId) return NextResponse.json({ error: "题库缺少稳定主键。" }, { status: 400 });
-  const payload = sanitizeSharedQuestionBankPackage(body.package);
-  const groupName = parsed.groupName?.trim().slice(0, 60) ?? "";
-  const stage = inferPavilionStudyStage(parsed.name, groupName);
+  const payload = createSharedQuestionBankPackage(parsed);
+  const override = typeof body.subject === "string" ? normalizeQuestionBankGroup(body.subject) : "";
+  const groupName = override || pavilionSubject(parsed.name, parsed.groupName, parsed.sourceTitle);
+  const originalStage = inferPavilionStudyStage(parsed.name, parsed.groupName);
+  const stage = originalStage === "其他" ? inferPavilionStudyStage(parsed.name, groupName) : originalStage;
+  payload.bank.groupName = groupName === "未分组" ? "" : groupName;
   try {
     await ensurePavilionTable();
     const rows = await query<PavilionRow>(

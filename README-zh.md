@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.1.12" src="https://img.shields.io/badge/version-2.4.1.12-b43d35" />
+    <img alt="版本 2.4.2.0" src="https://img.shields.io/badge/version-2.4.2.0-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.1.12。** AI 只使用当前已验证邮箱账号的加密配置。游客和未配置账号不再使用原全站共享密钥。
+> **当前版本：v2.4.2.0。** 藏经阁在培养阶段下支持科目分组；电脑刷题可直接在选项下方确认答案。红豆 JSON 导入可归并不相邻的 A3 同组题，仅去除内容等同的重复题。
 
 主站提供独立的 [Elapse 介绍](https://avecove.com/projects/elapse/)与[更新日志](https://avecove.com/updates/elapse/)，博客文章保持独立。
 

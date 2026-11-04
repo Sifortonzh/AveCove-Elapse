@@ -3,6 +3,31 @@ import type { QuizQuestion } from "./question-parser";
 const key = (text: string) => text.replace(/\s+/g, "");
 export const isSharedCase = (q: QuizQuestion) => q.medicalQuestionType === "A3" || q.medicalQuestionType === "A4";
 
+// Compare writing variants only; numbers, units, negation and clinical words stay significant.
+const caseText = (text: string) => text.normalize("NFC")
+  .replace(/[！-～]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xFEE0)).replace(/\s+/g, "")
+  .replace(/[｡。]/g, ".").replace(/査/g, "查").replace(/徴/g, "征").replace(/瞼/g, "睑");
+const nearCaseKey = (text: string) => text.length >= 65 ? text.replace(/[的了]/g, "") : text;
+const similarCase = (left: string, right: string) => {
+  if (left === right) return true;
+  if (Math.min(left.length, right.length) < 65 || Math.abs(left.length - right.length) !== 1) return false;
+  const [long, short] = left.length > right.length ? [left, right] : [right, left];
+  let index = 0;
+  while (index < short.length && long[index] === short[index]) index++;
+  return /[的了]/.test(long[index]) && long.slice(index + 1) === short.slice(index);
+};
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_name, item: unknown) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+      : item);
+}
+
+const a3Scope = (q: QuizQuestion) => JSON.stringify([q.category ?? "", q.examYear ?? null]);
+const hasA3Type = (q: QuizQuestion) => /^A3(?:型题?)?$/i.test(String(q.medicalQuestionType ?? "").trim())
+  || /^A3(?:型题?)?$/i.test(String(q.questionType ?? "").trim());
+
 export function removeSharedPrefix(stem: string, shared: string): string {
   const prefix = key(shared);
   if (!prefix || !key(stem).startsWith(prefix)) return stem.trim();
@@ -41,15 +66,80 @@ export function sharedCaseDraft(question: QuizQuestion, bank: QuizQuestion[]) {
 
 export function groupSharedCases(items: QuizQuestion[]): QuizQuestion[] {
   const groups = new Map<string, string>();
-  const owners = new Map<string, string>();
-  return items.map(q => {
-    if (!isSharedCase(q) || !q.sharedStem?.trim()) return q;
-    const identity = JSON.stringify([q.category, q.medicalQuestionType, key(q.sharedStem)]);
-    const preferred = q.sharedStemGroup ?? `case-${q.id}`;
-    const group = groups.get(identity) ?? (owners.has(preferred) && owners.get(preferred) !== identity ? `case-${q.id}` : preferred);
+  const nearGroups = new Map<string, Array<{ text: string; group: string }>>();
+  const owners = new Set<string>();
+  const reserved = new Set(items.flatMap(q => q.sharedOptionGroup ? [q.sharedOptionGroup] : []));
+  return items.map((q, index) => {
+    if (!isSharedCase(q) || typeof q.sharedStem !== "string" || !q.sharedStem.trim()) return q;
+    const a3 = q.medicalQuestionType === "A3";
+    const text = a3 ? caseText(q.sharedStem) : key(q.sharedStem);
+    const scope = a3 ? JSON.stringify([a3Scope(q), stableJson(q.sharedStemImages ?? [])]) : q.category;
+    const identity = JSON.stringify([scope, q.medicalQuestionType, text]);
+    const nearIdentity = JSON.stringify([scope, nearCaseKey(text)]);
+    const candidates = a3 ? nearGroups.get(nearIdentity) ?? [] : [];
+    let group = groups.get(identity) ?? candidates.find(candidate => similarCase(candidate.text, text))?.group;
+    if (!group) {
+      group = q.sharedStemGroup ?? `case-${q.id}`;
+      while (owners.has(group) || reserved.has(group)) group = `case-${index}-${group}`;
+      owners.add(group);
+      if (a3) nearGroups.set(nearIdentity, [...candidates, { text, group }]);
+    }
     groups.set(identity, group);
-    owners.set(group, identity);
     return { ...q, sharedStem: q.sharedStem.trim(), sharedStemGroup: group };
+  });
+}
+
+export function prepareImportedA3Cases(items: QuizQuestion[]): QuizQuestion[] {
+  if (!items.some(hasA3Type)) return items;
+  const prefixCounts = new Map<string, { count: number; explicit: boolean }>();
+  const prefixes = items.map(q => {
+    if (!hasA3Type(q) || typeof q.stem !== "string") return [];
+    // Only derive complete sentence prefixes, and only if corroborated by another A3.
+    const candidates = new Map<string, { prefix: string; rest: string }>();
+    const scope = a3Scope(q);
+    for (const boundary of q.stem.slice(0, 1800).matchAll(/[。！？；?!;\n]|\.(?=\s)/g)) {
+      const end = boundary.index + 1;
+      const prefix = q.stem.slice(0, end).trim();
+      const rest = q.stem.slice(end).trim();
+      const normalized = caseText(prefix);
+      if (normalized.length >= 24 && rest && !candidates.has(normalized)) candidates.set(normalized, { prefix, rest });
+    }
+    for (const normalized of candidates.keys()) {
+      const id = JSON.stringify([scope, normalized]);
+      const current = prefixCounts.get(id);
+      prefixCounts.set(id, { count: (current?.count ?? 0) + 1, explicit: current?.explicit ?? false });
+    }
+    if (typeof q.sharedStem === "string" && q.sharedStem.trim()) {
+      const id = JSON.stringify([scope, caseText(q.sharedStem)]);
+      prefixCounts.set(id, { count: prefixCounts.get(id)?.count ?? 0, explicit: true });
+    }
+    return [...candidates.values()];
+  });
+  const prepared = items.map((q, index): QuizQuestion => {
+    if (!hasA3Type(q) || q.examProfile === "western-medicine-306" || q.answer.length > 1 || q.questionType === "X") return q;
+    const base = { ...q, medicalQuestionType: "A3" as const, questionType: "A" as const, multiple: false };
+    const explicit = typeof q.sharedStem === "string" && q.sharedStem.trim();
+    if (explicit) {
+      const repeated = prefixes[index].find(candidate => caseText(candidate.prefix) === caseText(explicit));
+      return { ...base, stem: repeated?.rest || removeSharedPrefix(q.stem, explicit) || q.stem };
+    }
+    const inferred = prefixes[index].findLast(candidate => {
+      const evidence = prefixCounts.get(JSON.stringify([a3Scope(q), caseText(candidate.prefix)]));
+      return Boolean(evidence && (evidence.explicit || evidence.count >= 2));
+    });
+    return inferred ? { ...base, sharedStem: inferred.prefix, stem: inferred.rest } : base;
+  });
+  const seen = new Set<string>();
+  return groupSharedCases(prepared).filter(q => {
+    if (q.medicalQuestionType !== "A3" || !q.sharedStemGroup || !q.sharedStem) return true;
+    // Never discard different answers, source metadata, explanation or images.
+    const content: Partial<QuizQuestion> = { ...q, sharedStem: caseText(q.sharedStem) };
+    delete content.id;
+    delete content.sourceNumber;
+    const signature = stableJson(content);
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
   });
 }
 

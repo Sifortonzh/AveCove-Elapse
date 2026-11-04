@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.4.1.12" src="https://img.shields.io/badge/version-2.4.1.12-b43d35" />
+    <img alt="Version 2.4.2.0" src="https://img.shields.io/badge/version-2.4.2.0-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.4.1.12.** AI requests use only the signed-in, email-verified account’s encrypted provider configuration. Guest and unconfigured accounts cannot use the former site-wide key.
+> **Current release: v2.4.2.0.** The Pavilion groups public banks by subject within each study stage. Desktop practice puts confirmation directly below the choices. Hongdou JSON imports bring nonadjacent A3 questions into the same case group and remove only equivalent copies.
 
 Visit the [Elapse introduction](https://avecove.com/projects/elapse/) and the separate [release history](https://avecove.com/updates/elapse/).
 

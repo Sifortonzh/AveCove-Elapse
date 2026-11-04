@@ -234,7 +234,7 @@ test("Pavilion import reuses guarded private-bank storage and chapter heading st
   assert.match(css, /\.chapter-directory-list\{min-height:0;overflow-y:auto/);
 });
 
-test("wrong review raises existing Featured stars and desktop confirmation remains fixed", async () => {
+test("wrong review raises existing Featured stars and desktop confirmation is inline", async () => {
   const page = await text("app/page.tsx"), css = await text("app/globals.css");
   assert.match(page, /raiseReviewStars = sessionScope === "wrong" && result === "wrong" && favorites.includes\(current.id\)/);
   assert.match(page, /Math.min\(99, Math.max\(1, favoriteStars\[current.id\] \?\? 1\) \+ 1\)/);
@@ -242,6 +242,8 @@ test("wrong review raises existing Featured stars and desktop confirmation remai
   assert.match(page, /favoriteStars: nextFavoriteStars, notes, ledger: nextLedger/);
   assert.match(page, /lowerReviewStars \? Math.max\(1, \(favoriteStars\[current.id\] \?\? 1\) - 1\)/);
   assert.match(css, /@media \(min-width:621px\)\{[^\n]*\.tablet-quiz-action\{position:fixed/);
+  assert.match(css, /\.tablet-quiz-action:not\(\.exam-submit-floating\) \{ display:none \}/);
+  assert.match(page, /\}\)\}<\/div><\/article>\s*<div className=\{`quiz-actions/);
   const submit = page.slice(page.indexOf("  function submitAnswer()"), page.indexOf("  function toggleFavorite()"));
   const fixture = `export function run(sessionScope, answer, favorites, favoriteStars) {
     const current = { id: "q", answer: ["A"] }, selected = [answer];
@@ -316,6 +318,50 @@ test("A3 correction separates shared cases and groups children without losing an
   const withoutGroup=reviseSharedCase(updated,{...updated[0],medicalQuestionType:"A1",sharedStem:undefined,sharedStemGroup:undefined,stem:shared+"最可能的诊断？"});
   assert.equal(withoutGroup[0].sharedStem,undefined);assert.deepEqual(withoutGroup[1],updated[1]);
   const page=await text("app/page.tsx");assert.match(page,/aria-label="共用题干"/);assert.match(page,/同组小题 ·/);assert.match(page,/setQuestions\(saved.questions\)/);
+});
+
+test("Hongdou import groups nonadjacent A3 cases and removes only equivalent duplicates", async () => {
+  const compile = source => `data:text/javascript;base64,${Buffer.from(ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  }).outputText).toString("base64")}`;
+  const grouping = compile(await text("app/lib/bank-grouping.ts"));
+  const cases = compile(await text("app/lib/shared-case.ts"));
+  const source = (await text("app/lib/local-bank.ts")).replace("./bank-grouping", grouping).replace("./shared-case", cases);
+  const { parseSharedQuestionBankPackage, sanitizeSharedQuestionBankPackage } = await import(compile(source));
+  const { pavilionSubject } = await import(grouping);
+  assert.equal(pavilionSubject("眼科主治题库", "主治"), "眼科学");
+  assert.equal(pavilionSubject("练习试卷", "眼科专项"), "眼科专项");
+  assert.equal(pavilionSubject("练习试卷", "", "第九版传染病学"), "传染病学");
+  assert.equal(pavilionSubject("无科目线索", "大四"), "未分组");
+  const history = "患者男，62岁，右眼视物模糊半年，近两周加重，无眼痛，无外伤史。查体：右眼矫正视力0.5，眼压18mmHg，结膜无充血，前房深度正常，晶状体混浊。";
+  const make = (id, stem, extra = {}) => ({ id, sourceNumber: id, category: "眼科学", medicalQuestionType: "A3", stem, multiple: false,
+    options: [{ label: "A", text: "甲" }, { label: "B", text: "乙" }], answer: ["A"], ...extra });
+  const unrelated = make("plain", "普通题目", { medicalQuestionType: "A1" });
+  const first = make("one", history + "最可能的诊断？");
+  const second = make("two", history + "首选何种检查？");
+  const rows = [
+    first, unrelated, second,
+    make("duplicate", "最可能的诊断？", { sharedStem: history.replace("62", "６２") }),
+    make("typography", "最适宜的处理？", { sharedStem: history.replace("查体", "査体").replace("晶状体混浊", "晶状体的混浊") }),
+    make("conflict", "最可能的诊断？", { sharedStem: history, answer: ["B"] }),
+    make("image", "最可能的诊断？", { sharedStem: history, sourceImages: [{ url: "https://example.test/eye.png" }] }),
+    make("changed", "另一个病例？", { sharedStem: history.replace("0.5", "0.05") }),
+    make("other-chapter", "另一个章节？", { sharedStem: history, category: "另一章" }),
+  ];
+  const pack = { format: "hongdou-question-bank", version: 1, bank: { name: "合成眼科主治题", questions: rows } };
+  const before = structuredClone(pack);
+  const { questions } = parseSharedQuestionBankPackage(pack);
+  assert.deepEqual(questions.map(q => q.id), ["one", "plain", "two", "typography", "conflict", "image", "changed", "other-chapter"]);
+  assert.equal(questions[0].stem, "最可能的诊断？");
+  assert.equal(questions[0].sharedStem, history);
+  assert.equal(questions[2].sharedStemGroup, questions[0].sharedStemGroup);
+  assert.equal(questions[3].sharedStemGroup, questions[0].sharedStemGroup);
+  assert.notEqual(questions[6].sharedStemGroup, questions[0].sharedStemGroup);
+  assert.notEqual(questions[7].sharedStemGroup, questions[0].sharedStemGroup);
+  assert.deepEqual(questions[4].answer, ["B"]);
+  assert.equal(questions[5].sourceImages.length, 1);
+  assert.equal(sanitizeSharedQuestionBankPackage(pack).bank.questions.length, rows.length);
+  assert.deepEqual(pack, before);
 });
 
 test("filtered progress, chapter totals and newer settings share one contract", async () => {
@@ -1033,7 +1079,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
+  assert.equal(JSON.parse(manifest).version, "2.4.2.0");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1793,7 +1839,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.4.1.12");
+  assert.equal(JSON.parse(packageJson).version, "2.4.2.0");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2204,7 +2250,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
+  assert.equal(JSON.parse(manifest).version, "2.4.2.0");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2265,7 +2311,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
+  assert.equal(JSON.parse(manifest).version, "2.4.2.0");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2283,7 +2329,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
+  assert.equal(JSON.parse(manifest).version, "2.4.2.0");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2303,7 +2349,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.1.12");
+  assert.equal(JSON.parse(manifest).version, "2.4.2.0");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

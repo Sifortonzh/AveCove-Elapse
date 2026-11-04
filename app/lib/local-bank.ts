@@ -1,6 +1,6 @@
 import type { QuizQuestion } from "./question-parser";
 import { normalizeQuestionBankGroup, suggestQuestionBankGroup } from "./bank-grouping";
-import { groupSharedCases } from "./shared-case";
+import { groupSharedCases, prepareImportedA3Cases } from "./shared-case";
 
 export type SavedQuestionBank = {
   id: string;
@@ -654,7 +654,7 @@ export function publicQuestion(question: QuizQuestion): QuizQuestion {
 }
 
 export function sanitizeSharedQuestionBankPackage(value: unknown): SharedQuestionBankPackage {
-  const bank = parseSharedQuestionBankPackage(value);
+  const bank = parseSharedQuestionBankPackage(value, { repairA3: false });
   return createSharedQuestionBankPackage(bank);
 }
 
@@ -678,7 +678,7 @@ export function createSharedQuestionBankPackage(bank: QuestionBankInput): Shared
   };
 }
 
-export function parseSharedQuestionBankPackage(value: unknown): QuestionBankInput {
+export function parseSharedQuestionBankPackage(value: unknown, { repairA3 = true } = {}): QuestionBankInput {
   const payload = value as Partial<SharedQuestionBankPackage | Western306StandardPackage>;
   if ((payload?.format !== "hongdou-question-bank" && payload?.format !== "avecove-western-306") || payload.version !== 1 || !payload.bank || !Array.isArray(payload.bank.questions)) {
     throw new Error("这不是可识别的红豆题库分享文件");
@@ -697,7 +697,7 @@ export function parseSharedQuestionBankPackage(value: unknown): QuestionBankInpu
     author: typeof payload.bank.author === "string" ? payload.bank.author.slice(0, 120) : "",
     copyrightNotice: typeof payload.bank.copyrightNotice === "string" ? payload.bank.copyrightNotice.slice(0, 500) : "",
     groupName: typeof payload.bank.groupName === "string" ? payload.bank.groupName : "",
-    questions,
+    questions: repairA3 && payload.format === "hongdou-question-bank" ? prepareImportedA3Cases(questions) : questions,
     importedAt: new Date().toISOString(),
   };
 }
