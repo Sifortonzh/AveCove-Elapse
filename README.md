@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.5.0" src="https://img.shields.io/badge/version-2.5.0-b43d35" />
+    <img alt="Version 2.5.0.1" src="https://img.shields.io/badge/version-2.5.0.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.5.0 — Your learning, in perspective.** Open **唯我独尊** in the home sidebar for personal study time, answered questions, averages, streaks, a heatmap, a trend chart, and four-hour activity bands. Switch between day, week, month and year, or browse past periods.
+> **Current release: v2.5.0.1 — A personal learning journey.** The themed sidebar now includes **华山论剑**, an opt-in monthly top-ten arena for study time, confirmed attempts, and average time (at least ten attempts). Monthly resets and newly recorded activity give learners a common starting line; these motivational statistics are not verified exam scores or anti-cheat rankings.
+
+Personal study time has brighter digits with smaller unit labels, and the heatmap uses contrasting colors with centered labels. The answer sheet can remove all slash-skipped questions from the active private bank after confirmation and a learning-record backup download; at least one question must remain. Original source numbers, personal records, and independent Pavilion copies are preserved. Notes now appear above discussion. This incremental release is deliberately untagged.
 
 Study time is collected only while the medical practice screen is visible and focused; counting pauses after 90 seconds without interaction. Timing starts with this release: historical durations are not inferred. Existing ordinary-practice answer counts and accuracy are preserved; featured reviews and independent exams do not change these scores. New activity is stored locally per account and merged idempotently across devices. Refresh all devices before using the new statistics.
 

@@ -11,6 +11,30 @@ async function moduleAt(path) {
 const stats = await moduleAt("study-activity"), records = await moduleAt("record-sync");
 const at = (day, hour=12, minute=0, second=0) => new Date(2026, 10, day, hour, minute, second).getTime();
 
+test("monthly arena excludes previous months, sorts fairly and never returns account identifiers", async () => {
+  const raw=await readFile(new URL("../app/lib/leaderboard.ts",import.meta.url),"utf8");
+  const dependency=ts.transpileModule(await readFile(new URL("../app/lib/record-sync.ts",import.meta.url),"utf8"),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const source=ts.transpileModule(raw,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText.replace('"./record-sync"',JSON.stringify(`data:text/javascript;base64,${Buffer.from(dependency).toString("base64")}`));
+  const {monthlyRanks}=await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+  const row=(id,seconds,answers)=>({user_id:id,nickname:id,activity:{[`2026-11-06|3|${id}`]:{seconds,answers,graded:answers,correct:0,start:1,end:seconds*1000+1}}});
+  const rows=[row("slow",600,10),row("fast",200,20),row("few",100,1)];
+  assert.deepEqual(monthlyRanks(rows,"2026-11","fast","time").map(x=>x.nickname),["slow","fast","few"]);
+  assert.deepEqual(monthlyRanks(rows,"2026-11","fast","average").map(x=>x.nickname),["fast","slow"]);
+  assert.equal(monthlyRanks(rows,"2026-10","fast","time").length,0);
+  assert.equal(monthlyRanks(Array.from({length:15},(_,i)=>row(`p${i}`,i+1,10)),"2026-11","none","time").length,10);
+  assert.equal(monthlyRanks(rows,"2026-11","fast","time")[1].own,true);
+  assert.ok(!JSON.stringify(monthlyRanks(rows,"2026-11","fast","time")).includes("user_id"));
+});
+test("bulk slash removal keeps source evidence and refuses an empty bank", async()=>{
+  const {removeMarkedQuestions}=await moduleAt("question-edit");
+  const items=[{id:"a",sourceNumber:"11"},{id:"b",sourceNumber:"12"},{id:"c",sourceNumber:"13"}];
+  assert.deepEqual(removeMarkedQuestions(items,["b","missing"]).questions,[items[0],items[2]]);
+  assert.equal(items.length,3); assert.throws(()=>removeMarkedQuestions(items,["a","b","c"]),/至少保留/);
+  const page=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+  assert.ok(page.indexOf('<details className="note-card collapsible-note-card"')<page.indexOf('<details className="community-card"'));
+  assert.match(page,/await exportLearningRecord\(\);\s*const saved = await saveQuestionBank/);
+});
+
 test("time splits at four-hour and midnight boundaries without changing input", () => {
   const original = {}, split = stats.addStudyActivity(original, "device-one", at(6,3,59,55),at(6,4,0,5),"correct");
   assert.deepEqual(original, {});

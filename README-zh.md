@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.5.0" src="https://img.shields.io/badge/version-2.5.0-b43d35" />
+    <img alt="版本 2.5.0.1" src="https://img.shields.io/badge/version-2.5.0.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.5.0 — 学有所迹。** 从首页侧栏进入「唯我独尊」，查看个人刷题时长、题量、平均用时、正确率、连续学习天数，以及热力图、趋势图和4小时时段分布；支持日、周、月、年切换及历史周期浏览。
+> **当前版本：v2.5.0.1 — 江湖有路，学有所迹。** 侧栏更新为桃花岛、四十二章经、降龙十八斩、易筋精、葵花宝典，并新增「华山论剑」：自愿公开昵称和月度学习统计，按时长、确认作答次数、平均用时排列前十；平均用时至少答10题才入榜。每月重新起跑，不计算旧版历史题量。榜单仅供激励，不代表成绩，暂不包含防刷榜审核。
+
+个人页时间数字亮色突出、单位缩小，热力图高对比并居中标注。答题卡支持确认后清理当前私人题库全部已斩题（先下载学习记录备份，至少保留一题）；原题号、个人记录和藏经阁独立副本保留。刷题页笔记移到讨论上方。本次为增量更新，不新增 Git 标签。
 
 仅在医学刷题页面前台聚焦时计时，90秒无操作后暂停。本版开始累计时长，不倒推补造历史；题量与正确率沿用原有日常记录，精选复刷和独立考试不改变这两项评分。学习统计按账号保存在本机，并随多端同步合并，重复同步不会重复累加。请先刷新所有设备再使用新统计。
 

@@ -15,6 +15,7 @@ import EnglishLearningView from "./components/EnglishLearningView";
 import MinerUWorkbench from "./components/MinerUWorkbench";
 import DocumentImportWorkbench from "./components/DocumentImportWorkbench";
 import StudyProfile from "./components/StudyProfile";
+import StudyLeaderboard from "./components/StudyLeaderboard";
 import { useStudyTracker } from "./components/useStudyTracker";
 import { MathText } from "./components/MathText";
 import { QuestionImages } from "./components/QuestionImages";
@@ -55,7 +56,7 @@ import SyncStatusNotice from "./components/SyncStatusNotice";
 import SyncFileList from "./components/SyncFileList";
 import { syncErrorMessage, type SyncFileChange } from "./lib/sync-feedback";
 import { fetchSync } from "./lib/sync-request";
-import { deleteQuestionAndRenumber, insertQuestionAfter } from "./lib/question-edit";
+import { deleteQuestionAndRenumber, insertQuestionAfter, removeMarkedQuestions } from "./lib/question-edit";
 import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
 import { hasOptionAnnotation, noteImageMarkdown } from "./lib/note-annotations";
 import { collectNoteExportSections, downloadBankNoteArchive, printNotePdf } from "./lib/note-pdf-export";
@@ -67,7 +68,7 @@ type Western306SubjectScope = "all" | Western306Subject;
 type ThemeMode = "system" | "light" | "dark";
 type StudyMode = "standard" | "blind" | "memorize";
 type AiMode = "summary" | "pitfall" | "companion";
-type View = "home" | "quiz" | "banks" | "bank-requests" | "notes" | "copyright" | "profile";
+type View = "home" | "quiz" | "banks" | "bank-requests" | "notes" | "copyright" | "profile" | "leaderboard";
 type AccountSession = { id: string; nickname: string; email?: string; expiresAt: number };
 type SharedComment = { id: string; nickname: string; text: string; createdAt: string; status?: string; likes: number; own?: boolean };
 type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "cancelled" | "ai-ready"; detail: string };
@@ -1884,6 +1885,23 @@ export default function HomePage() {
     setToast(`原题号 ${result.deleted.sourceNumber} 已删除，连续题号与学习记录已同步整理 🗑️📚`);
   }
 
+  async function deleteKilledQuestions() {
+    const bank = questionBanks.find(item => item.id === activeBankId);
+    if (!bank) throw new Error("请先导入并打开一份题库，再清理已斩题。");
+    const result = removeMarkedQuestions(bank.questions, killedQuestions);
+    if (!result.deleted.length) throw new Error("当前题库没有已斩题。");
+    await exportLearningRecord();
+    const saved = await saveQuestionBank({ ...bank, questions: result.questions, updatedAt: new Date().toISOString() }, true);
+    const removed = new Set(result.deleted.map(question => question.id));
+    setQuestionBanks(banks => banks.map(item => item.id === saved.id ? saved : item));
+    setQuestions(saved.questions);
+    const nextSession = sessionQuestions.filter(question => !removed.has(question.id));
+    setSessionQuestions(nextSession);
+    setCurrentIndex(0); setSelected([]); setSubmitted(false); setAiTexts({});
+    if (!nextSession.length) setView("banks");
+    setToast(`已清理 ${removed.size} 道已斩题 🗑️ 原题号保留，修订版将用于同步与分享；学习笔记和备份保留。`);
+  }
+
   async function removeSavedBank(id: string, archiveNotes = true) {
     const bank = questionBanks.find(item => item.id === id);
     if (!bank) throw new Error("题库已不存在，请刷新后重试。");
@@ -1947,7 +1965,7 @@ export default function HomePage() {
 
   return (
     <main className={`product ${resolvedDark ? "dark" : ""}`}>
-      {view === "profile" ? <StudyProfile nickname={nickname} account={account} activity={activity} progress={progress} onBack={() => setView("home")} onAccount={() => setShowAccount(true)} /> : view === "home" ? (
+      {view === "leaderboard" ? <StudyLeaderboard loggedIn={Boolean(account)} onBack={() => setView("home")} onAccount={() => setShowAccount(true)} /> : view === "profile" ? <StudyProfile nickname={nickname} account={account} activity={activity} progress={progress} onBack={() => setView("home")} onAccount={() => setShowAccount(true)} /> : view === "home" ? (
         <HomeView
           bankName={bankName}
           questions={questions.length}
@@ -1963,6 +1981,7 @@ export default function HomePage() {
           onSearch={() => setShowSearch(true)}
           onNotes={() => setView("notes")}
           onProfile={() => setView("profile")}
+          onLeaderboard={() => setView("leaderboard")}
           onCopyright={() => setView("copyright")}
           onToggleTheme={() => saveSettings({ ...settings, themeMode: resolvedDark ? "light" : "dark", darkMode: !resolvedDark })}
           darkMode={resolvedDark}
@@ -2075,7 +2094,7 @@ export default function HomePage() {
         <SettingsModal settings={settings} counts={scopeCounts} typeCounts={typeCounts} western306SubjectCounts={western306SubjectCounts} showWestern306Subjects={hasModernWestern306} onChange={saveSettings} onClose={() => setShowSettings(false)} onStart={() => buildSession()} />
       )}
       {showAnswerSheet && (
-        <AnswerSheet questions={sessionQuestions} progress={displayedProgress} favorites={sessionIsExam ? [] : favorites} favoriteStars={sessionIsExam ? {} : favoriteStars} notes={sessionIsExam && !examFinished ? {} : notes} killed={sessionIsExam ? [] : killedQuestions} answerSelections={displayedAnswerSelections} currentIndex={currentIndex} onBatchAnswers={sessionIsExam ? async () => { setToast("模拟考试内不修改题库答案"); } : saveBatchAnswerEntries} onUpdateKilled={sessionIsExam ? () => { setToast("模拟考试不更改斩题记录"); } : updateKilledQuestions} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
+        <AnswerSheet questions={sessionQuestions} progress={displayedProgress} favorites={sessionIsExam ? [] : favorites} favoriteStars={sessionIsExam ? {} : favoriteStars} notes={sessionIsExam && !examFinished ? {} : notes} killed={sessionIsExam ? [] : killedQuestions} answerSelections={displayedAnswerSelections} currentIndex={currentIndex} onBatchAnswers={sessionIsExam ? async () => { setToast("模拟考试内不修改题库答案"); } : saveBatchAnswerEntries} onDeleteKilled={sessionIsExam ? undefined : deleteKilledQuestions} onUpdateKilled={sessionIsExam ? () => { setToast("模拟考试不更改斩题记录"); } : updateKilledQuestions} onJump={(next) => { resetQuestion(next, settings.showAnswerOnReturn); setShowAnswerSheet(false); }} onClose={() => setShowAnswerSheet(false)} />
       )}
       {showImport && (
         <ImportModal
@@ -2114,24 +2133,24 @@ function Brand({ compact = false, hideTagline = false }: { compact?: boolean; hi
   return <div className={`brand ${compact ? "compact" : ""}`}><span className="brand-logo"><Image src="/hongdou-logo.png" alt="红豆生南国蛇形医学标识" width={48} height={48} priority /></span><div><strong>红豆生南国</strong>{!hideTagline && <small>医学知识训练与复盘</small>}</div></div>;
 }
 
-function HomeView({ bankName, questions, answered, wrong, noteCount, accuracy, progress, examScore, onPractice, onImport, onBanks, onSearch, onNotes, onProfile, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, syncing, quote, onAccount, onSync, onEnglish }: {
+function HomeView({ bankName, questions, answered, wrong, noteCount, accuracy, progress, examScore, onPractice, onImport, onBanks, onSearch, onNotes, onProfile, onLeaderboard, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, syncing, quote, onAccount, onSync, onEnglish }: {
   bankName: string; questions: number; answered: number; wrong: number; noteCount: number; accuracy: number; progress: number;
   examScore?: { earned: number; answeredMaximum: number; total: number };
   onPractice: (custom?: Partial<Settings>, limit?: number, proportionalExam?: boolean) => void; onImport: () => void; onBanks: () => void; onSearch: () => void; onNotes: () => void;
-  onProfile: () => void; onCopyright: () => void; onToggleTheme: () => void; darkMode: boolean; nickname: string;
+  onLeaderboard: () => void; onProfile: () => void; onCopyright: () => void; onToggleTheme: () => void; darkMode: boolean; nickname: string;
   account: AccountSession | null; syncStatus: string; syncing: boolean; quote: (typeof homeQuotes)[number]; onAccount: () => void; onSync: () => void; onEnglish: () => void;
 }) {
   return <div className="home-shell">
     <aside className="home-sidebar">
       <Brand hideTagline />
       <nav className="side-nav">
-        <button className="active"><Home size={19} />首页</button>
-        <button onClick={onBanks}><Database size={19} />我的题库</button>
-        <button onClick={() => onPractice({ scope: "all" })}><BookOpen size={19} />开始刷题</button>
-        <button onClick={() => onPractice({ scope: "wrong" })}><AlertCircle size={19} />错题复盘{wrong > 0 && <em>{wrong}</em>}</button>
-        <button onClick={() => onPractice({ scope: "favorite" })}><Star size={19} />精选题</button>
-        <button onClick={onNotes}><NotebookPen size={19} />我的笔记{noteCount > 0 && <em>{noteCount}</em>}</button>
-        <button onClick={onProfile}><UserRound size={19} />唯我独尊</button>
+        <button className="active" aria-label="桃花岛 首页"><Home size={19} /><span className="wuxia-label">桃花岛</span></button>
+        <button onClick={onBanks} aria-label="四十二章经 我的题库"><Database size={19} /><span className="wuxia-label">四十二章经</span></button>
+        <button onClick={() => onPractice({ scope: "wrong" })} aria-label="降龙十八斩 错题复盘"><AlertCircle size={19} /><span className="wuxia-label">降龙十八斩</span>{wrong > 0 && <em>{wrong}</em>}</button>
+        <button onClick={() => onPractice({ scope: "favorite" })} aria-label="易筋精 精选题"><Star size={19} /><span className="wuxia-label">易筋精</span></button>
+        <button onClick={onNotes} aria-label="葵花宝典 我的笔记"><NotebookPen size={19} /><span className="wuxia-label">葵花宝典</span>{noteCount > 0 && <em>{noteCount}</em>}</button>
+        <button onClick={onProfile}><UserRound size={19} /><span className="wuxia-label">唯我独尊</span></button>
+        <button onClick={onLeaderboard}><Target size={19}/><span className="wuxia-label">华山论剑</span></button>
       </nav>
       <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <SyncStatusNotice status={syncStatus} syncing={syncing} onSync={onSync} onDetails={onAccount} />}<button className="import-entry" aria-label="导入题库" onClick={onImport}><Import size={18} /><span>导入题库</span></button><a className="custom-ai-entry" aria-label="自定义 AI" href="/custom-ai"><Bot size={17} /><span>自定义AI</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button><p>本地优先 · 无广告<br />.docx / PDF 本机处理 · 旧 .doc 仅内存转换</p></div>
     </aside>
@@ -2213,9 +2232,9 @@ function QuestionBankPage({ banks, activeBankId, progress, favorites, favoriteSt
   const [editGroupName, setEditGroupName] = useState("");
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [archiveBeforeDelete, setArchiveBeforeDelete] = useState(true);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const [sharingBank, setSharingBank] = useState<SavedQuestionBank | null>(null);
   const [resettingBank, setResettingBank] = useState<SavedQuestionBank | null>(null);
   const [groupOrder, setGroupOrder] = useState<string[]>([]);
@@ -2902,8 +2921,8 @@ function QuizView(props: {
   const [editingQuestion, setEditingQuestion] = useState(false);
   const [addingQuestion, setAddingQuestion] = useState<QuizQuestion | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
   const { current, total, selected, excluded, submitted, studyMode, result, favorite, favoriteStars, note, aiMode, aiTexts, aiLoading, examScore } = props;
   const firstOptionClick = useRef<{ questionId: string; label: string; selected: string[]; excluded: boolean } | null>(null);
@@ -3231,8 +3250,8 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
   return <aside className="learning-panel"><div className="learning-heading"><h2>解析与考点</h2><button className="note-search-trigger" onClick={onSearchNotes}><Search size={16} />搜索笔记</button></div><div className="learning-tabs">{modes.map((mode) => <button key={mode.id} className={aiMode === mode.id ? "active" : ""} onClick={() => onAi(mode.id)}>{mode.icon}{mode.displayLabel ?? mode.label}</button>)}</div>
     <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong><small>{aiMode === "pitfall" ? explanationIsAi ? "AI 生成后存入题库 · 与原题解析分开标识" : "来自导入文件 · 保留原始依据" : "AI 学习助理 · 针对当前题目"}</small></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后开放学习内容，避免提前泄露答案。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className={`original-explanation-panel ${explanationIsAi ? "ai-saved" : "source-saved"}`}><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“AI 解析”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>}</> : <>{generatedText && <div className="ai-copy"><MarkdownNotePreview value={generatedText} /></div>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "录入解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
     {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={`${account?.id ?? "guest"}:${current.id}`} accountId={account?.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
-    <details className="community-card"><summary className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>{bankName} · {comments.length} 条</span></summary><div className="community-body"><p className="comment-scope-note">当前题库独立讨论 · 原题号 {current.sourceNumber}</p>{account ? <div className="comment-identity"><UserRound size={15} /><span>{account.nickname}</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={15} />登录后参与讨论</button>}<div className="comment-form"><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 300))} placeholder="写下你的判断依据、易错点或疑问…" disabled={!account || commentBusy} /><button onClick={() => void publishComment()} disabled={!account || commentBusy || commentDraft.trim().length < 2}><Send size={14} />{commentBusy ? "发布中…" : "发布"}</button></div>{commentMessage && <p className="comment-message">{commentMessage}</p>}<div className="local-comments">{comments.length ? comments.map((comment) => <article key={comment.id}><div><b>{comment.nickname}</b><time>{new Date(comment.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p>{comment.text}</p><div className="comment-tools"><button onClick={() => void runCommentAction(() => onLikeComment(comment.id))}><ThumbsUp size={13} />{comment.likes || "赞"}</button><button onClick={() => void runCommentAction(() => onReportComment(comment.id))}><Flag size={13} />举报</button>{comment.own && <button onClick={() => void runCommentAction(() => onDeleteComment(comment.id))}><Trash2 size={13} />删除</button>}</div></article>) : <p className="empty-comments">还没有讨论，成为这份题库中第一个留下学习线索的人。</p>}</div></div></details>
     <details className="note-card collapsible-note-card" open={noteExpanded} onToggle={(event) => setNoteExpanded(event.currentTarget.open)}><summary className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></summary><div className="note-editor-body"><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><span>Markdown 编辑</span><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果<button type="button" onClick={() => setExpandedPreview(true)} aria-label="放大笔记预览"><ExternalLink size={14}/>放大查看</button></header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <button key={tag} title={`删除标签 ${tag}`} onClick={() => onNote(removeNoteTag(note, tag))}>#{tag}<X size={12} /></button>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div><InkNote note={note} onNote={onNote} /></div></details>
+    <details className="community-card"><summary className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>{bankName} · {comments.length} 条</span></summary><div className="community-body"><p className="comment-scope-note">当前题库独立讨论 · 原题号 {current.sourceNumber}</p>{account ? <div className="comment-identity"><UserRound size={15} /><span>{account.nickname}</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={15} />登录后参与讨论</button>}<div className="comment-form"><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 300))} placeholder="写下你的判断依据、易错点或疑问…" disabled={!account || commentBusy} /><button onClick={() => void publishComment()} disabled={!account || commentBusy || commentDraft.trim().length < 2}><Send size={14} />{commentBusy ? "发布中…" : "发布"}</button></div>{commentMessage && <p className="comment-message">{commentMessage}</p>}<div className="local-comments">{comments.length ? comments.map((comment) => <article key={comment.id}><div><b>{comment.nickname}</b><time>{new Date(comment.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p>{comment.text}</p><div className="comment-tools"><button onClick={() => void runCommentAction(() => onLikeComment(comment.id))}><ThumbsUp size={13} />{comment.likes || "赞"}</button><button onClick={() => void runCommentAction(() => onReportComment(comment.id))}><Flag size={13} />举报</button>{comment.own && <button onClick={() => void runCommentAction(() => onDeleteComment(comment.id))}><Trash2 size={13} />删除</button>}</div></article>) : <p className="empty-comments">还没有讨论，成为这份题库中第一个留下学习线索的人。</p>}</div></div></details>
     {expandedPreview && <NotePreviewDialog onClose={() => setExpandedPreview(false)}><MarkdownNotePreview value={note}/></NotePreviewDialog>}
   </aside>;
 }
@@ -3257,18 +3276,20 @@ function SwitchRow({ label, detail, value, onChange }: { label: string; detail: 
   return <button className="switch-row" onClick={() => onChange(!value)}><div><strong>{label}</strong><span>{detail}</span></div><i className={value ? "on" : ""}><b /></i></button>;
 }
 
-function AnswerSheet({ questions, progress, favorites, favoriteStars, notes, killed, answerSelections, currentIndex, onBatchAnswers, onUpdateKilled, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; favorites: string[]; favoriteStars: Record<string, number>; notes: Record<string, string>; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onBatchAnswers: (entries: BatchAnswerEntry[]) => Promise<void>; onUpdateKilled: (ids: string[], killed: boolean) => void; onJump: (index: number) => void; onClose: () => void }) {
+function AnswerSheet({ questions, progress, favorites, favoriteStars, notes, killed, answerSelections, currentIndex, onBatchAnswers, onDeleteKilled, onUpdateKilled, onJump, onClose }: { questions: QuizQuestion[]; progress: Progress; favorites: string[]; favoriteStars: Record<string, number>; notes: Record<string, string>; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onBatchAnswers: (entries: BatchAnswerEntry[]) => Promise<void>; onDeleteKilled?: () => Promise<void>; onUpdateKilled: (ids: string[], killed: boolean) => void; onJump: (index: number) => void; onClose: () => void }) {
   const favoriteIds = new Set(favorites);
   const killedIds = new Set(killed);
   const [batchOpen, setBatchOpen] = useState(false);
   const [killOpen, setKillOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const currentButtonRef = useRef<HTMLButtonElement | null>(null);
   const pendingCount = pendingAnswerQuestions(questions).length;
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => currentButtonRef.current?.scrollIntoView({ block: "center", inline: "center" }));
     return () => window.cancelAnimationFrame(frame);
   }, [currentIndex]);
-  return <><div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><div className="answer-sheet-actions"><button className="batch-answer-trigger" onClick={() => setKillOpen(true)}><Scissors size={16} />批量斩题</button>{pendingCount > 0 && <button className="batch-answer-trigger" onClick={() => setBatchOpen(true)}><Plus size={16} />批量补答案 <em>{pendingCount}</em></button>}<button onClick={onClose} aria-label="关闭答题卡"><X /></button></div></header><div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选星级</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = hasOptionAnnotation(notes[question.id] ?? ""); return <button ref={index === currentIndex ? currentButtonRef : undefined} aria-current={index === currentIndex ? "true" : undefined} key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? `，精选 ${favoriteStars[question.id] ?? 1} 星` : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★{favoriteStars[question.id] ?? 1}</span>}</button>; })}</div></section></div>{killOpen && <KillQuestionsModal questions={questions} onApply={(ids, killed) => { onUpdateKilled(ids, killed); setKillOpen(false); }} onClose={() => setKillOpen(false)} />}{batchOpen && <BatchAnswerModal questions={questions} onSave={onBatchAnswers} onClose={() => setBatchOpen(false)} />}</>;
+  return <><div className="modal-layer answer-layer" onMouseDown={onClose}><section className="answer-sheet" onMouseDown={(event) => event.stopPropagation()}><header><div><span>练习进度</span><h2>答题卡</h2></div><div className="answer-sheet-actions">{onDeleteKilled && questions.some(q => killedIds.has(q.id)) && <button className="batch-answer-trigger" disabled={deleting} onClick={async () => { if (!window.confirm("⚠️ 删除当前题库全部已斩题？先下载学习记录备份，再保存修订版；会同步私人副本，藏经阁不受影响。请保留备份。")) return; setDeleting(true); try { await onDeleteKilled(); onClose(); } catch(e) { setDeleteError(e instanceof Error ? e.message : "删除失败"); } finally { setDeleting(false); } }}><Trash2 size={16}/>{deleting ? "清理中…" : "删除全部已斩"}</button>}<button className="batch-answer-trigger" onClick={() => setKillOpen(true)}><Scissors size={16} />批量斩题</button>{pendingCount > 0 && <button className="batch-answer-trigger" onClick={() => setBatchOpen(true)}><Plus size={16} />批量补答案 <em>{pendingCount}</em></button>}<button onClick={onClose} aria-label="关闭答题卡"><X /></button></div></header>{deleteError && <p role="alert">{deleteError}</p>}<div className="answer-legend"><span><i className="done" />正确</span><span><i className="wrong" />错误</span><span><i className="pending" />已选未核对</span><span><i className="no-answer">?</i>待答案</span><span><i className="killed" />已斩</span><span>✎ 批注</span><span>★ 精选星级</span><span><i className="current" />当前</span><span><i />未答</span></div><div className="number-grid">{questions.map((question, index) => { const isKilled = killedIds.has(question.id); const answerMissing = !question.answer.length; const annotated = hasOptionAnnotation(notes[question.id] ?? ""); return <button ref={index === currentIndex ? currentButtonRef : undefined} aria-current={index === currentIndex ? "true" : undefined} key={`${question.id}-${index}`} aria-label={`第 ${index + 1} 题${isKilled ? "，已斩" : answerMissing ? "，待答案" : favoriteIds.has(question.id) ? `，精选 ${favoriteStars[question.id] ?? 1} 星` : ""}${annotated ? "，有批注" : ""}`} className={`${isKilled ? "killed" : answerMissing ? "no-answer" : progress[question.id] ?? (answerSelections[question.id]?.length ? "pending" : "")} ${index === currentIndex ? "current" : ""}`} onClick={() => onJump(index)}>{isKilled ? <span className="sheet-slash">／</span> : index + 1}{!isKilled && annotated && <span className="sheet-annotation">✎</span>}{!isKilled && answerMissing && <span className="sheet-answer-missing">?</span>}{favoriteIds.has(question.id) && <span className="sheet-star">★{favoriteStars[question.id] ?? 1}</span>}</button>; })}</div></section></div>{killOpen && <KillQuestionsModal questions={questions} onApply={(ids, killed) => { onUpdateKilled(ids, killed); setKillOpen(false); }} onClose={() => setKillOpen(false)} />}{batchOpen && <BatchAnswerModal questions={questions} onSave={onBatchAnswers} onClose={() => setBatchOpen(false)} />}</>;
 }
 
 function BatchAnswerModal({ questions, onSave, onClose }: { questions: QuizQuestion[]; onSave: (entries: BatchAnswerEntry[]) => Promise<void>; onClose: () => void }) {

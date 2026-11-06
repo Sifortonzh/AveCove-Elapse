@@ -1,5 +1,12 @@
 import type { QuizQuestion } from "./question-parser";
 
+export function removeMarkedQuestions(items: QuizQuestion[], ids: string[]) {
+  const marked = new Set(ids);
+  const remaining = items.filter(question => !marked.has(question.id));
+  if (!remaining.length) throw new Error("全部题目都已斩，请在题库页备份后删除整份题库；这里至少保留一道题。");
+  return { questions: remaining, deleted: items.filter(question => marked.has(question.id)) };
+}
+
 export function insertQuestionAfter(
   items: QuizQuestion[],
   afterQuestionId: string,
