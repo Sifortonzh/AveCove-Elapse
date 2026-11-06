@@ -104,7 +104,7 @@ export async function PUT(request: Request) {
   const englishBundle = state.englishTests as { tests?: unknown[] } | undefined;
   if (bankBundle?.banks && (!Array.isArray(bankBundle.banks) || bankBundle.banks.length > 40)) return NextResponse.json({ error: "同步题库数量超出限制。" }, { status: 400 });
   if (englishBundle?.tests && (!Array.isArray(englishBundle.tests) || englishBundle.tests.length > 80)) return NextResponse.json({ error: "英文题库数量超出限制。" }, { status: 400 });
-  const allowedKeys = ["progress", "firstProgress", "favorites", "favoriteStars", "killedQuestions", "notes", "recordLedger", "settings", "nickname", "bankName", "questionBanks", "englishTests", "englishPractice"];
+  const allowedKeys = ["progress", "firstProgress", "favorites", "favoriteStars", "killedQuestions", "notes", "recordLedger", "activity", "settings", "nickname", "bankName", "questionBanks", "englishTests", "englishPractice"];
   const allowed = Object.fromEntries(allowedKeys.filter((key) => key in state).map((key) => [key, state[key]])) as Record<string, unknown>;
   try {
   await ensureSyncStore(session.userId);
@@ -129,6 +129,7 @@ export async function PUT(request: Request) {
         killed: currentPayload.killedQuestions,
         notes: currentPayload.notes,
         ledger: currentPayload.recordLedger,
+        activity: currentPayload.activity,
       },
       {
         progress: allowed.progress,
@@ -138,6 +139,7 @@ export async function PUT(request: Request) {
         killed: allowed.killedQuestions,
         notes: allowed.notes,
         ledger: allowed.recordLedger,
+        activity: allowed.activity,
       },
     );
     const mergedPayload = {
@@ -154,6 +156,7 @@ export async function PUT(request: Request) {
       killedQuestions: records.killed,
       notes: records.notes,
       recordLedger: records.ledger,
+      activity: records.activity,
     };
     const mergedBundle = allowed.questionBanks as BankBundle;
     const mergedBanks = (mergedBundle.banks ?? []) as SyncBank[];

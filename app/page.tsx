@@ -14,6 +14,8 @@ import { AnnotatedOption, AiDialogue, ChapterDirectory, InkNote, NoteImages } fr
 import EnglishLearningView from "./components/EnglishLearningView";
 import MinerUWorkbench from "./components/MinerUWorkbench";
 import DocumentImportWorkbench from "./components/DocumentImportWorkbench";
+import StudyProfile from "./components/StudyProfile";
+import { useStudyTracker } from "./components/useStudyTracker";
 import { MathText } from "./components/MathText";
 import { QuestionImages } from "./components/QuestionImages";
 import { extractQuestionFileText, importQuestionFile, QuestionRecognitionError, type ImportUpdate } from "./lib/file-import";
@@ -29,7 +31,7 @@ import { exportEnglishTestSyncBundle, mergeEnglishTestSyncBundle } from "./lib/e
 import { exportEnglishPracticeSyncBundle, mergeEnglishPracticeSyncBundle } from "./lib/english-practice";
 import {
   learningRecordsEqual, mergeLearningRecords, normalizeLearningRecords, stampLearningRecord,
-  type LearningRecordsInput, type RecordLedger,
+  type LearningRecordsInput, type RecordLedger, type StudyActivity,
 } from "./lib/record-sync";
 import { type MedicalQuestionType, type QuizQuestion } from "./lib/question-parser";
 import { isMineruHybridJson, parseMineruHybridQuestionBank, type MinerUQuestionBank } from "./lib/mineru-import";
@@ -65,7 +67,7 @@ type Western306SubjectScope = "all" | Western306Subject;
 type ThemeMode = "system" | "light" | "dark";
 type StudyMode = "standard" | "blind" | "memorize";
 type AiMode = "summary" | "pitfall" | "companion";
-type View = "home" | "quiz" | "banks" | "bank-requests" | "notes" | "copyright";
+type View = "home" | "quiz" | "banks" | "bank-requests" | "notes" | "copyright" | "profile";
 type AccountSession = { id: string; nickname: string; email?: string; expiresAt: number };
 type SharedComment = { id: string; nickname: string; text: string; createdAt: string; status?: string; likes: number; own?: boolean };
 type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "cancelled" | "ai-ready"; detail: string };
@@ -350,6 +352,7 @@ export default function HomePage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [killedQuestions, setKilledQuestions] = useState<string[]>([]);
   const [recordLedger, setRecordLedger] = useState<RecordLedger>({});
+  const [activity, setActivity] = useState<StudyActivity>({});
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [showSettings, setShowSettings] = useState(false);
   const [showAnswerSheet, setShowAnswerSheet] = useState(false);
@@ -395,6 +398,18 @@ export default function HomePage() {
   const syncedBankRevisionsRef = useRef<Record<string, string>>({});
   const bankNavigationRef = useRef(0);
   const latestRecordsRef = useRef<LearningRecordsInput>({});
+  const learningOwnerRef = useRef("guest");
+  const studyAnsweredRef = useRef(new Set<string>());
+  const recordStudyAnswer = useStudyTracker(localReady && view === "quiz" && learningMode === "medical", account?.id ?? "guest", (owner, update) => {
+    if (learningOwnerRef.current !== owner) return;
+    const current = normalizeLearningRecords(latestRecordsRef.current);
+    persistLearningRecords({ ...current, activity: update(current.activity ?? {}) });
+  });
+  function trackStudyAnswer(id: string, result: "correct" | "wrong" | "pending") {
+    if (studyAnsweredRef.current.has(id)) return;
+    studyAnsweredRef.current.add(id);
+    recordStudyAnswer(result);
+  }
   const latestSettingsRef = useRef<Settings>(defaultSettings);
   useEffect(() => { latestSettingsRef.current = settings; }, [settings]);
   const shareImportCheckedRef = useRef(false);
@@ -403,8 +418,8 @@ export default function HomePage() {
   useEffect(() => () => importAbortRef.current?.abort(), []);
 
   useEffect(() => {
-    latestRecordsRef.current = { progress, firstProgress, favorites, favoriteStars, notes, killed: killedQuestions, ledger: recordLedger };
-  }, [progress, firstProgress, favorites, favoriteStars, notes, killedQuestions, recordLedger]);
+    latestRecordsRef.current = { progress, firstProgress, favorites, favoriteStars, notes, killed: killedQuestions, ledger: recordLedger, activity };
+  }, [progress, firstProgress, favorites, favoriteStars, notes, killedQuestions, recordLedger, activity]);
 
   useEffect(() => {
     let active = true;
@@ -535,7 +550,7 @@ export default function HomePage() {
     const timer = window.setTimeout(() => { void pushRemoteState(); }, 1_200);
     return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, favoriteStars, favorites, firstProgress, killedQuestions, nickname, notes, progress, recordLedger, settings, syncReady, syncRevision]);
+  }, [account, favoriteStars, favorites, firstProgress, killedQuestions, nickname, notes, progress, recordLedger, activity, settings, syncReady, syncRevision]);
 
   useEffect(() => {
     if (!account) return;
@@ -702,7 +717,7 @@ export default function HomePage() {
   }
 
   function persistLearningRecords(records: Parameters<typeof normalizeLearningRecords>[0]) {
-    const normalized = normalizeLearningRecords(records);
+    const normalized = normalizeLearningRecords({ ...records, activity: records.activity ?? latestRecordsRef.current.activity });
     latestRecordsRef.current = normalized;
     setProgress(normalized.progress);
     setFirstProgress(normalized.firstProgress);
@@ -711,6 +726,7 @@ export default function HomePage() {
     setNotes(normalized.notes);
     setKilledQuestions(normalized.killed);
     setRecordLedger(normalized.ledger);
+    setActivity(normalized.activity ?? {});
     void saveLocalLearningRecords(normalized).then(() => {
       for (const key of ["hongdou-progress", "hongdou-first-progress", "hongdou-favorites", "hongdou-favorite-stars", "hongdou-notes", "hongdou-killed-questions", "hongdou-record-ledger"]) {
         localStorage.removeItem(key);
@@ -732,6 +748,7 @@ export default function HomePage() {
       notes: records.notes,
       killedQuestions: records.killed,
       recordLedger: records.ledger,
+      activity: records.activity,
       settings: latestSettingsRef.current, nickname, bankName,
       questionBanks: questionBanksBundle,
       englishTests,
@@ -745,7 +762,7 @@ export default function HomePage() {
     const localRecords = normalizeLearningRecords(latestRecordsRef.current);
     const mergedRecords = mergeLearningRecords(
       localRecords,
-      { progress: state.progress, firstProgress: state.firstProgress, favorites: state.favorites, favoriteStars: state.favoriteStars, notes: state.notes, killed: state.killedQuestions, ledger: state.recordLedger },
+      { progress: state.progress, firstProgress: state.firstProgress, favorites: state.favorites, favoriteStars: state.favoriteStars, notes: state.notes, killed: state.killedQuestions, ledger: state.recordLedger, activity: state.activity },
     );
     if (!learningRecordsEqual(localRecords, mergedRecords)) persistLearningRecords(mergedRecords);
     if (state.settings && typeof state.settings === "object" && !Array.isArray(state.settings)) {
@@ -862,7 +879,9 @@ export default function HomePage() {
     if (syncInFlightRef.current) throw new Error("☁️ 请等当前同步完成，再切换身份。");
     setSyncReady(false);
     const stored = await switchLocalLearningAccount(owner);
-    persistLearningRecords(normalizeLearningRecords(stored.records as LearningRecordsInput));
+    learningOwnerRef.current = owner;
+    const restored = normalizeLearningRecords(stored.records as LearningRecordsInput);
+    persistLearningRecords({ ...restored, activity: restored.activity ?? {} });
     setAnswerSelections(stored.selections);
     setNoteArchives(await listArchivedBankNotes());
     await refreshLocalQuestionBanks();
@@ -972,6 +991,7 @@ export default function HomePage() {
   }
 
   function openPractice(custom?: Partial<Settings>, limit?: number, proportionalExam = false) {
+    studyAnsweredRef.current = new Set();
     if (custom) {
       buildSession(custom, limit, proportionalExam);
     } else {
@@ -1098,6 +1118,9 @@ export default function HomePage() {
     if (!window.confirm("📝 确定交卷评分吗？未作答题不计分，交卷后可核对答案。本场不影响日常进度和正确率。")) return;
     const choices = { ...reviewSelections, ...(current ? { [current.id]: [...selected] } : {}) };
     const result = gradeMockExam(sessionQuestions, choices);
+    for (const question of sessionQuestions) {
+      if (choices[question.id]?.length) trackStudyAnswer(question.id, result.progress[question.id] ?? "pending");
+    }
     setReviewSelections(choices);
     setReviewProgress(result.progress);
     setRevealedAnswers(sessionQuestions.map(question => question.id));
@@ -1109,6 +1132,7 @@ export default function HomePage() {
   function submitAnswer() {
     if (sessionIsExam) { finishMockExam(); return; }
     if (!current || !selected.length) return;
+    trackStudyAnswer(current.id, !current.answer.length ? "pending" : [...selected].sort().join(",") === [...current.answer].sort().join(",") ? "correct" : "wrong");
     if (isolatedReviewSession) setReviewSelections((value) => ({ ...value, [current.id]: [...selected] }));
     else setAnswerSelections((value) => ({ ...value, [current.id]: [...selected] }));
     if (sessionStudyMode === "blind") {
@@ -1923,7 +1947,7 @@ export default function HomePage() {
 
   return (
     <main className={`product ${resolvedDark ? "dark" : ""}`}>
-      {view === "home" ? (
+      {view === "profile" ? <StudyProfile nickname={nickname} account={account} activity={activity} progress={progress} onBack={() => setView("home")} onAccount={() => setShowAccount(true)} /> : view === "home" ? (
         <HomeView
           bankName={bankName}
           questions={questions.length}
@@ -1938,6 +1962,7 @@ export default function HomePage() {
           onBanks={() => setView("banks")}
           onSearch={() => setShowSearch(true)}
           onNotes={() => setView("notes")}
+          onProfile={() => setView("profile")}
           onCopyright={() => setView("copyright")}
           onToggleTheme={() => saveSettings({ ...settings, themeMode: resolvedDark ? "light" : "dark", darkMode: !resolvedDark })}
           darkMode={resolvedDark}
@@ -2089,11 +2114,11 @@ function Brand({ compact = false, hideTagline = false }: { compact?: boolean; hi
   return <div className={`brand ${compact ? "compact" : ""}`}><span className="brand-logo"><Image src="/hongdou-logo.png" alt="红豆生南国蛇形医学标识" width={48} height={48} priority /></span><div><strong>红豆生南国</strong>{!hideTagline && <small>医学知识训练与复盘</small>}</div></div>;
 }
 
-function HomeView({ bankName, questions, answered, wrong, noteCount, accuracy, progress, examScore, onPractice, onImport, onBanks, onSearch, onNotes, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, syncing, quote, onAccount, onSync, onEnglish }: {
+function HomeView({ bankName, questions, answered, wrong, noteCount, accuracy, progress, examScore, onPractice, onImport, onBanks, onSearch, onNotes, onProfile, onCopyright, onToggleTheme, darkMode, nickname, account, syncStatus, syncing, quote, onAccount, onSync, onEnglish }: {
   bankName: string; questions: number; answered: number; wrong: number; noteCount: number; accuracy: number; progress: number;
   examScore?: { earned: number; answeredMaximum: number; total: number };
   onPractice: (custom?: Partial<Settings>, limit?: number, proportionalExam?: boolean) => void; onImport: () => void; onBanks: () => void; onSearch: () => void; onNotes: () => void;
-  onCopyright: () => void; onToggleTheme: () => void; darkMode: boolean; nickname: string;
+  onProfile: () => void; onCopyright: () => void; onToggleTheme: () => void; darkMode: boolean; nickname: string;
   account: AccountSession | null; syncStatus: string; syncing: boolean; quote: (typeof homeQuotes)[number]; onAccount: () => void; onSync: () => void; onEnglish: () => void;
 }) {
   return <div className="home-shell">
@@ -2106,6 +2131,7 @@ function HomeView({ bankName, questions, answered, wrong, noteCount, accuracy, p
         <button onClick={() => onPractice({ scope: "wrong" })}><AlertCircle size={19} />错题复盘{wrong > 0 && <em>{wrong}</em>}</button>
         <button onClick={() => onPractice({ scope: "favorite" })}><Star size={19} />精选题</button>
         <button onClick={onNotes}><NotebookPen size={19} />我的笔记{noteCount > 0 && <em>{noteCount}</em>}</button>
+        <button onClick={onProfile}><UserRound size={19} />唯我独尊</button>
       </nav>
       <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <SyncStatusNotice status={syncStatus} syncing={syncing} onSync={onSync} onDetails={onAccount} />}<button className="import-entry" aria-label="导入题库" onClick={onImport}><Import size={18} /><span>导入题库</span></button><a className="custom-ai-entry" aria-label="自定义 AI" href="/custom-ai"><Bot size={17} /><span>自定义AI</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button><p>本地优先 · 无广告<br />.docx / PDF 本机处理 · 旧 .doc 仅内存转换</p></div>
     </aside>

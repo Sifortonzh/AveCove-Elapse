@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.4.2.2" src="https://img.shields.io/badge/version-2.4.2.2-b43d35" />
+    <img alt="版本 2.5.0" src="https://img.shields.io/badge/version-2.5.0-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,7 +27,9 @@
 </p>
 
 > [!IMPORTANT]
-> **当前版本：v2.4.2.2。** 排除和批注按钮都放在选项框内，可分别点击；双击排除仍可使用。
+> **当前版本：v2.5.0 — 学有所迹。** 从首页侧栏进入「唯我独尊」，查看个人刷题时长、题量、平均用时、正确率、连续学习天数，以及热力图、趋势图和4小时时段分布；支持日、周、月、年切换及历史周期浏览。
+
+仅在医学刷题页面前台聚焦时计时，90秒无操作后暂停。本版开始累计时长，不倒推补造历史；题量与正确率沿用原有日常记录，精选复刷和独立考试不改变这两项评分。学习统计按账号保存在本机，并随多端同步合并，重复同步不会重复累加。请先刷新所有设备再使用新统计。
 
 主站提供独立的 [Elapse 介绍](https://avecove.com/projects/elapse/)与[更新日志](https://avecove.com/updates/elapse/)，博客文章保持独立。
 

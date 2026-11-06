@@ -15,8 +15,10 @@ export type RecordLedgerEntry = {
 };
 
 export type RecordLedger = Record<string, RecordLedgerEntry>;
+export type StudyActivity = Record<string, { seconds: number; answers: number; graded: number; correct: number; start: number; end: number }>;
 
 export type LearningRecords = {
+  activity?: StudyActivity;
   progress: Record<string, ProgressValue>;
   firstProgress: Record<string, ProgressValue>;
   favorites: string[];
@@ -27,6 +29,7 @@ export type LearningRecords = {
 };
 
 export type LearningRecordsInput = {
+  activity?: unknown;
   progress?: unknown;
   firstProgress?: unknown;
   favorites?: unknown;
@@ -37,6 +40,23 @@ export type LearningRecordsInput = {
 };
 
 const LEGACY_TIMESTAMP = 1;
+
+export function mergeStudyActivity(...inputs: unknown[]): StudyActivity {
+  const result: StudyActivity = {};
+  for (const input of inputs) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) continue;
+    for (const [id, candidate] of Object.entries(input)) {
+      if (!/^\d{4}-\d{2}-\d{2}\|[0-5]\|[a-zA-Z0-9-]{1,80}$/.test(id) || !candidate || typeof candidate !== "object") continue;
+      const row = candidate as Record<string, unknown>;
+      if (!["seconds", "answers", "graded", "correct", "start", "end"].every(k => typeof row[k] === "number" && Number.isFinite(row[k]) && (row[k] as number) >= 0)) continue;
+      const old = result[id];
+      const value = row as StudyActivity[string];
+      if (value.seconds > 14400 || value.answers > 10000 || value.graded > value.answers || value.correct > value.graded || value.end < value.start) continue;
+      result[id] = old ? { seconds: Math.max(old.seconds, value.seconds), answers: Math.max(old.answers, value.answers), graded: Math.max(old.graded, value.graded), correct: Math.max(old.correct, value.correct), start: Math.min(old.start, value.start), end: Math.max(old.end, value.end) } : { ...value };
+    }
+  }
+  return result;
+}
 
 function validTimestamp(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : LEGACY_TIMESTAMP;
@@ -198,7 +218,8 @@ export function normalizeLearningRecords(input: LearningRecordsInput): LearningR
       killed: ledger[questionId]?.killed ?? { value: true, updatedAt: LEGACY_TIMESTAMP },
     };
   }
-  return materializeLedger(ledger);
+  const activity = mergeStudyActivity(input.activity);
+  return { ...materializeLedger(ledger), ...(Object.keys(activity).length ? { activity } : {}) };
 }
 
 export function mergeLearningRecords(leftInput: LearningRecordsInput, rightInput: LearningRecordsInput): LearningRecords {
@@ -224,10 +245,13 @@ export function mergeLearningRecords(leftInput: LearningRecordsInput, rightInput
     const killed = chooseTimedValue(leftEntry?.killed, rightEntry?.killed, (leftValue, rightValue) => leftValue || rightValue);
     ledger[questionId] = { progress, firstProgress, favorite, favoriteStars, note, killed };
   }
-  return materializeLedger(ledger);
+  const activity = mergeStudyActivity(left.activity, right.activity);
+  return { ...materializeLedger(ledger), ...(Object.keys(activity).length ? { activity } : {}) };
 }
 
 export function learningRecordsEqual(leftInput: LearningRecordsInput, rightInput: LearningRecordsInput) {
+  const a = mergeStudyActivity(leftInput.activity), b = mergeStudyActivity(rightInput.activity);
+  if (Object.keys(a).length !== Object.keys(b).length || Object.keys(a).some(k => !b[k] || JSON.stringify(a[k]) !== JSON.stringify(b[k]))) return false;
   const left = normalizeLearningRecords(leftInput).ledger;
   const right = normalizeLearningRecords(rightInput).ledger;
   const leftIds = Object.keys(left);

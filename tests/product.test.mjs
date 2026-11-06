@@ -249,7 +249,7 @@ test("wrong review raises existing Featured stars and desktop confirmation is in
     const current = { id: "q", answer: ["A"] }, selected = [answer];
     const sessionIsExam = false, isolatedReviewSession = false, sessionStudyMode = "standard", settings = { autoNext: false, autoFavoriteWrong: false };
     const progress = { q: "wrong" }, firstProgress = { q: "wrong" }, notes = {}, recordLedger = {};
-    let saved; const setAnswerSelections = () => {}, setSubmitted = () => {}, setToast = () => {};
+    let saved; const trackStudyAnswer = () => {}; const setAnswerSelections = () => {}, setSubmitted = () => {}, setToast = () => {};
     const stampLearningRecord = (ledger, id, patch) => ({ [id]: patch });
     const persistLearningRecords = records => { saved = records; };
     ${submit}
@@ -1079,7 +1079,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.4.2.2");
+  assert.equal(JSON.parse(manifest).version, "2.5.0");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1839,7 +1839,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.4.2.2");
+  assert.equal(JSON.parse(packageJson).version, "2.5.0");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2276,7 +2276,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.4.2.2");
+  assert.equal(JSON.parse(manifest).version, "2.5.0");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2337,7 +2337,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.2.2");
+  assert.equal(JSON.parse(manifest).version, "2.5.0");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2355,7 +2355,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.2.2");
+  assert.equal(JSON.parse(manifest).version, "2.5.0");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2375,7 +2375,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.4.2.2");
+  assert.equal(JSON.parse(manifest).version, "2.5.0");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
