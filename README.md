@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.5.0.1" src="https://img.shields.io/badge/version-2.5.0.1-b43d35" />
+    <img alt="Version 2.5.1" src="https://img.shields.io/badge/version-2.5.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,11 +27,13 @@
 </p>
 
 > [!IMPORTANT]
-> **Current release: v2.5.0.1 — A personal learning journey.** The themed sidebar now includes **华山论剑**, an opt-in monthly top-ten arena for study time, confirmed attempts, and average time (at least ten attempts). Monthly resets and newly recorded activity give learners a common starting line; these motivational statistics are not verified exam scores or anti-cheat rankings.
+> **v2.5.1 appearance update:** Day mode adds restrained peach, sage and mist-blue overlays with distinct sidebar icon tiles; night mode uses neutral graphite glass. Navigation labels are naturally left-aligned with counts on the right. Homepage-only styles preserve practice, sync and scoring, with reduced-transparency fallbacks.
 
-Personal study time has brighter digits with smaller unit labels, and the heatmap uses contrasting colors with centered labels. The answer sheet can remove all slash-skipped questions from the active private bank after confirmation and a learning-record backup download; at least one question must remain. Original source numbers, personal records, and independent Pavilion copies are preserved. Notes now appear above discussion. This incremental release is deliberately untagged.
+> **Current release: v2.5.1 — A personal learning journey.** The themed sidebar now includes **华山论剑**, an opt-in monthly top-ten arena for study time, confirmed attempts, and average time (at least ten attempts). Monthly resets and newly recorded activity give learners a common starting line; these motivational statistics are not verified exam scores or anti-cheat rankings.
 
-Study time is collected only while the medical practice screen is visible and focused; counting pauses after 90 seconds without interaction. Timing starts with this release: historical durations are not inferred. Existing ordinary-practice answer counts and accuracy are preserved; featured reviews and independent exams do not change these scores. New activity is stored locally per account and merged idempotently across devices. Refresh all devices before using the new statistics.
+Personal study time has brighter digits with smaller unit labels, and the heatmap uses contrasting colors with centered labels. The answer sheet can remove all slash-skipped questions from the active private bank after confirmation and a learning-record backup download; at least one question must remain. Original source numbers, personal records, and independent Pavilion copies are preserved. Notes now appear above discussion. Release tags are published for updates spanning more than three areas; v2.5.0.1 remains tagged.
+
+Study time is collected only while the medical practice screen is visible and focused; counting pauses after 90 seconds without interaction. Timing started in v2.5.0: historical durations are not inferred. Existing ordinary-practice answer counts and accuracy are preserved; featured reviews and independent exams do not change these scores. New activity is stored locally per account and merged idempotently across devices. Refresh all devices before using the new statistics.
 
 Visit the [Elapse introduction](https://avecove.com/projects/elapse/) and the separate [release history](https://avecove.com/updates/elapse/).
 
