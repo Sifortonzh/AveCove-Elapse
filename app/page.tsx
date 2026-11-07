@@ -5,7 +5,7 @@ import Image from "next/image";
 import {
   AlertCircle, ArrowDown, ArrowRight, ArrowUp, BookOpen, Bot, BrainCircuit, Check, CheckCircle2,
   ChevronLeft, ChevronRight, CircleHelp, Clock3, Cloud, Download, FileText, Home, Import,
-  Copy, Database, ExternalLink, Eye, EyeOff, GripVertical, Languages, Library, Lightbulb, Link2, ListChecks, MessageCircle, Moon, NotebookPen, Pencil, Play, Plus,
+  Copy, Database, ExternalLink, Eye, EyeOff, GripVertical, Languages, Library, Link2, ListChecks, MessageCircle, Moon, NotebookPen, Pencil, Play, Plus,
   RefreshCw, RotateCcw, ScanText, Search, Send, Settings2, Share2, ShieldCheck, Shuffle, Sparkles,
   Flag, Scissors, Star, Sun, Target, ThumbsUp, Trash2, Upload, UserRound, X, Zap,
 } from "lucide-react";
@@ -2152,35 +2152,36 @@ function HomeView({ bankName, questions, answered, wrong, noteCount, accuracy, p
         <button onClick={onProfile}><UserRound size={19} /><span className="wuxia-label">唯我独尊</span></button>
         <button onClick={onLeaderboard}><Target size={19}/><span className="wuxia-label">华山论剑</span></button>
       </nav>
-      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <SyncStatusNotice status={syncStatus} syncing={syncing} onSync={onSync} onDetails={onAccount} />}<button className="import-entry" aria-label="导入题库" onClick={onImport}><Import size={18} /><span>导入题库</span></button><a className="custom-ai-entry" aria-label="自定义 AI" href="/custom-ai"><Bot size={17} /><span>自定义AI</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button><p>本地优先 · 无广告<br />.docx / PDF 本机处理 · 旧 .doc 仅内存转换</p></div>
+      <div className="sidebar-bottom"><button className="sync-entry" onClick={onAccount}><Cloud size={18} />{account ? "管理多端同步" : "开启多端同步"}</button>{account && <SyncStatusNotice status={syncStatus} syncing={syncing} onSync={onSync} onDetails={onAccount} />}<button className="import-entry" aria-label="导入题库" onClick={onImport}><Import size={18} /><span>导入题库</span></button><a className="custom-ai-entry" aria-label="自定义 AI" href="/custom-ai"><Bot size={17} /><span>自定义AI</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />版权、声明与协议</button></div>
     </aside>
     <section className="home-main">
       <header className="home-topbar"><div className="home-quote"><p><Sparkles size={13} />{quote.lead}</p><h1>{quote.title}</h1></div><div className="top-actions"><button className="english-learning-toggle" aria-label="English Learning" onClick={onEnglish}><Languages size={17} /><span>English Learning</span></button><button aria-label="搜索题目" onClick={onSearch}><Search size={19} /></button><button aria-label="切换主题" onClick={onToggleTheme}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><button className="profile" onClick={onAccount} aria-label="同步身份">{(nickname.trim()[0] || "红").toUpperCase()}</button></div></header>
       <section className="home-bento" aria-label="今日学习概览">
         <article className="hero-card bento-hero">
-          <div className="hero-copy"><span className="overline"><Sparkles size={14} /> 今日学习</span><h2>{bankName}</h2><p>{bankName === "演示题库" ? "用少量示例题体验完整流程；准备好后，导入属于自己的医学题库。" : "从上次停下的地方继续。系统会把错题与薄弱知识点带回你的学习节奏。"}</p><div className="hero-actions"><button className="primary-action" onClick={() => onPractice({ scope: answered ? "unanswered" : "all" })}><Play size={17} fill="currentColor" />{answered ? "继续学习" : "开始学习"}</button><button className="ghost-action" onClick={() => onPractice()}>练习设置 <Settings2 size={16} /></button></div></div>
+          <div className="hero-copy"><span className="overline"><Sparkles size={14} /> 今日学习</span><h2>{bankName}</h2><div className="hero-actions"><button className="primary-action" onClick={() => onPractice({ scope: answered ? "unanswered" : "all" })}><Play size={17} fill="currentColor" />{answered ? "继续学习" : "开始学习"}</button><button className="ghost-action" onClick={() => onPractice()}>练习设置 <Settings2 size={16} /></button></div></div>
         </article>
         <article className="bento-progress-card" aria-label={`当前学习进度 ${progress}%`}>
-          <span className="overline">STUDY PULSE</span>
+          <span className="overline">学习进度</span>
           <div className="hero-progress"><div className="progress-orbit" style={{ "--p": `${progress * 3.6}deg` } as React.CSSProperties}><div><strong>{progress}%</strong><span>总进度</span></div></div><ul>{examScore ? <><li><span>西综题目</span><b>{questions}</b></li><li><span>首次作答得分</span><b>{examScore.earned}</b></li><li><span>试卷总分</span><b>{examScore.total}</b></li></> : <><li><span>题目总数</span><b>{questions}</b></li><li><span>已完成</span><b>{answered}</b></li><li><span>当前正确率</span><b>{accuracy}%</b></li></>}</ul></div>
         </article>
         <article className="bento-practice">
-          <div className="section-heading"><div><span>选择一种节奏</span><h2>开始今天的练习</h2></div><button onClick={() => onPractice()}>更多设置 <ChevronRight size={16} /></button></div>
+          <div className="section-heading"><div><h2>练习模式</h2></div><button onClick={() => onPractice()}>更多设置 <ChevronRight size={16} /></button></div>
           <section className="mode-grid">
-            <button className="mode-card red" onClick={() => onPractice({ scope: "unanswered", questionOrder: "sequential" })}><span><BookOpen size={20} /></span><div><strong>顺序练习</strong><p>按原题顺序稳步推进，适合系统完成第一遍。</p></div><ChevronRight size={18} /></button>
-            <button className="mode-card green" onClick={() => onPractice({ scope: "all", questionOrder: "random" }, 20, true)}><span><Shuffle size={20} /></span><div><strong>随机挑战</strong><p>从已做题按章节比例抽取 20 道，独立盲考、交卷评分；不影响日常正确率。</p></div><ChevronRight size={18} /></button>
-            <button className="mode-card gold" onClick={() => onPractice({ scope: "wrong", questionOrder: "random" })}><span><RotateCcw size={20} /></span><div><strong>错题复盘</strong><p>{wrong ? `${wrong} 道错题集中回炉，把薄弱点逐个拿下。` : "当前没有错题，可以先完成一组新练习。"}</p></div><ChevronRight size={18} /></button>
-            <button className="mode-card blue" onClick={() => onPractice({ scope: "all", questionOrder: "random", shuffleOptions: true }, 100, true)}><span><Clock3 size={20} /></span><div><strong>模拟考试</strong><p>仅从普通练习已确认作答的题中，按章节占比抽取 100 题；不足时使用全部，未做题不抽取。</p></div><ChevronRight size={18} /></button>
+            <button className="mode-card red" onClick={() => onPractice({ scope: "unanswered", questionOrder: "sequential" })}><span><BookOpen size={20} /></span><div><strong>顺序练习</strong></div><ChevronRight size={18} /></button>
+            <button className="mode-card green" aria-describedby="home-exam-note" onClick={() => onPractice({ scope: "all", questionOrder: "random" }, 20, true)}><span><Shuffle size={20} /></span><div><strong>随机挑战 <sup aria-hidden="true">*</sup></strong></div><ChevronRight size={18} /></button>
+            <button className="mode-card gold" onClick={() => onPractice({ scope: "wrong", questionOrder: "random" })}><span><RotateCcw size={20} /></span><div><strong>错题复盘</strong><p>{wrong ? `${wrong} 道错题` : "暂无错题"}</p></div><ChevronRight size={18} /></button>
+            <button className="mode-card blue" aria-describedby="home-exam-note" onClick={() => onPractice({ scope: "all", questionOrder: "random", shuffleOptions: true }, 100, true)}><span><Clock3 size={20} /></span><div><strong>模拟考试 <sup aria-hidden="true">*</sup></strong></div><ChevronRight size={18} /></button>
           </section>
         </article>
         <article className="bento-library-card">
           <span className="bento-library-icon"><Database size={24} /></span>
-          <div><span className="overline">YOUR LIBRARY</span><h2>知识书架</h2><p>当前题库共收录 <b>{questions}</b> 道题。导入、切换与整理都集中在这里。</p></div>
+          <div><h2>知识书架</h2><p className="library-question-count"><strong>{questions.toLocaleString("zh-CN")}</strong> 道题</p></div>
           <div className="bento-library-actions"><button onClick={onBanks}>查看题库 <ArrowRight size={16} /></button><button onClick={onImport}><Import size={16} />导入</button></div>
         </article>
-        <article className="insight-card bento-insight"><div className="card-title"><span><Target size={18} /></span><div><strong>学习洞察</strong><p>你的个人复盘视图</p></div></div><div className="metrics"><div><b>{answered}</b><span>累计完成</span></div><div><b>{accuracy}%</b><span>正确率</span></div><div><b>{wrong}</b><span>待巩固</span></div></div><div className="tip"><Lightbulb size={17} /><p>{wrong ? "优先重做错题，比盲目刷新题更有效。" : "先完成一组题，系统就能开始生成复盘建议。"}</p></div></article>
-        <article className="ai-preview bento-ai"><div className="ai-preview-head"><span className="ai-orb"><BrainCircuit size={22} /></span><div><small>AI 学习工作台</small><strong>答案、原文与拓展各归其位</strong></div></div><div className="ai-chips"><span>AI 解析</span><span>原题解析</span><span>同类考点</span></div><p>确认答案后，可分别查看 AI 解析、导入文件自带解析和相关考点拓展。</p><button onClick={() => onPractice({ scope: "unanswered" })}>去体验 <ArrowRight size={16} /></button></article>
+        <article className="insight-card bento-insight"><div className="card-title"><span><Target size={18} /></span><strong>学习洞察</strong></div><div className="metrics"><div><b>{answered}</b><span>累计完成</span></div><div><b>{accuracy}%</b><span>正确率</span></div><div><b>{wrong}</b><span>待巩固</span></div></div></article>
+        <article className="ai-preview bento-ai"><div className="ai-preview-head"><span className="ai-orb"><BrainCircuit size={22} /></span><strong>AI 学习工作台</strong></div><div className="ai-chips"><span>AI 解析</span><span>原题解析</span><span>同类考点</span></div><button onClick={() => onPractice({ scope: "unanswered" })}>去体验 <ArrowRight size={16} /></button></article>
       </section>
+      <p className="ui-footnote home-exam-note" id="home-exam-note">* 随机挑战最多 20 题，模拟考试最多 100 题。仅从普通练习已确认作答的题中按章节比例抽取，交卷后独立评分。</p>
       <footer className="home-footer"><span>© 2026 Sifortonzh. All rights reserved.</span><nav aria-label="站点相关链接"><a href="https://avecrouge.top/" target="_blank" rel="noreferrer">访问作者博客</a><button onClick={onCopyright}>版权、免责声明与用户协议 <ChevronRight size={14} /></button></nav></footer>
     </section>
   </div>;

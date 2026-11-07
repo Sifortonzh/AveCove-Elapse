@@ -6,6 +6,7 @@
 - Do not change practice, sync, scoring, existing imports, production DB tables or migrations just to accommodate Forge. Keep conversion in `forge/src/elapse_forge/export.py`.
 - Current Elapse shared files use `hongdou-question-bank`, version 1. Curriculum paths flatten to `category`; exact original question numbers and chapter names go in `bank.description` (4000-character limit). Save provenance separately; imported question IDs may change.
 - Private user PDFs, credentials, OCR artifacts, AI responses, reviews and local DB files must never enter Git, browser-public assets or the Elapse Docker context.
+- Keep interface copy concise: omit decorative filler and repeated explanations. Put supporting rules in readable, linked page footnotes where appropriate; keep errors, consent and action-critical warnings next to the relevant control.
 
 ## Forge boundaries
 

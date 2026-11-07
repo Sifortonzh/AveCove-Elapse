@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.5.1" src="https://img.shields.io/badge/version-2.5.1-b43d35" />
+    <img alt="版本 2.5.2" src="https://img.shields.io/badge/version-2.5.2-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,9 +27,11 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.5.2：** 知识书架的题量数字随主题切换，修复日间对比度。清理多余界面小字，考试规则和计时口径集中在页脚。
+
 > **v2.5.1 外观更新：** 日间采用淡杏、鼠尾草绿和雾蓝轻叠层，侧栏入口以柔和图标底色区分；夜间为中性石墨玻璃。导航自然左对齐，计数靠右。样式仅作用于主页，不改动刷题、同步和评分；支持减少透明效果及不支持毛玻璃时的实色回退。
 
-> **当前版本：v2.5.1 — 江湖有路，学有所迹。** 侧栏更新为桃花岛、四十二章经、降龙十八斩、易筋精、葵花宝典，并新增「华山论剑」：自愿公开昵称和月度学习统计，按时长、确认作答次数、平均用时排列前十；平均用时至少答10题才入榜。每月重新起跑，不计算旧版历史题量。榜单仅供激励，不代表成绩，暂不包含防刷榜审核。
+> **v2.5.0 起的学习功能 — 江湖有路，学有所迹。** 侧栏更新为桃花岛、四十二章经、降龙十八斩、易筋精、葵花宝典，并新增「华山论剑」：自愿公开昵称和月度学习统计，按时长、确认作答次数、平均用时排列前十；平均用时至少答10题才入榜。每月重新起跑，不计算旧版历史题量。榜单仅供激励，不代表成绩，暂不包含防刷榜审核。
 
 个人页时间数字亮色突出、单位缩小，热力图高对比并居中标注。答题卡支持确认后清理当前私人题库全部已斩题（先下载学习记录备份，至少保留一题）；原题号、个人记录和藏经阁独立副本保留。刷题页笔记移到讨论上方。超过三处的更新可发布标签；此前 v2.5.0.1 标签保留。
 

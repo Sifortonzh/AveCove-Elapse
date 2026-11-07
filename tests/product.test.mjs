@@ -1079,7 +1079,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.5.1");
+  assert.equal(JSON.parse(manifest).version, "2.5.2");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1150,7 +1150,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /const homeQuotes/);
   assert.match(page, /不存原始学号/);
   assert.match(page, /自定义AI/);
-  assert.match(page, /\.docx \/ PDF 本机处理 · 旧 \.doc 仅内存转换/);
+  assert.match(page, /\.docx 与 PDF 默认本地提取，旧版 \.doc 会临时发送本站服务器内存处理/);
   assert.match(page, /function QuestionBankPage/);
   assert.match(page, /function ResetBankProgressModal/);
   assert.match(page, /请谨慎操作：清空后无法撤销/);
@@ -1839,7 +1839,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.5.1");
+  assert.equal(JSON.parse(packageJson).version, "2.5.2");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2276,7 +2276,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.5.1");
+  assert.equal(JSON.parse(manifest).version, "2.5.2");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2337,7 +2337,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.5.1");
+  assert.equal(JSON.parse(manifest).version, "2.5.2");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2355,7 +2355,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.5.1");
+  assert.equal(JSON.parse(manifest).version, "2.5.2");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2375,7 +2375,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.5.1");
+  assert.equal(JSON.parse(manifest).version, "2.5.2");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
@@ -2472,6 +2472,16 @@ test("homepage glass themes stay scoped with readable navigation and accessibili
   assert.match(css, /@supports not \(backdrop-filter/);
   assert.doesNotMatch(css, /(?:url\(|animation:|\.quiz-|\.learning-panel)/);
   assert.match(await text("app/layout.tsx"), /import "\.\/home-glass.css"/);
+});
+
+test("home library count follows theme ink and exam rules remain accessible", async () => {
+  const [page, css] = await Promise.all([text("app/page.tsx"), text("app/home-glass.css")]);
+  const home = page.slice(page.indexOf("function HomeView("), page.indexOf("const UNGROUPED_BANKS"));
+  assert.match(home, /className="library-question-count"><strong>/);
+  assert.match(css, /\.library-question-count strong\s*\{\s*color: var\(--ink\)/);
+  assert.equal((home.match(/aria-describedby="home-exam-note"/g) || []).length, 2);
+  assert.match(home, /id="home-exam-note">\* 随机挑战最多 20 题，模拟考试最多 100 题/);
+  assert.doesNotMatch(home, /本地优先 · 无广告|把薄弱点逐个拿下|你的个人复盘视图/);
 });
 
 test("bank note archives retain only annotated context, stars and personal AI", async () => {
