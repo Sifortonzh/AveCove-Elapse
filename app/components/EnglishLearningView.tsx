@@ -261,7 +261,7 @@ function InteractivePassage({ content = passage, sourceTitle = "Memory is a livi
     </div>
     <div className="reading-tool-hint"><Sparkles size={14} /><span>{toolHint}</span></div>
     {lookupWord && <div className="word-lookup-card"><Languages /><div><small>CLICK-TO-TRANSLATE</small><strong>{lookupWord}</strong><p>{wordDictionary[normalizedLookup] ?? "暂未收录本地释义；后续可交给自定义 AI 结合句子解释。"}</p></div><div className="word-lookup-actions"><button className={lookupSaved ? "saved" : ""} disabled={lookupSaved} onClick={addLookupWord}><BookMarked />{lookupSaved ? "Saved" : "Add to wordbook"}</button><button aria-label="Close word translation" onClick={() => setLookupWord("")}><X /></button></div></div>}
-    {showVocabulary && <section className="reading-wordbook"><header><div><small>LOCAL VOCABULARY</small><strong>My wordbook</strong></div><span>{vocabulary.length} saved</span></header>{vocabulary.length ? <div>{vocabulary.map((entry) => <article key={entry.word}><div><strong>{entry.word}</strong><p>{entry.meaning}</p><small>From “{entry.source || "English practice"}”</small></div><button aria-label={`Remove ${entry.word} from wordbook`} onClick={() => removeVocabulary(entry.word)}><Trash2 /></button></article>)}</div> : <p className="empty-wordbook">Click a word in the passage, then choose “Add to wordbook”.</p>}</section>}
+    {showVocabulary && <section className="reading-wordbook"><header><div><strong>My wordbook</strong></div><span>{vocabulary.length} saved</span></header>{vocabulary.length ? <div>{vocabulary.map((entry) => <article key={entry.word}><div><strong>{entry.word}</strong><p>{entry.meaning}</p><small>From “{entry.source || "English practice"}”</small></div><button aria-label={`Remove ${entry.word} from wordbook`} onClick={() => removeVocabulary(entry.word)}><Trash2 /></button></article>)}</div> : <p className="empty-wordbook">Click a word in the passage, then choose “Add to wordbook”.</p>}</section>}
     <div className={`interactive-paper tool-${tool}`}>
       <p ref={ref} className="english-passage" onMouseUp={captureSelection} onTouchEnd={captureSelection}>
         {segments.map((segment, index) => segment.highlighted ? <mark key={index}>{renderWords(segment.text, index)}</mark> : <span key={index}>{renderWords(segment.text, index)}</span>)}
@@ -324,7 +324,7 @@ function ListeningExercise({ stage }: { stage: Stage }) {
   const [submitted, setSubmitted] = useState(false);
   const correct = "C";
   return <section className="english-listening-grid">
-    <article className="qr-detection-card"><span className="qr-visual"><QrCode size={78} /></span><div><small>QR RESOURCE DETECTED</small><h2>{stage === "ielts" ? "Academic lecture track" : stage === "toefl" ? "Campus conversation track" : "Practice set audio"}</h2><p>The importer found one QR code and linked it to this listening section.</p><button className="english-secondary"><ScanSearch size={16} />Open detected resource</button></div></article>
+    <article className="qr-detection-card"><span className="qr-visual"><QrCode size={78} /></span><div><h2>{stage === "ielts" ? "Academic lecture track" : stage === "toefl" ? "Campus conversation track" : "Practice set audio"}</h2><p>The importer found one QR code and linked it to this listening section.</p><button className="english-secondary"><ScanSearch size={16} />Open detected resource</button></div></article>
     <article className="audio-practice"><span>LISTENING · DEMO 01</span><h3>Why does the speaker mention weekly review?</h3><button className={`audio-play ${playing ? "playing" : ""}`} onClick={() => setPlaying((value) => !value)}><CirclePlay size={34} fill="currentColor" /><span>{playing ? "Pause preview" : "Play preview"}</span></button><div className="audio-line"><i style={{ width: playing ? "58%" : "12%" }} /></div><div className="listening-demo-options">{[
       ["A", "To replace all classroom discussion"],
       ["B", "To shorten the examination"],
@@ -617,7 +617,7 @@ function EnglishOverview({ stage, onTask }: { stage: Stage; onTask: (task: Engli
 function AnswerCompanionModal({ testName, busy, onChoose, onSkip }: { testName: string; busy: boolean; onChoose: () => void; onSkip: () => void }) {
   return <div className="modal-layer english-answer-companion-layer" onMouseDown={() => !busy && onSkip()}>
     <section className="english-answer-companion" onMouseDown={(event) => event.stopPropagation()}>
-      <header><span><Bot /></span><div><small>AI ANSWER PAIRING</small><h2>Add the answer or analysis file?</h2></div></header>
+      <header><span><Bot /></span><div><h2>Add the answer or analysis file?</h2></div></header>
       <p>“{testName}” looks like a blank paper. Import its matching answer/analysis PDF now, and AI will combine the question paper, answer key, listening transcript and explanations into the same Test Library entry.</p>
       <div><FileText /><span><strong>No duplicate test</strong><small>The existing paper will be upgraded in place.</small></span></div>
       <div><ShieldCheck /><span><strong>No guessed answers</strong><small>Scoring uses only answers explicitly found in the companion file.</small></span></div>

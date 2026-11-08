@@ -20,3 +20,8 @@ CREATE TABLE IF NOT EXISTS user_ai_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, verified_email)
 );
+-- Optional reply linkage; older clients continue inserting top-level comments.
+ALTER TABLE IF EXISTS comments ADD COLUMN IF NOT EXISTS parent_id TEXT REFERENCES comments(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS comments_owner_idx ON comments(user_id) WHERE status = 'published';
+CREATE INDEX IF NOT EXISTS comments_parent_idx ON comments(parent_id, created_at DESC) WHERE parent_id IS NOT NULL AND status = 'published';
+CREATE INDEX IF NOT EXISTS pavilion_question_banks_created_idx ON pavilion_question_banks(created_at DESC);

@@ -5,11 +5,52 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("device preferences resolve languages, theme fallback boundaries and daily verses", async () => {
+  const source = await text("app/lib/ui-preferences.ts");
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { resolveUiLanguage, resolveSystemDark, nextTheme, dailyQuoteIndex, homeQuotes, uiLanguages, uiText } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  assert.equal(resolveUiLanguage("system", ["de", "zh-Hant-HK"]), "zh-TW");
+  assert.equal(resolveUiLanguage("system", ["ja-JP", "zh-CN"]), "ja");
+  assert.equal(resolveUiLanguage("system", ["ko-KR"]), "ko");
+  assert.equal(resolveUiLanguage("system", ["en-GB"]), "en");
+  assert.equal(resolveUiLanguage("system", ["zh-Hans-SG"]), "zh-CN");
+  assert.equal(resolveUiLanguage("en", ["zh-TW"]), "en");
+  assert.equal(resolveSystemDark(false, false, 23), true);
+  assert.equal(resolveSystemDark(false, false, 5), true);
+  assert.equal(resolveSystemDark(false, false, 6), false);
+  assert.equal(resolveSystemDark(false, true, 23), false);
+  assert.equal(resolveSystemDark(true, false, 12), true);
+  assert.equal(nextTheme("dark", true), "system");
+  assert.equal(nextTheme("system", true), "light");
+  assert.equal(new Set(Array.from({ length: 7 }, (_, i) => dailyQuoteIndex(new Date(2026, 10, i + 1, 13)))).size, 7);
+  assert.ok(homeQuotes.every(item => item.title && item.source));
+  assert.equal(new Set(uiLanguages.map(language => uiText(language).banks)).size, 5);
+  for (const language of uiLanguages) assert.equal(Object.values(uiText(language)).filter(Boolean).length, Object.keys(uiText("zh-CN")).length);
+});
+
+test("notifications are private, bounded and based on real replies and likes", async () => {
+  const [route, comments, component, schema, page] = await Promise.all([
+    text("app/api/notifications/route.ts"), text("app/api/comments/route.ts"),
+    text("app/components/HomeNotifications.tsx"), text("db/sync-v3.sql"), text("app/page.tsx"),
+  ]);
+  assert.match(route, /status: 401/);
+  assert.match(route, /private, no-store/);
+  assert.match(route, /r\.parent_id = c\.id/);
+  assert.match(route, /c\.user_id = \$1 AND r\.user_id <> \$1/);
+  assert.match(route, /c\.user_id = \$1 AND l\.user_id <> \$1/);
+  assert.match(route, /created_at >= \$1/);
+  assert.match(comments, /id = \$8 AND question_id = \$3 AND status = 'published'/);
+  assert.match(schema, /REFERENCES comments\(id\) ON DELETE SET NULL/);
+  assert.match(component, /\.slice\(0, 5\)/);
+  assert.match(component, /elapse-notifications-seen:/);
+  assert.match(page, /nameOrder\.compare\(a\.name, b\.name\)/);
+});
+
 test("blind exams always expose submission and final Next opens grading confirmation", async () => {
   const page=await text("app/page.tsx"),css=await text("app/globals.css");
   assert.match(page,/examActive \? props.onSubmit : submitted/);
   assert.match(page,/examActive && <button className="exam-submit-top"/);
-  assert.match(page,/lastExamQuestion \? "交卷评分" : "下一题"/);
+  assert.match(page,/lastExamQuestion \? "交卷评分" : t\.next/);
   assert.match(css,/\.quiz-shell \.tablet-quiz-action\.exam-submit-floating\{display:flex;position:fixed/);
   assert.match(page,/questionOrder: "random" \}, 20, true\)/);
   const next=page.slice(page.indexOf("  function goNextQuestion()"),page.indexOf("  function updateKilledQuestions"));
@@ -1079,7 +1120,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.5.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.0");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1124,7 +1165,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /题库已就位 🎉 此刻就是新起点，题海有岸，胜利正在装进口袋/);
   assert.match(page, /function SearchModal/);
   assert.match(page, /noteCount=\{Object\.values\(notes\)\.filter\(\(note\) => note\.trim\(\)\.length > 0\)\.length\}/);
-  assert.match(page, /葵花宝典<\/span>\{noteCount > 0 && <em>\{noteCount\}<\/em>\}/);
+  assert.match(page, /葵花宝典" : t\.notes\}<\/span>\{noteCount > 0 && <em>\{noteCount\}<\/em>\}/);
   assert.match(page, /版权、免责声明与用户协议/);
   assert.match(page, /重要免责声明与权利义务提示/);
   assert.match(page, /你保证对上传、导入、发布或分享的内容拥有合法权利或充分授权/);
@@ -1134,7 +1175,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(styles, /Copyright, disclaimer, and responsible-use agreement/);
   assert.match(page, /className="community-card"/);
   assert.match(page, /当前题库独立讨论/);
-  assert.match(page, /AI 学习工作台/);
+  assert.match(await text("app/lib/ui-preferences.ts"), /AI 学习工作台/);
   assert.match(page, /学号只生成不可逆的同步标识/);
   assert.match(page, /邮箱验证码/);
   assert.match(page, /导出学习记录/);
@@ -1147,9 +1188,9 @@ test("includes the requested product flows and copy", async () => {
   assert.match(styles, /"Times New Roman","Songti SC","STSong","SimSun",serif/);
   assert.doesNotMatch(page, /红豆伴学/);
   assert.doesNotMatch(page, /AI我在/);
-  assert.match(page, /const homeQuotes/);
+  assert.match(await text("app/lib/ui-preferences.ts"), /export const homeQuotes/);
   assert.match(page, /不存原始学号/);
-  assert.match(page, /自定义AI/);
+  assert.match(page, /aria-label=\{t\.customAi\}/);
   assert.match(page, /\.docx 与 PDF 默认本地提取，旧版 \.doc 会临时发送本站服务器内存处理/);
   assert.match(page, /function QuestionBankPage/);
   assert.match(page, /function ResetBankProgressModal/);
@@ -1312,7 +1353,7 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(page, /reconcileQuestionBankOrder/);
   assert.match(page, /function toggleSavedBankFeatured/);
   assert.match(page, /精选试卷/);
-  assert.match(page, /keyword \? "题库搜索结果" : "全部题库"/);
+  assert.match(page, /keyword \? homeDetails\[language\]\.bankResults : t\.banks/);
   assert.match(page, /filteredBanks\.length/);
   assert.match(page, /bank-request-page-title">藏经阁/);
   assert.doesNotMatch(page, /藏经阁 · Demo/);
@@ -1486,7 +1527,7 @@ test("ships an isolated, responsive English learning demo", async () => {
   assert.match(english, /Your imported papers are still saved/);
   assert.match(english, /setStage\(storedStage \|\| items\[0\]\?\.stage \|\| "cet"\)/);
   assert.match(english, /Why B\?/);
-  assert.match(english, /QR RESOURCE DETECTED/);
+  assert.match(english, /className="qr-detection-card"/);
   assert.match(english, /type="file" multiple/);
   assert.match(english, /Test Library/);
   assert.match(english, /const stageTests = tests\.filter/);
@@ -1839,7 +1880,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.5.2");
+  assert.equal(JSON.parse(packageJson).version, "2.6.0");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2276,7 +2317,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.5.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.0");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2337,7 +2378,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.5.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.0");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2355,7 +2396,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.5.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.0");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2375,7 +2416,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.5.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.0");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
@@ -2480,7 +2521,7 @@ test("home library count follows theme ink and exam rules remain accessible", as
   assert.match(home, /className="library-question-count"><strong>/);
   assert.match(css, /\.library-question-count strong\s*\{\s*color: var\(--ink\)/);
   assert.equal((home.match(/aria-describedby="home-exam-note"/g) || []).length, 2);
-  assert.match(home, /id="home-exam-note">\* 随机挑战最多 20 题，模拟考试最多 100 题/);
+  assert.match(home, /id="home-exam-note">\* \{copy\.examNote\}/);
   assert.doesNotMatch(home, /本地优先 · 无广告|把薄弱点逐个拿下|你的个人复盘视图/);
 });
 

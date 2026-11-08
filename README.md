@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.5.2" src="https://img.shields.io/badge/version-2.5.2-b43d35" />
+    <img alt="Version 2.6.0" src="https://img.shields.io/badge/version-2.6.0-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.6.0:** A daily classical verse, a simpler library, name-sorted Pavilion results, and a notification center for new uploads, comment replies and likes, and five recent versions. Theme follows the device by default, with a 23:00–06:00 fallback when no preference is available. Five-language navigation supports browser detection and manual override; content and some detailed screens remain in their original language.
+
 > **v2.5.2:** The library count follows the active theme for readable contrast. Redundant interface captions are removed; exam and timing rules remain in page footnotes.
 
 > **v2.5.1 appearance update:** Day mode adds restrained peach, sage and mist-blue overlays with distinct sidebar icon tiles; night mode uses neutral graphite glass. Navigation labels are naturally left-aligned with counts on the right. Homepage-only styles preserve practice, sync and scoring, with reduced-transparency fallbacks.

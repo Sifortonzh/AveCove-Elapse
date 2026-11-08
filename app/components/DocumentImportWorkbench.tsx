@@ -76,10 +76,10 @@ export default function DocumentImportWorkbench({ onClose, onSave, initialFile }
   const answered = questions.filter((question) => question.answer.length > 0).length;
   return <div className="modal-layer document-import-layer" onMouseDown={() => !busy && !saving && onClose()}>
     <section className="document-import-modal" role="dialog" aria-modal="true" aria-label="Word 与 PDF 识别工作台" onMouseDown={(event) => event.stopPropagation()}>
-      <header><div><span>DOCUMENT RECOGNITION · LOCAL FIRST</span><h2>Word / PDF 识别工作台</h2><p>只做提取、OCR 与题目识别；预览无误后再保存。这里不会调用 AI。</p></div><button aria-label="关闭工作台" disabled={busy || saving} onClick={onClose}><X /></button></header>
-      <div className="document-import-flow"><div><FileText /><strong>Word .doc / .docx</strong><small>优先保留题干、选项与原文答案</small></div><div><ScanText /><strong>PDF 文字 / OCR</strong><small>扫描效果不足时建议先制作标准 JSON</small></div><div><CheckCircle2 /><strong>识别后审阅</strong><small>确认题数与答案数，再入库</small></div></div>
+      <header><div><h2>Word / PDF 识别工作台</h2><p>只做提取、OCR 与题目识别；预览无误后再保存。这里不会调用 AI。</p></div><button aria-label="关闭工作台" disabled={busy || saving} onClick={onClose}><X /></button></header>
+      <div className="document-import-flow"><div><FileText /><strong>Word .doc / .docx</strong></div><div><ScanText /><strong>PDF 文字 / OCR</strong><small>扫描效果不足时建议先制作标准 JSON</small></div><div><CheckCircle2 /><strong>识别后审阅</strong></div></div>
       <div className="document-import-picker" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); chooseFile(event.dataTransfer.files[0]); }}>
-        <Upload /><div><strong>{file?.name || "拖入 Word 或 PDF 文件"}</strong><small>{file ? "可更换文件后重新识别" : "也可以点击选择文件"}</small></div>
+        <Upload /><div><strong>{file?.name || "拖入 Word 或 PDF 文件"}</strong></div>
         <button type="button" disabled={busy || saving} onClick={() => inputRef.current?.click()}>选择文件</button>
         <input ref={inputRef} hidden type="file" accept=".doc,.docx,.pdf" onChange={(event) => { chooseFile(event.target.files?.[0]); event.currentTarget.value = ""; }} />
       </div>
