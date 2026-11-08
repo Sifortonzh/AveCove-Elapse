@@ -83,15 +83,35 @@
 .home-shell .home-topbar .home-quote { flex: 1 1 18rem; min-width: 0; max-width: none; }
 .home-shell .home-topbar .home-quote h1 { font-size: clamp(1.2rem, 2vw, 1.8rem) !important; line-height: 1.35; }
 .home-shell .home-topbar .top-actions { flex: 0 0 auto; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; margin-inline-start: auto; }
-.home-shell .home-language-select {
+.home-shell .home-language-control {
+  position: relative;
+  display: inline-flex;
   max-width: 8rem;
-  min-height: 39px;
-  padding: 0 6px;
   border: 1px solid var(--home-border);
   border-radius: 12px;
-  background: var(--home-glass);
+  background: #ffffff50;
   color: var(--ink);
+}
+.dark .home-shell .home-language-control { background: #ffffff08; }
+.home-shell .home-language-select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline: 10px 26px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
   font-size: .875rem !important;
+  cursor: pointer;
+}
+.home-shell .home-language-control > svg {
+  position: absolute;
+  inset-inline-end: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 .home-shell .home-language-select:focus-visible { outline: 3px solid var(--bean); outline-offset: 3px; }
 .home-shell .home-notification-trigger { position: relative; }
@@ -235,7 +255,7 @@
   .home-shell .home-quote { flex-basis: 100%; min-height: 0; padding: 14px 16px; }
   .home-shell .home-topbar .top-actions { position: static; transform: none; flex-direction: row; justify-content: flex-start; margin-inline-start: 0; }
   .home-shell .home-topbar .top-actions > button { display: grid; place-items: center; }
-  .home-shell .home-language-select { min-height: 34px; border-radius: 10px; }
+  .home-shell .home-language-control { border-radius: 10px; }
 }
 @media (prefers-reduced-transparency: reduce) {
   .home-shell .home-bento > article,
@@ -248,7 +268,7 @@
 
 .home-shell .home-topbar .top-actions { --home-tool-size: 44px; }
 .home-shell .home-topbar .top-actions > button,
-.home-shell .home-topbar .home-language-select {
+.home-shell .home-topbar .home-language-control {
   height: var(--home-tool-size) !important;
   min-height: var(--home-tool-size) !important;
   box-sizing: border-box;
