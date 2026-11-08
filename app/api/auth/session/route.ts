@@ -7,11 +7,11 @@ import { query } from "@/app/lib/server/db";
 import { allowRequest, requestFingerprint } from "@/app/lib/server/rate-limit";
 import { consumeEmailCode } from "@/app/lib/server/login-code";
 
-type UserRow = { id: string; email: string | null; nickname: string };
+type UserRow = { id: string; email: string | null; nickname: string; avatar_slot: number };
 
 function sessionResponse(user: UserRow, emailVerified = false) {
   const session: Omit<SessionUser, "expiresAt"> = { userId: user.id, nickname: user.nickname, ...(user.email ? { email: user.email, emailVerified } : {}) };
-  const response = NextResponse.json({ ok: true, user: publicSession({ ...session, expiresAt: Date.now() + 30 * 24 * 60 * 60_000 }) });
+  const response = NextResponse.json({ ok: true, user: publicSession({ ...session, expiresAt: Date.now() + 30 * 24 * 60 * 60_000 }, user.avatar_slot) });
   response.cookies.set(SESSION_COOKIE, createSessionToken(session), {
     httpOnly: true,
     sameSite: "lax",
@@ -24,7 +24,10 @@ function sessionResponse(user: UserRow, emailVerified = false) {
 
 export async function GET(request: Request) {
   const session = readSession(request);
-  return NextResponse.json({ user: session ? publicSession(session) : null });
+  const headers = { "Cache-Control": "private, no-store" };
+  if (!session) return NextResponse.json({ user: null }, { headers });
+  const [user] = await query<{ avatar_slot: number }>("SELECT avatar_slot FROM users WHERE id = $1", [session.userId]).catch(() => []);
+  return NextResponse.json({ user: publicSession(session, user?.avatar_slot) }, { headers });
 }
 
 export async function POST(request: Request) {
@@ -41,7 +44,7 @@ export async function POST(request: Request) {
 
     if (!studentId && email) {
       if (!code || !(await consumeEmailCode(email, code))) return NextResponse.json({ error: "邮箱验证码无效或已过期。" }, { status: 401 });
-      const users = await query<UserRow>("SELECT id, email, nickname FROM users WHERE email = $1", [email]);
+      const users = await query<UserRow>("SELECT id, email, nickname, avatar_slot FROM users WHERE email = $1", [email]);
       if (!users[0]) return NextResponse.json({ error: "该邮箱尚未绑定学号，请先使用学号建立同步身份。" }, { status: 404 });
       await query("UPDATE users SET last_seen_at = NOW() WHERE id = $1", [users[0].id]);
       return sessionResponse(users[0], true);
@@ -63,7 +66,7 @@ export async function POST(request: Request) {
          nickname = EXCLUDED.nickname,
          last_seen_at = NOW()
        WHERE EXCLUDED.email IS NULL OR users.email IS NULL OR users.email = EXCLUDED.email
-       RETURNING id, email, nickname`,
+       RETURNING id, email, nickname, avatar_slot`,
       [userId, email, nickname],
     );
     if (!users[0]) return NextResponse.json({ error: "该账号已有绑定邮箱，请用原邮箱验证码登录。" }, { status: 409 });

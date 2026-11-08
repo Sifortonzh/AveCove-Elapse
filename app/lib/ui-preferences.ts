@@ -1,7 +1,7 @@
 export const uiLanguages = ["zh-CN", "zh-TW", "en", "ja", "ko"] as const;
 export type UiLanguage = typeof uiLanguages[number];
 export type UiLanguageMode = UiLanguage | "system";
-export type ThemeMode = "light" | "dark" | "system";
+export type ThemeMode = "light" | "dark" | "system" | "auto";
 
 export function resolveUiLanguage(preference: UiLanguageMode, languages: readonly string[]): UiLanguage {
   if (preference !== "system") return preference;
@@ -15,13 +15,19 @@ export function resolveUiLanguage(preference: UiLanguageMode, languages: readonl
   return "zh-CN";
 }
 
-export function resolveSystemDark(dark: boolean, light: boolean, hour: number) {
-  return dark || (!light && (hour >= 23 || hour < 6));
+export function resolveClockDark(hour: number) {
+  return hour >= 19 || hour < 6;
 }
 
-export function nextTheme(mode: ThemeMode, dark: boolean): ThemeMode {
-  return mode === "system" ? (dark ? "light" : "dark") : mode === "light" ? "dark" : "system";
+export function resolveSystemDark(dark: boolean, light: boolean, hour: number) {
+  return dark || (!light && resolveClockDark(hour));
 }
+
+export function nextTheme(mode: ThemeMode): ThemeMode {
+  return mode === "auto" ? "light" : mode === "light" ? "dark" : mode === "dark" ? "system" : "auto";
+}
+
+export const automaticThemeNames: Record<UiLanguage, string> = { "zh-CN": "自动昼夜", "zh-TW": "自動晝夜", en: "Day / night", ja: "昼夜で切替", ko: "낮·밤 자동" };
 
 const labels = ["home","banks","wrong","favorites","notes","profile","arena","importBank","sync","syncManage","customAi","legal","vault","back","messages","language","system","search","theme","account","today","studyProgress","practice","start","resume","practiceSettings","sequential","challenge","exam","library","viewBanks","insights","ai","total","done","accuracy","questions","previous","next","answerSheet","settings","confirm","learning","uploads","responses","releases","readAll","close","empty","login","retry","loading","themeLight","themeDark"] as const;
 type Label = typeof labels[number];

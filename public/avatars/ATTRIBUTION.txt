@@ -1,0 +1,6 @@
+Twemoji animal graphics, from Twemoji by Twitter, Inc. and contributors.
+Community-maintained upstream: https://github.com/jdecked/twemoji
+Source revision (v17.0.3): https://github.com/jdecked/twemoji/tree/b6b55fef1e8636b540a6d016a4729ca8cdf2e60b/assets/svg
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+SVG artwork unchanged. Elapse displays the files inside its own avatar controls.

@@ -6,6 +6,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Flame, UserRound } from "
 import type { StudyActivity } from "../lib/record-sync";
 import { activitySeries, activitySummary, localDay, type ActivityPeriod } from "../lib/study-activity";
 import "./study-profile.css";
+import AccountAvatar from "./AccountAvatar";
 
 function duration(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -16,7 +17,7 @@ const slots = Array.from({ length: 6 }, (_, i) => `${i * 4}–${(i + 1) * 4}时`
 
 export default function StudyProfile({ language, nickname, account, activity, progress, onBack, onAccount }: {
   language: UiLanguage;
-  nickname: string; account: { id: string; email?: string } | null; activity: StudyActivity;
+  nickname: string; account: { id: string; email?: string; avatarSlot?: number } | null; activity: StudyActivity;
   progress: Record<string, "correct" | "wrong">; onBack: () => void; onAccount: () => void;
 }) {
   const [period, setPeriod] = useState<ActivityPeriod>("week");
@@ -55,7 +56,7 @@ export default function StudyProfile({ language, nickname, account, activity, pr
   const t = uiText(language);
   return <section className="study-profile" aria-label={t.profile}>
     <header className="study-profile-nav"><button onClick={onBack}><ArrowLeft size={18} />{t.home}</button><button onClick={onAccount}><UserRound size={18} />{account ? "管理账号" : "登录同步"}</button></header>
-    <section className="study-identity"><button className="study-avatar" onClick={onAccount} aria-label="管理个人身份">{nickname.trim().slice(0, 1) || "红"}</button><div><h1>{nickname}</h1></div></section>
+    <section className="study-identity"><button className="study-avatar" onClick={onAccount} aria-label="管理个人身份"><AccountAvatar slot={account?.avatarSlot} nickname={nickname} /></button><div><h1>{nickname}</h1></div></section>
     <section className="study-totals" aria-label="累计学习数据" aria-describedby="study-timing-note"><div><span><Clock3 size={17} />累计刷题时长 <sup aria-hidden="true">*</sup></span><strong className="study-clock">{Math.floor(summary.seconds / 3600)}<small>时</small>{String(Math.floor(summary.seconds % 3600 / 60)).padStart(2,"0")}<small>分</small></strong></div><div><span>已答题量</span><b>{answered.toLocaleString()}<small>题</small></b></div></section>
     <section className="study-metrics"><div><b>{summary.answers ? `${Math.round(summary.perAnswer)}秒` : "—"}</b><span>平均每题用时</span></div><div><b>{duration(summary.perDay)}</b><span>平均每日用时</span></div><div><b>{answered ? `${accuracy}%` : "—"}</b><span>当前平均正确率</span></div><div><b>{summary.longest}天</b><span>最长连续学习</span></div><div><b><Flame size={19} />{summary.current}天</b><span>当前连续学习</span></div></section>
     <div className="study-period"><div role="group" aria-label="统计周期">{periods.map(([id, label]) => <button key={id} aria-pressed={id === period} onClick={() => setPeriod(id)}>{label}</button>)}</div><div className="study-date"><button aria-label="上一周期" onClick={() => move(-1)}><ChevronLeft size={18} /></button><strong>{title}</strong><button aria-label="下一周期" onClick={() => move(1)}><ChevronRight size={18} /></button><button onClick={() => setAnchor(Date.now())}>今天</button></div></div>

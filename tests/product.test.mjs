@@ -8,7 +8,7 @@ const root = new URL("../", import.meta.url);
 test("device preferences resolve languages, theme fallback boundaries and daily verses", async () => {
   const source = await text("app/lib/ui-preferences.ts");
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
-  const { resolveUiLanguage, resolveSystemDark, nextTheme, dailyQuoteIndex, homeQuotes, uiLanguages, uiText } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  const { resolveUiLanguage, resolveClockDark, resolveSystemDark, nextTheme, dailyQuoteIndex, homeQuotes, uiLanguages, uiText } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
   assert.equal(resolveUiLanguage("system", ["de", "zh-Hant-HK"]), "zh-TW");
   assert.equal(resolveUiLanguage("system", ["ja-JP", "zh-CN"]), "ja");
   assert.equal(resolveUiLanguage("system", ["ko-KR"]), "ko");
@@ -20,12 +20,33 @@ test("device preferences resolve languages, theme fallback boundaries and daily 
   assert.equal(resolveSystemDark(false, false, 6), false);
   assert.equal(resolveSystemDark(false, true, 23), false);
   assert.equal(resolveSystemDark(true, false, 12), true);
-  assert.equal(nextTheme("dark", true), "system");
-  assert.equal(nextTheme("system", true), "light");
+  assert.equal(resolveClockDark(18), false);
+  assert.equal(resolveClockDark(19), true);
+  assert.equal(resolveClockDark(5), true);
+  assert.equal(resolveClockDark(6), false);
+  assert.equal(nextTheme("dark"), "system");
+  assert.equal(nextTheme("system"), "auto");
+  assert.equal(nextTheme("auto"), "light");
   assert.equal(new Set(Array.from({ length: 7 }, (_, i) => dailyQuoteIndex(new Date(2026, 10, i + 1, 13)))).size, 7);
   assert.ok(homeQuotes.every(item => item.title && item.source));
   assert.equal(new Set(uiLanguages.map(language => uiText(language).banks)).size, 5);
   for (const language of uiLanguages) assert.equal(Object.values(uiText(language)).filter(Boolean).length, Object.keys(uiText("zh-CN")).length);
+});
+
+test("account avatars precede the language selector and bundle the complete fixed slot pool", async () => {
+  const [page, avatar, migration, auth, account, attribution] = await Promise.all([
+    text("app/page.tsx"), text("app/components/AccountAvatar.tsx"), text("db/user-avatars.sql"),
+    text("app/api/auth/session/route.ts"), text("app/api/account/route.ts"), text("public/avatars/ATTRIBUTION.txt"),
+  ]);
+  assert.match(page, /className="profile"[^\n]*<AccountAvatar slot=\{account\?\.avatarSlot\}[^\n]*<select className="home-language-select"/);
+  const assets = avatar.match(/"1f[0-9a-f]{3}"/g).map(value => JSON.parse(value));
+  assert.equal(new Set(assets).size, 16);
+  for (const id of assets) assert.match(await text(`public/avatars/${id}.svg`), /^<svg /);
+  assert.match(migration, /WHERE avatar_slot IS NULL/);
+  assert.match(migration, /ORDER BY count\(u\.id\), slots\.slot LIMIT 1/);
+  assert.match(auth, /SELECT avatar_slot FROM users WHERE id = \$1/);
+  assert.match(account, /RETURNING avatar_slot/);
+  assert.match(attribution, /CC BY 4\.0/);
 });
 
 test("notifications are private, bounded and based on real replies and likes", async () => {
@@ -1153,7 +1174,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.6.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.3");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1913,7 +1934,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.6.2");
+  assert.equal(JSON.parse(packageJson).version, "2.6.3");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2350,7 +2371,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.6.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.3");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2411,7 +2432,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.3");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2429,7 +2450,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.3");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2449,7 +2470,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.2");
+  assert.equal(JSON.parse(manifest).version, "2.6.3");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

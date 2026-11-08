@@ -18,9 +18,10 @@ import StudyProfile from "./components/StudyProfile";
 import StudyLeaderboard from "./components/StudyLeaderboard";
 import HomeNotifications from "./components/HomeNotifications";
 import MockExamTimer from "./components/MockExamTimer";
+import AccountAvatar from "./components/AccountAvatar";
 import PavilionAnnotationDialog from "./components/PavilionAnnotationDialog";
 import { syncHasProblem } from "./lib/sync-feedback";
-import { dailyQuoteIndex, homeDetails, homeQuotes, languageNames, systemLanguageNames, nextTheme, resolveSystemDark, resolveUiLanguage, uiLanguages, uiText, type ThemeMode, type UiLanguage, type UiLanguageMode } from "./lib/ui-preferences";
+import { automaticThemeNames, dailyQuoteIndex, homeDetails, homeQuotes, languageNames, systemLanguageNames, nextTheme, resolveClockDark, resolveSystemDark, resolveUiLanguage, uiLanguages, uiText, type ThemeMode, type UiLanguage, type UiLanguageMode } from "./lib/ui-preferences";
 import { useStudyTracker } from "./components/useStudyTracker";
 import { MathText } from "./components/MathText";
 import { QuestionImages } from "./components/QuestionImages";
@@ -73,7 +74,7 @@ type Western306SubjectScope = "all" | Western306Subject;
 type StudyMode = "standard" | "blind" | "memorize";
 type AiMode = "summary" | "pitfall" | "companion";
 type View = "home" | "quiz" | "banks" | "bank-requests" | "notes" | "copyright" | "profile" | "leaderboard";
-type AccountSession = { id: string; nickname: string; email?: string; expiresAt: number };
+type AccountSession = { id: string; nickname: string; email?: string; expiresAt: number; avatarSlot?: number };
 type SharedComment = { id: string; nickname: string; text: string; createdAt: string; status?: string; likes: number; own?: boolean; replyTo?: string | null };
 type ImportReport = { id: string; name: string; status: "waiting" | "processing" | "success" | "failed" | "cancelled" | "ai-ready"; detail: string };
 type AiFallbackFile = { id: string; fileName: string; extractedText: string };
@@ -155,7 +156,7 @@ const defaultSettings: Settings = {
   showAnswerOnReturn: false,
   autoFavoriteWrong: true,
   darkMode: false,
-  themeMode: "system",
+  themeMode: "auto",
 };
 
 function normalizeSettings(value: unknown): Settings {
@@ -169,9 +170,9 @@ function normalizeSettings(value: unknown): Settings {
     || stored.western306Subject === "surgery"
     ? stored.western306Subject
     : "all";
-  const themeMode: ThemeMode = stored.themeMode === "light" || stored.themeMode === "dark" || stored.themeMode === "system"
+  const themeMode: ThemeMode = stored.themeMode === "light" || stored.themeMode === "dark" || stored.themeMode === "system" || stored.themeMode === "auto"
     ? stored.themeMode
-    : stored.darkMode ? "dark" : "system";
+    : stored.darkMode ? "dark" : "auto";
   return { ...defaultSettings, ...stored, noteTags: noteTagCatalog(stored.noteTags), studyMode, western306Subject, themeMode, darkMode: themeMode === "dark" };
 }
 
@@ -382,6 +383,7 @@ export default function HomePage() {
   const [manualSyncing, setManualSyncing] = useState(false);
   const [syncRevision, setSyncRevision] = useState(0);
   const [systemDark, setSystemDark] = useState(false);
+  const [clockDark, setClockDark] = useState(false);
   const [localReady, setLocalReady] = useState(false);
   const [toast, setToast] = useState("");
   const [quoteIndex, setQuoteIndex] = useState(0);
@@ -510,18 +512,27 @@ export default function HomePage() {
     const update = () => {
       const now = new Date();
       setSystemDark(resolveSystemDark(Boolean(dark?.matches), Boolean(light?.matches), now.getHours()));
+      setClockDark(resolveClockDark(now.getHours()));
       setQuoteIndex(dailyQuoteIndex(now));
     };
     update();
     const timer = window.setInterval(update, 30_000);
-    dark?.addEventListener?.("change", update);
-    light?.addEventListener?.("change", update);
+    for (const query of [dark, light]) {
+      if (query?.addEventListener) query.addEventListener("change", update);
+      else query?.addListener?.(update);
+    }
     window.addEventListener("focus", update);
+    window.addEventListener("pageshow", update);
+    document.addEventListener("visibilitychange", update);
     return () => {
       window.clearInterval(timer);
-      dark?.removeEventListener?.("change", update);
-      light?.removeEventListener?.("change", update);
+      for (const query of [dark, light]) {
+        if (query?.removeEventListener) query.removeEventListener("change", update);
+        else query?.removeListener?.(update);
+      }
       window.removeEventListener("focus", update);
+      window.removeEventListener("pageshow", update);
+      document.removeEventListener("visibilitychange", update);
     };
   }, []);
 
@@ -1988,7 +1999,7 @@ export default function HomePage() {
     setAiTexts({});
   }
 
-  const resolvedDark = settings.themeMode === "system" ? systemDark : settings.themeMode === "dark";
+  const resolvedDark = settings.themeMode === "auto" ? clockDark : settings.themeMode === "system" ? systemDark : settings.themeMode === "dark";
 
   if (learningMode === "english") {
     return <main className={`product english-product ${resolvedDark ? "dark" : ""}`}><EnglishLearningView accountId={account?.id} onExit={() => switchLearningMode("medical")} /></main>;
@@ -2015,7 +2026,7 @@ export default function HomePage() {
           onLeaderboard={() => setView("leaderboard")}
           onCopyright={() => setView("copyright")}
           onToggleTheme={() => {
-            const themeMode = nextTheme(settings.themeMode, resolvedDark);
+            const themeMode = nextTheme(settings.themeMode);
             saveSettings({ ...settings, themeMode, darkMode: themeMode === "dark" });
           }}
           themeMode={settings.themeMode}
@@ -2190,7 +2201,7 @@ function HomeView({ language, languageMode, onLanguage, onVault, themeMode, bank
   const t = uiText(language);
   const copy = homeDetails[language];
   const themed = language === "zh-CN";
-  const themeLabel = themeMode === "system" ? t.system : themeMode === "dark" ? t.themeDark : t.themeLight;
+  const themeLabel = themeMode === "auto" ? automaticThemeNames[language] : themeMode === "system" ? t.system : themeMode === "dark" ? t.themeDark : t.themeLight;
   return <div className="home-shell">
     <aside className="home-sidebar">
       <Brand />
@@ -2206,7 +2217,7 @@ function HomeView({ language, languageMode, onLanguage, onVault, themeMode, bank
       <div className="sidebar-bottom"><button className={`sync-entry${account && syncHasProblem(syncStatus, syncing) ? " sync-problem" : ""}`} onClick={onAccount} aria-label={account ? t.syncManage : t.sync} title={account ? t.syncManage : t.sync}><Cloud size={18} /><span>{account ? t.syncManage : t.sync}</span></button>{account && <SyncStatusNotice status={syncStatus} syncing={syncing} onSync={onSync} onDetails={onAccount} />}<button className="import-entry" aria-label={t.importBank} onClick={onImport}><Import size={18} /><span>{t.importBank}</span></button><a className="custom-ai-entry" aria-label={t.customAi} href="/custom-ai"><Bot size={17} /><span>{t.customAi}</span></a><button className="copyright-link" onClick={onCopyright}><FileText size={16} />{t.legal}</button></div>
     </aside>
     <section className="home-main">
-      <header className="home-topbar"><div className="home-quote" lang="zh-CN"><h1 title={quote.source}>{quote.title}</h1></div><div className="top-actions"><button className="english-learning-toggle" aria-label="English Learning" onClick={onEnglish}><Languages size={17} /><span>English Learning</span></button><button aria-label={t.search} onClick={onSearch}><Search size={19} /></button><button aria-label={t.theme} title={themeLabel} onClick={onToggleTheme}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><HomeNotifications key={account?.id ?? "guest"} accountId={account?.id} language={language} onOpenVault={onVault} /><select className="home-language-select" aria-label={t.language} value={languageMode} onChange={event => onLanguage(event.target.value as UiLanguageMode)}><option value="system">{systemLanguageNames[language]}</option>{uiLanguages.map(value => <option key={value} value={value}>{languageNames[value]}</option>)}</select><button className="profile" onClick={onAccount} aria-label={t.account}>{(nickname.trim()[0] || "红").toUpperCase()}</button></div></header>
+      <header className="home-topbar"><div className="home-quote" lang="zh-CN"><h1 title={quote.source}>{quote.title}</h1></div><div className="top-actions"><button className="english-learning-toggle" aria-label="English Learning" onClick={onEnglish}><Languages size={17} /><span>English Learning</span></button><button aria-label={t.search} onClick={onSearch}><Search size={19} /></button><button aria-label={t.theme} title={themeLabel} onClick={onToggleTheme}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><HomeNotifications key={account?.id ?? "guest"} accountId={account?.id} language={language} onOpenVault={onVault} /><button className="profile" onClick={onAccount} aria-label={t.account}><AccountAvatar slot={account?.avatarSlot} nickname={nickname} /></button><select className="home-language-select" aria-label={t.language} value={languageMode} onChange={event => onLanguage(event.target.value as UiLanguageMode)}><option value="system">{systemLanguageNames[language]}</option>{uiLanguages.map(value => <option key={value} value={value}>{languageNames[value]}</option>)}</select></div></header>
       <section className="home-bento" aria-label={t.today}>
         <article className="hero-card bento-hero">
           <div className="hero-copy"><span className="overline"><Sparkles size={14} /> {t.today}</span><h2>{bankName}</h2><div className="hero-actions"><button className="primary-action" onClick={() => onPractice({ scope: answered ? "unanswered" : "all" })}><Play size={17} fill="currentColor" />{answered ? t.resume : t.start}</button><button className="ghost-action" onClick={() => onPractice()}>{t.practiceSettings} <Settings2 size={16} /></button></div></div>
@@ -3342,7 +3353,7 @@ function SettingsModal({ settings, counts, typeCounts, western306SubjectCounts, 
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
   return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>开始之前</span><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section study-mode-section"><label>刷题模式</label><div className="study-mode-grid"><button className={settings.studyMode === "standard" ? "active" : ""} onClick={() => update("studyMode", "standard")}><Target size={19} /><strong>标准练习</strong><span>提交后立即判题并记录对错</span></button><button className={settings.studyMode === "blind" ? "active" : ""} onClick={() => update("studyMode", "blind")}><EyeOff size={19} /><strong>盲刷</strong><span>先连续作答，需要时再对答案</span></button><button className={settings.studyMode === "memorize" ? "active" : ""} onClick={() => update("studyMode", "memorize")}><Eye size={19} /><strong>背题</strong><span>进入后直接展开标准答案</span></button></div>{settings.studyMode !== "standard" && <p className="study-mode-note">{settings.studyMode === "blind" ? "盲刷会保留每题选择，但在点击“对答案”前不判分、不显示正误。" : "背题只用于快速记忆，不会把浏览行为计入做题数、正确率或首次得分。"}</p>}</div><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
     ["all", "全部题目", Library], ["unanswered", "未练题目", Zap], ["wrong", "错题复盘", RotateCcw], ["favorite", "精选题", Star],
-  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div>{showWestern306Subjects && <div className="setting-section western306-subject-section"><label>西综 306 · 只练某一科</label><div className="western306-subject-grid"><button className={settings.western306Subject === "all" ? "active" : ""} onClick={() => update("western306Subject", "all")}><strong>全部科目</strong><em>{western306SubjectCounts.all} 道</em></button>{WESTERN_306_SUBJECTS.map((subject) => <button key={subject.id} className={settings.western306Subject === subject.id ? "active" : ""} onClick={() => update("western306Subject", subject.id)}><strong>{subject.label}</strong><em>{western306SubjectCounts[subject.id]} 道</em></button>)}</div><p className="western306-subject-note">按现代 165 题固定题号分布筛选；单科练习不包含第 108–115 题医学人文。</p></div>}<div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋X 型</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
+  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div>{showWestern306Subjects && <div className="setting-section western306-subject-section"><label>西综 306 · 只练某一科</label><div className="western306-subject-grid"><button className={settings.western306Subject === "all" ? "active" : ""} onClick={() => update("western306Subject", "all")}><strong>全部科目</strong><em>{western306SubjectCounts.all} 道</em></button>{WESTERN_306_SUBJECTS.map((subject) => <button key={subject.id} className={settings.western306Subject === subject.id ? "active" : ""} onClick={() => update("western306Subject", subject.id)}><strong>{subject.label}</strong><em>{western306SubjectCounts[subject.id]} 道</em></button>)}</div><p className="western306-subject-note">按现代 165 题固定题号分布筛选；单科练习不包含第 108–115 题医学人文。</p></div>}<div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋X 型</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "auto" ? "active" : ""} aria-pressed={settings.themeMode === "auto"} title="19:00 至次日 06:00 为夜间" onClick={() => onChange({ ...settings, themeMode: "auto", darkMode: false })}><Clock3 size={17} />自动昼夜</button><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
 }
 
 function SwitchRow({ label, detail, value, onChange }: { label: string; detail: string; value: boolean; onChange: (value: boolean) => void }) {
@@ -3653,7 +3664,7 @@ function AccountModal({ account, syncStatus, syncFiles, syncing, nickname: initi
     }
   }
 
-  return <div className="modal-layer account-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose} aria-label="关闭同步窗口"><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span>{account.nickname.slice(0, 1)}</span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><form className="public-nickname-form" onSubmit={event => { event.preventDefault(); void savePublicNickname(); }}><label>🏷️ 公开昵称<input aria-label="公开昵称" value={nickname} maxLength={20} onChange={event => setNickname(event.target.value)} /></label><button disabled={busy || !nickname.trim() || nickname.trim() === account.nickname}>{busy ? "保存中…" : "保存昵称"}</button><small>用于藏经阁和讨论区；不会显示学号或邮箱。</small>{message && <p role="status">{message}</p>}</form><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><SyncFileList files={syncFiles} syncing={syncing} onSync={onSync} /><div className="sync-coverage"><span><Database />已导入中文题库</span><span><BookOpen />英文 Test Library</span><span><CheckCircle2 />答题记录与写作草稿</span><span><NotebookPen />收藏、错题与笔记</span></div><p className="sync-privacy-copy">原始 Word、PDF 不会上传；解析后的题库、内嵌题图、笔记图片和学习记录会压缩同步。请只同步你有权使用的资料。</p><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。登录后可同步解析后的中英文题库与学习记录；原始文件仍只留在你的设备。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📚 同步题库与记录</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
+  return <div className="modal-layer account-layer" onMouseDown={onClose}><section className="account-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>轻量身份 · 多端同步</span><h2>{account ? "管理同步身份" : "把学习进度稳稳接上"}</h2></div><button onClick={onClose} aria-label="关闭同步窗口"><X /></button></header>{account ? <div className="account-signed"><div className="account-badge"><span><AccountAvatar slot={account.avatarSlot} nickname={account.nickname} /></span><div><strong>{account.nickname}</strong><p>{account.email ?? "未绑定邮箱"}</p></div><ShieldCheck /></div><form className="public-nickname-form" onSubmit={event => { event.preventDefault(); void savePublicNickname(); }}><label>🏷️ 公开昵称<input aria-label="公开昵称" value={nickname} maxLength={20} onChange={event => setNickname(event.target.value)} /></label><button disabled={busy || !nickname.trim() || nickname.trim() === account.nickname}>{busy ? "保存中…" : "保存昵称"}</button><small>用于藏经阁和讨论区；不会显示学号或邮箱。</small>{message && <p role="status">{message}</p>}</form><div className="sync-state"><Cloud /><div><strong>多端同步已开启</strong><p>{syncStatus}</p></div></div><SyncFileList files={syncFiles} syncing={syncing} onSync={onSync} /><div className="sync-coverage"><span><Database />已导入中文题库</span><span><BookOpen />英文 Test Library</span><span><CheckCircle2 />答题记录与写作草稿</span><span><NotebookPen />收藏、错题与笔记</span></div><p className="sync-privacy-copy">原始 Word、PDF 不会上传；解析后的题库、内嵌题图、笔记图片和学习记录会压缩同步。请只同步你有权使用的资料。</p><div className="record-actions"><button onClick={onSync}><RefreshCw />立即同步</button><button onClick={onExport}><Download />导出学习记录</button><button onClick={() => importRef.current?.click()}><Upload />导入学习记录</button><input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div><div className="account-danger"><button onClick={onLogout}>退出当前设备</button><button onClick={onDelete}><Trash2 />注销云端身份</button></div></div> : <form className="account-form" onSubmit={login}><div className="privacy-banner"><span className="privacy-icon"><ShieldCheck /></span><div><strong>放心同步 <span aria-hidden="true">🔐☁️</span></strong><p>学号只生成不可逆的同步标识，服务器不保存原始学号。登录后可同步解析后的中英文题库与学习记录；原始文件仍只留在你的设备。</p><div className="privacy-tags"><span>🔒 不存原始学号</span><span>📚 同步题库与记录</span><span>📮 邮箱按需使用</span></div></div></div><label><span>学号 <em>同步主键</em></span><input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="首次使用请填写学号" autoComplete="username" /></label><label><span>昵称 <em>评论区显示</em></span><input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="例如：红豆同学" /></label><label><span>邮箱 <em>可选 · 登录与身份保护</em></span><div className="code-field"><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="绑定时需验证码" autoComplete="email" /><button type="button" onClick={sendCode} disabled={busy || !email.trim()}>发送验证码</button></div></label>{email && <label><span>邮箱验证码</span><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="6 位验证码" /></label>}<p className="email-login-hint">已有绑定邮箱？学号留空，填写邮箱与验证码即可登录 📮</p>{message && <p className="account-message">{message}</p>}<button className="account-submit" disabled={busy || (!studentId.trim() && !email.trim())}><Cloud />{busy ? "正在连接…" : "开启安全同步"}</button></form>}</section></div>;
 }
 
 function SearchModal({ banks, returnToQuiz = false, onOpen, onClose }: { banks: SavedQuestionBank[]; returnToQuiz?: boolean; onOpen: (bank: SavedQuestionBank, id: string) => Promise<void> | void; onClose: () => void }) {
@@ -3813,6 +3824,8 @@ function CopyrightPage({ bankName, onHome, onRestoreDemo }: { bankName: string; 
           <article><b>03</b><h2>医学与 AI 声明</h2><p>题目答案、AI 总结与讨论内容可能存在错误、遗漏或时效差异，仅用于学习辅助，不构成医疗服务，不能替代现行教材、指南、执业判断、诊断或治疗建议。</p></article>
           <article><b>04</b><h2>隐私与数据</h2><p>原始学号只用于生成不可逆同步标识。普通题库导入不自动调用 AI；识别失败时，可自行下载提取文字 JSON 并决定是否交给外部 AI。严禁导入可识别患者身份的资料。</p></article>
         </section>
+
+        <p>内置动物头像：<a href="/avatars/ATTRIBUTION.txt">Twemoji（CC BY 4.0）</a>。</p>
 
         <section className="terms-section" aria-labelledby="terms-title">
           <header className="terms-head">

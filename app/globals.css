@@ -860,3 +860,11 @@ dialog.note-preview-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-
 .pavilion-note-dialog p[role="alert"] { color:var(--bean) }
 .pavilion-note-dialog textarea { display:block;width:100%;margin:7px 0;resize:vertical;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--ink) }
 .pavilion-note-dialog footer { display:flex;justify-content:flex-end;gap:8px;margin-top:16px }
+.account-avatar-art { display:block;object-fit:contain; }
+.home-topbar .profile .account-avatar-art { width:67%;height:67%; }
+.study-identity .study-avatar .account-avatar-art { width:68%;height:68%;margin:auto; }
+.account-badge .account-avatar-art { width:68%;height:68%; }
+.product .theme-segmented { grid-template-columns:repeat(4,minmax(0,1fr)); }
+@media (max-width:620px) {
+  .product .theme-segmented { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}

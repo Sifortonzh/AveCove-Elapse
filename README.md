@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.6.2" src="https://img.shields.io/badge/version-2.6.2-b43d35" />
+    <img alt="Version 2.6.3" src="https://img.shields.io/badge/version-2.6.3-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.6.3:** Fixed animal avatars now appear before the language selector, and the optional day/night schedule switches at 19:00 and 06:00 local time.
+>
 > **v2.6.2:** Compact touch sync and aligned home controls, clearer leaderboard rules, uploader-only annotation editing, and mock exams with a stopwatch, a configurable countdown, and green review pins.
 
 > **v2.6.0:** A daily classical verse, a simpler library, name-sorted Pavilion results, and a notification center for new uploads, comment replies and likes, and five recent versions. Theme follows the device by default, with a 23:00–06:00 fallback when no preference is available. Five-language navigation supports browser detection and manual override; content and some detailed screens remain in their original language.

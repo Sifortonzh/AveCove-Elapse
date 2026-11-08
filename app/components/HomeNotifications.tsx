@@ -5,6 +5,7 @@ import { Bell, X } from "lucide-react";
 import { type UiLanguage, uiText } from "../lib/ui-preferences";
 
 const updates = [
+  { version: "v2.6.3", at: "2026-11-08T23:03:00+08:00", detail: "头像移到语言前，为账号分配固定动物头像；新增自动昼夜切换。" },
   { version: "v2.6.2", at: "2026-11-08T22:32:00+08:00", detail: "移动端同步入口、榜单规则、藏经阁备注，以及模拟考试计时与绿针复盘。" },
   { version: "v2.6.1", at: "2026-11-08T13:14:00+08:00", detail: "首页工具随可用宽度排列，精简语言选项。" },
   { version: "v2.6.0", at: "2026-11-08T00:00:00+08:00", detail: "消息中心、古诗主页、藏经阁排序与语言入口。" },
