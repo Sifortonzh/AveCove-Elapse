@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.6.0" src="https://img.shields.io/badge/version-2.6.0-b43d35" />
+    <img alt="Version 2.6.1" src="https://img.shields.io/badge/version-2.6.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.6.1:** The daily verse and controls share a row when space allows and wrap on narrow or zoomed screens. The compact language selector keeps full language names and a short System option.
+
 > **v2.6.0:** A daily classical verse, a simpler library, name-sorted Pavilion results, and a notification center for new uploads, comment replies and likes, and five recent versions. Theme follows the device by default, with a 23:00–06:00 fallback when no preference is available. Five-language navigation supports browser detection and manual override; content and some detailed screens remain in their original language.
 
 > **v2.5.2:** The library count follows the active theme for readable contrast. Redundant interface captions are removed; exam and timing rules remain in page footnotes.

@@ -33,6 +33,7 @@ const translations: Record<UiLanguage, string[]> = {
   ko: ["홈","내 문제집","오답","즐겨찾기","내 노트","학습 통계","순위표","문제집 가져오기","동기화 켜기","동기화 관리","AI 설정","저작권 및 이용약관","공유 문제집","뒤로","알림","언어","시스템 설정","문제 검색","테마 전환","동기화 계정","오늘의 학습","진행률","연습 모드","학습 시작","학습 이어가기","연습 설정","순서대로 연습","무작위 연습","모의고사","라이브러리","문제집 보기","학습 현황","AI 학습 도구","전체 문제","완료","정답률","문항","이전 문제","다음 문제","답안 목록","설정","정답 확인","학습 패널","오늘의 새 문제집","답글과 좋아요","업데이트","모두 읽음","닫기","알림이 없습니다","로그인 후 확인","다시 시도","불러오는 중…","밝게","어둡게"],
 };
 export const languageNames: Record<UiLanguage, string> = { "zh-CN": "简体中文", "zh-TW": "繁體中文", en: "English", ja: "日本語", ko: "한국어" };
+export const systemLanguageNames: Record<UiLanguage, string> = { "zh-CN": "跟随系统", "zh-TW": "跟隨系統", en: "System", ja: "システム", ko: "시스템" };
 export function uiText(language: UiLanguage): Record<Label, string> {
   return Object.fromEntries(labels.map((key, i) => [key, translations[language][i] || translations["zh-CN"][i]])) as Record<Label, string>;
 }

@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.6.0" src="https://img.shields.io/badge/version-2.6.0-b43d35" />
+    <img alt="版本 2.6.1" src="https://img.shields.io/badge/version-2.6.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.6.1：** 首页诗句与工具能放下时保持一排，窄屏或放大时自动换行。缩小语言框，保留原语言名称；自动选项仅显示「跟随系统」。
+
 > **v2.6.0：** 首页每天换一句古诗，精简题库与学习界面的说明，藏经阁按名称排序。消息中心汇总今日上新、评论回复与赞赏，以及最近五次版本更新。主题默认跟随设备，无法读取时在 23:00–06:00 使用夜间模式。导航支持简中、繁中、英语、日语、韩语，可自动识别或手动切换；题库内容及部分详情仍保留原语言。
 
 > **v2.5.2：** 知识书架的题量数字随主题切换，修复日间对比度。清理多余界面小字，考试规则和计时口径集中在页脚。

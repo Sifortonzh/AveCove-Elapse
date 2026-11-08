@@ -5,6 +5,7 @@ import { Bell, X } from "lucide-react";
 import { type UiLanguage, uiText } from "../lib/ui-preferences";
 
 const updates = [
+  { version: "v2.6.1", at: "2026-11-08T13:14:00+08:00", detail: "首页工具随可用宽度排列，精简语言选项。" },
   { version: "v2.6.0", at: "2026-11-08T00:00:00+08:00", detail: "消息中心、古诗主页、藏经阁排序与语言入口。" },
   { version: "v2.5.2", at: "2026-11-07T00:00:00+08:00", detail: "知识书架题量更清楚，界面说明更简洁。" },
   { version: "v2.5.1", at: "2026-11-06T23:00:00+08:00", detail: "日间淡彩与夜间石墨玻璃主题。" },
