@@ -1,5 +1,15 @@
 import type { QuizQuestion } from "./question-parser";
 
+export function mockExamClock(startedAt: number, now: number, minutes: number) {
+  const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000));
+  return { elapsed, remaining: Math.max(0, minutes * 60 - elapsed) };
+}
+
+export function formatMockExamTime(seconds: number) {
+  return [Math.floor(seconds / 3600), Math.floor(seconds % 3600 / 60), seconds % 60]
+    .map(part => String(part).padStart(2, "0")).join(":");
+}
+
 export function gradeMockExam(questions: readonly QuizQuestion[], selections: Record<string, string[]>) {
   const progress: Record<string, "correct" | "wrong"> = {};
   let correct = 0, unanswered = 0, pending = 0, earned = 0, maximum = 0;

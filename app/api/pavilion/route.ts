@@ -154,6 +154,32 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  const session = readSession(request);
+  if (!session) return NextResponse.json({ error: "登录后才能编辑公开备注。" }, { status: 401 });
+  if (!allowRequest(`pavilion:annotation:${session.userId}`, 60, 60 * 60_000)) return NextResponse.json({ error: "编辑得有点频繁，请稍后再试。" }, { status: 429 });
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id || id.length > 100) return NextResponse.json({ error: "缺少有效的藏经阁题库标识。" }, { status: 400 });
+  const raw = await request.text();
+  if (Buffer.byteLength(raw, "utf8") > 2_048) return NextResponse.json({ error: "备注内容过长。" }, { status: 413 });
+  let body: { annotation?: unknown } | null;
+  try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: "备注格式无效。" }, { status: 400 }); }
+  if (typeof body?.annotation !== "string") return NextResponse.json({ error: "请填写有效的公开备注。" }, { status: 400 });
+  const annotation = body.annotation.trim();
+  if (Array.from(annotation).length > 50 || annotation.includes("\0")) return NextResponse.json({ error: "📝 公开备注最多 50 字，且不能包含空字符。" }, { status: 400 });
+  try {
+    await ensurePavilionTable();
+    const rows = await query<{ annotation: string }>(
+      "UPDATE pavilion_question_banks SET annotation = $3 WHERE id = $1 AND user_id = $2 RETURNING annotation",
+      [id, session.userId, annotation],
+    );
+    if (!rows[0]) return NextResponse.json({ error: "只能编辑自己上传题库的备注。" }, { status: 403 });
+    return NextResponse.json({ annotation: rows[0].annotation });
+  } catch {
+    return NextResponse.json({ error: "备注暂时无法保存，请稍后重试。" }, { status: 503 });
+  }
+}
+
 export async function DELETE(request: Request) {
   const session = readSession(request);
   if (!session) return NextResponse.json({ error: "登录后才能管理题库。" }, { status: 401 });

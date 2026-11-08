@@ -55,6 +55,30 @@ test("homepage toolbar wraps when space is tight and keeps language names concis
   assert.match(preferences, /systemLanguageNames[^\n]*"zh-CN": "跟随系统"/);
 });
 
+test("mock exam clock uses wall time, clamps countdown, and retains indexed review pins", async () => {
+  const [source, page, timer] = await Promise.all([text("app/lib/mock-exam.ts"), text("app/page.tsx"), text("app/components/MockExamTimer.tsx")]);
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { mockExamClock, formatMockExamTime } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  assert.deepEqual(mockExamClock(1_000, 66_980, 2), { elapsed: 65, remaining: 55 });
+  assert.deepEqual(mockExamClock(1_000, 182_000, 1), { elapsed: 181, remaining: 0 });
+  assert.deepEqual(mockExamClock(1_000, 999, 1), { elapsed: 0, remaining: 60 });
+  assert.equal(formatMockExamTime(3_665), "01:01:05");
+  assert.match(timer, /finishedAt \?\? now/);
+  assert.match(page, /setExamPins\(\[\]\)/);
+  assert.match(page, /const pinned = markedIds\.has\(question\.id\); if \(pinOnly && !pinned\) return null/);
+  assert.match(page, /onClick=\{\(\) => onJump\(index\)\}/);
+});
+
+test("pavilion annotation edits only update the uploader's metadata", async () => {
+  const [route, page] = await Promise.all([text("app/api/pavilion/route.ts"), text("app/page.tsx")]);
+  const patch = route.slice(route.indexOf("export async function PATCH"), route.indexOf("export async function DELETE"));
+  assert.match(patch, /readSession\(request\)/);
+  assert.match(patch, /Array\.from\(annotation\)\.length > 50/);
+  assert.match(patch, /SET annotation = \$3 WHERE id = \$1 AND user_id = \$2 RETURNING annotation/);
+  assert.doesNotMatch(patch, /SET payload|updated_at/);
+  assert.match(page, /entry\.own && <button type="button" className="pavilion-note-edit"/);
+});
+
 test("blind exams always expose submission and final Next opens grading confirmation", async () => {
   const page=await text("app/page.tsx"),css=await text("app/globals.css");
   assert.match(page,/examActive \? props.onSubmit : submitted/);
@@ -1129,7 +1153,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.6.1");
+  assert.equal(JSON.parse(manifest).version, "2.6.2");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1889,7 +1913,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.6.1");
+  assert.equal(JSON.parse(packageJson).version, "2.6.2");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2326,7 +2350,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.6.1");
+  assert.equal(JSON.parse(manifest).version, "2.6.2");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2387,7 +2411,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.1");
+  assert.equal(JSON.parse(manifest).version, "2.6.2");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2405,7 +2429,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.1");
+  assert.equal(JSON.parse(manifest).version, "2.6.2");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2425,7 +2449,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.1");
+  assert.equal(JSON.parse(manifest).version, "2.6.2");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

@@ -836,3 +836,27 @@ dialog.note-preview-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-
 .pavilion-subject-group[open] > summary strong::before { content:"▾" }
 .pavilion-subject-group > summary small { color:var(--muted) }
 .pavilion-subject-group[open] > summary { margin-bottom:12px }
+
+.study-ranking .rank-rules { margin:0 0 18px }
+.study-ranking .rank-rules ul { display:grid;gap:9px;margin:12px 0 0;padding-inline-start:1.3em;line-height:1.7 }
+.study-ranking .rank-rules li { font-size:1rem!important;color:var(--ink) }
+.mock-exam-tools,.mock-exam-clock { display:flex;align-items:center;gap:8px;flex-wrap:wrap }
+.mock-exam-clock { border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:4px 10px;min-height:44px }
+.mock-exam-clock time { font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap }
+.mock-exam-clock select,.mock-exam-clock input { min-height:34px;border:1px solid var(--line);border-radius:7px;padding:4px 6px;color:var(--ink);background:var(--surface-2) }
+.mock-exam-clock label { display:flex;gap:5px;align-items:center;white-space:nowrap }
+.mock-exam-clock input { width:4em }
+.mock-exam-clock .expired { color:var(--bean);font-weight:700 }
+.exam-pin-button,.answer-sheet-actions .exam-pin-filter { color:var(--green);background:var(--surface);border:1px solid var(--green);border-radius:11px;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:7px 11px;cursor:pointer }
+.exam-pin-button[aria-pressed="true"],.answer-sheet-actions .exam-pin-filter[aria-pressed="true"] { background:var(--green);color:var(--surface) }
+.exam-pin-legend { color:var(--green) }
+.number-grid button .exam-sheet-pin { position:absolute;top:3px;left:3px;color:var(--green);background:var(--surface);border-radius:4px;padding:1px;width:15px;height:15px }
+.exam-pin-empty { padding:14px;color:var(--muted) }
+.bank-vault-grid article > header .pavilion-note-edit { width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--green);cursor:pointer }
+.pavilion-note-dialog { width:min(460px,calc(100vw - 32px));max-height:90dvh;margin:auto;padding:22px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--ink);box-shadow:var(--shadow) }
+.pavilion-note-dialog::backdrop { background:rgba(12,24,20,.56) }
+.pavilion-note-dialog h2 { margin:0 }
+.pavilion-note-dialog p { overflow-wrap:anywhere;color:var(--muted) }
+.pavilion-note-dialog p[role="alert"] { color:var(--bean) }
+.pavilion-note-dialog textarea { display:block;width:100%;margin:7px 0;resize:vertical;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--ink) }
+.pavilion-note-dialog footer { display:flex;justify-content:flex-end;gap:8px;margin-top:16px }
