@@ -315,6 +315,31 @@ export async function listArchivedBankNotes(): Promise<ArchivedBankNotes[]> {
   });
 }
 
+export async function deleteArchivedBankNotes(archive: Pick<ArchivedBankNotes, "id" | "archivedAt">, expectedOwner: string): Promise<void> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    let reason: Error | undefined;
+    const cancel = (message: string) => { reason = new Error(message); transaction.abort(); };
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onabort = () => { database.close(); reject(reason ?? transaction.error ?? new Error("归档删除失败，请重试。")); };
+    const ownerRequest = store.get(LEARNING_OWNER_KEY);
+    ownerRequest.onsuccess = () => {
+      const owner = ownerRequest.result ?? "guest";
+      if (owner !== expectedOwner) { cancel("同步身份已变更，请重新打开笔记页面。"); return; }
+      const key = `note-archive:${owner}:${archive.id}`;
+      const lookup = store.get(key);
+      lookup.onsuccess = () => {
+        const current = lookup.result as ArchivedBankNotes | undefined;
+        if (!current) return;
+        if (current.archivedAt !== archive.archivedAt) { cancel("归档已有新版本，请刷新列表后重试。"); return; }
+        store.delete(key);
+      };
+    };
+  });
+}
+
 function normalizeBankOrder(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0 && entry.length <= 160))].slice(0, 200);

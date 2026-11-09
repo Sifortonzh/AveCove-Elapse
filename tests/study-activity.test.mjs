@@ -44,6 +44,19 @@ test("time splits at four-hour and midnight boundaries without changing input", 
   assert.deepEqual(stats.addStudyActivity({},"x",at(6),at(6)+21_000),{});
   assert.deepEqual(stats.addStudyActivity({},"x",at(6),at(6)-1),{});
 });
+test("today totals use local day and unique first graded questions, not attempt count", () => {
+  const before = at(8,23,59,55), after = at(9,0,0,5);
+  const activity = stats.addStudyActivity({}, "session", before, after, "correct");
+  const ledger = {
+    repeated: { firstProgress: { value:"wrong",updatedAt:before }, progress:{value:"correct",updatedAt:after} },
+    new: { firstProgress:{value:"correct",updatedAt:after} },
+    draft: { firstProgress:{value:null,updatedAt:after} },
+    removed: { firstProgress:{value:"correct",updatedAt:after} },
+  };
+  assert.deepEqual(stats.todayStudyTotals(activity,{repeated:"correct",new:"correct",legacy:"wrong"},ledger,after),{seconds:5,answered:1});
+  assert.deepEqual(stats.todayStudyTotals(activity,{repeated:"correct",new:"correct",legacy:"wrong"},ledger,at(10)),{seconds:0,answered:0});
+});
+
 test("answer counts and streaks exclude manufactured history", () => {
   let input = {};
   for (const day of [2,3,4,6]) input=stats.addStudyActivity(input,`s-${day}`,at(day),at(day)+10_000,"correct");

@@ -33,15 +33,17 @@ test("device preferences resolve languages, theme fallback boundaries and daily 
   for (const language of uiLanguages) assert.equal(Object.values(uiText(language)).filter(Boolean).length, Object.keys(uiText("zh-CN")).length);
 });
 
-test("account avatars precede the language selector and bundle the complete fixed slot pool", async () => {
+test("account avatars precede the language selector and use fixed native emoji slots", async () => {
   const [page, avatar, migration, auth, account, attribution] = await Promise.all([
     text("app/page.tsx"), text("app/components/AccountAvatar.tsx"), text("db/user-avatars.sql"),
     text("app/api/auth/session/route.ts"), text("app/api/account/route.ts"), text("public/avatars/ATTRIBUTION.txt"),
   ]);
   assert.match(page, /className="profile"[^\n]*<AccountAvatar slot=\{account\?\.avatarSlot\}[^\n]*<select className="home-language-select"/);
-  const assets = avatar.match(/"1f[0-9a-f]{3}"/g).map(value => JSON.parse(value));
+  const pool = avatar.match(/const accountEmojis = \[([\s\S]+?)\] as const/)[1];
+  const assets = JSON.parse(`[${pool}]`);
   assert.equal(new Set(assets).size, 16);
-  for (const id of assets) assert.match(await text(`public/avatars/${id}.svg`), /^<svg /);
+  assert.ok(assets.every(value => /\p{Extended_Pictographic}/u.test(value)));
+  assert.match(await text("app/globals.css"), /Apple Color Emoji/);
   assert.match(migration, /WHERE avatar_slot IS NULL/);
   assert.match(migration, /ORDER BY count\(u\.id\), slots\.slot LIMIT 1/);
   assert.match(auth, /SELECT avatar_slot FROM users WHERE id = \$1/);
@@ -95,7 +97,7 @@ test("pavilion annotation edits only update the uploader's metadata", async () =
   const patch = route.slice(route.indexOf("export async function PATCH"), route.indexOf("export async function DELETE"));
   assert.match(patch, /readSession\(request\)/);
   assert.match(patch, /Array\.from\(annotation\)\.length > 50/);
-  assert.match(patch, /SET annotation = \$3 WHERE id = \$1 AND user_id = \$2 RETURNING annotation/);
+  assert.match(patch, /SET annotation = COALESCE\(\$3, annotation\), rating = COALESCE\(\$4, rating\) WHERE id = \$1 AND user_id = \$2 RETURNING annotation, rating/);
   assert.doesNotMatch(patch, /SET payload|updated_at/);
   assert.match(page, /entry\.own && <button type="button" className="pavilion-note-edit"/);
 });
@@ -413,6 +415,22 @@ test("A3 correction separates shared cases and groups children without losing an
   const withoutGroup=reviseSharedCase(updated,{...updated[0],medicalQuestionType:"A1",sharedStem:undefined,sharedStemGroup:undefined,stem:shared+"最可能的诊断？"});
   assert.equal(withoutGroup[0].sharedStem,undefined);assert.deepEqual(withoutGroup[1],updated[1]);
   const page=await text("app/page.tsx");assert.match(page,/aria-label="共用题干"/);assert.match(page,/同组小题 ·/);assert.match(page,/setQuestions\(saved.questions\)/);
+});
+
+test("shared-stem revisions propagate by declared group without changing children or other papers", async () => {
+  const output = ts.transpileModule(await text("app/lib/shared-case.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { declaredSharedStemMembers, reviseSharedCase } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  for (const [medicalQuestionType, questionType, groupField] of [
+    ["A2","A","sharedStemGroup"], ["A3","A","sharedStemGroup"], ["A4","A","sharedStemGroup"],
+    ["B1","B","sharedOptionGroup"], ["C","C","sharedOptionGroup"],
+  ]) {
+    const base = { category:"皮肤", examYear:2024, medicalQuestionType, questionType, [groupField]:"group", sharedStem:"共用材料", options:[{label:"A",text:"甲"}], answer:["A"] };
+    const bank = [{...base,id:"a",stem:"第一小题"},{...base,id:"b",stem:"共用材料第二小题",explanation:"独立解析"},{...base,id:"c",stem:"别组", [groupField]:"other"},{...base,id:"d",stem:"另一年",examYear:2025}];
+    assert.deepEqual(declaredSharedStemMembers(bank[0],bank).map(q=>q.id),["b"]);
+    const revised = reviseSharedCase(bank,{...bank[0],sharedStem:"修订材料",stem:"只改当前小题"});
+    assert.deepEqual(revised[1],{...bank[1],stem:"第二小题",sharedStem:"修订材料"});
+    assert.deepEqual(revised.slice(2),bank.slice(2));
+  }
 });
 
 test("Hongdou import groups nonadjacent A3 cases and removes only equivalent duplicates", async () => {
@@ -1174,7 +1192,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.6.3");
+  assert.equal(JSON.parse(manifest).version, "2.6.4");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1934,7 +1952,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.6.3");
+  assert.equal(JSON.parse(packageJson).version, "2.6.4");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2371,7 +2389,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.6.3");
+  assert.equal(JSON.parse(manifest).version, "2.6.4");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2432,7 +2450,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.3");
+  assert.equal(JSON.parse(manifest).version, "2.6.4");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2450,7 +2468,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.3");
+  assert.equal(JSON.parse(manifest).version, "2.6.4");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2470,7 +2488,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.3");
+  assert.equal(JSON.parse(manifest).version, "2.6.4");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
@@ -2575,8 +2593,38 @@ test("home library count follows theme ink and exam rules remain accessible", as
   assert.match(home, /className="library-question-count"><strong>/);
   assert.match(css, /\.library-question-count strong\s*\{\s*color: var\(--ink\)/);
   assert.equal((home.match(/aria-describedby="home-exam-note"/g) || []).length, 2);
-  assert.match(home, /id="home-exam-note">\* \{copy\.examNote\}/);
+  assert.match(home, /<InfoNotice[^>]*id="home-exam-note"[^>]*>\{copy\.examNote\}/);
   assert.doesNotMatch(home, /本地优先 · 无广告|把薄弱点逐个拿下|你的个人复盘视图/);
+});
+
+test("archive deletion only touches the current owner's matching archive revision", async () => {
+  const source = await text("app/lib/local-bank.ts");
+  const body = source.slice(source.indexOf("export async function deleteArchivedBankNotes("), source.indexOf("function normalizeBankOrder("));
+  const fixture = `
+    const LEARNING_OWNER_KEY = "owner", STORE_NAME = "banks";
+    export const entries = new Map([["owner","a"],["note-archive:a:bank",{archivedAt:"new"}],["note-archive:b:bank",{archivedAt:"new"}],["bank:bank",{name:"Current bank"}]]);
+    async function openDatabase() {
+      return { close(){}, transaction() {
+        let pending = 0, aborted = false;
+        const tx = {
+          abort(){ aborted=true; tx.onabort(); },
+          objectStore(){return {
+            get(key) { const request={};pending++;queueMicrotask(()=>{ if(aborted)return;request.result=entries.get(key);request.onsuccess();pending--;if(!pending&&!aborted)tx.oncomplete();});return request; },
+            delete(key){entries.delete(key);},
+          };}
+        };return tx;
+      }};
+    }
+  `;
+  const compiled = ts.transpileModule(fixture + body, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { deleteArchivedBankNotes, entries } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  await assert.rejects(deleteArchivedBankNotes({id:"bank",archivedAt:"old"},"a"),/已有新版本/);
+  await assert.rejects(deleteArchivedBankNotes({id:"bank",archivedAt:"new"},"b"),/身份已变更/);
+  assert.ok(entries.has("note-archive:a:bank"));
+  await deleteArchivedBankNotes({id:"bank",archivedAt:"new"},"a");
+  assert.ok(!entries.has("note-archive:a:bank"));
+  assert.ok(entries.has("note-archive:b:bank"));
+  assert.ok(entries.has("bank:bank"));
 });
 
 test("bank note archives retain only annotated context, stars and personal AI", async () => {

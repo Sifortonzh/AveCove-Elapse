@@ -2,6 +2,17 @@ import type { QuizQuestion } from "./question-parser";
 
 const key = (text: string) => text.replace(/\s+/g, "");
 export const isSharedCase = (q: QuizQuestion) => q.medicalQuestionType === "A3" || q.medicalQuestionType === "A4";
+export const editableQuestionType = (q: QuizQuestion): NonNullable<QuizQuestion["medicalQuestionType"]> =>
+  q.questionType === "B" ? "B1" : q.questionType === "C" ? "C" : q.questionType === "X" ? "X" : q.medicalQuestionType ?? "A1";
+
+export function declaredSharedStemMembers(question: QuizQuestion, bank: readonly QuizQuestion[]) {
+  const type = editableQuestionType(question);
+  if ((!question.sharedStemGroup && !question.sharedOptionGroup) || !["A2", "A3", "A4", "B1", "C"].includes(type)) return [];
+  return bank.filter(q => q.id !== question.id && q.category === question.category && q.examYear === question.examYear
+    && editableQuestionType(q) === type
+    && (question.sharedStemGroup ? q.sharedStemGroup === question.sharedStemGroup
+      : Boolean(!q.sharedStemGroup && question.sharedOptionGroup && q.sharedOptionGroup === question.sharedOptionGroup)));
+}
 
 // Compare writing variants only; numbers, units, negation and clinical words stay significant.
 const caseText = (text: string) => text.normalize("NFC")
@@ -143,17 +154,33 @@ export function prepareImportedA3Cases(items: QuizQuestion[]): QuizQuestion[] {
   });
 }
 
-export function reviseSharedCase(items: QuizQuestion[], revision: QuizQuestion, children: QuizQuestion[] = []) {
+export function reviseSharedCase(items: QuizQuestion[], revision: QuizQuestion, children: QuizQuestion[] = []): QuizQuestion[] {
   const changes = new Map([revision, ...children].map(q => [q.id, q]));
   const original = items.find(q => q.id === revision.id);
   const shared = revision.sharedStem?.trim();
+  if (original && editableQuestionType(original) === editableQuestionType(revision)) {
+    const members = declaredSharedStemMembers(original, items);
+    if (members.length && (original.sharedStem || shared)) {
+      const memberIds = new Set(members.map(q => q.id));
+      return items.map(q => {
+        if (q.id === revision.id) return revision;
+        const child = changes.get(q.id);
+        if (!memberIds.has(q.id)) return isSharedCase(revision) && shared && child
+          && q.category === original.category && q.examYear === original.examYear && !q.multiple && !q.sharedStemGroup && !q.sharedOptionGroup
+          ? { ...q, stem: child.stem, sharedStem: shared, sharedStemGroup: original.sharedStemGroup, medicalQuestionType: revision.medicalQuestionType, questionType: "A", multiple: false }
+          : q;
+        const oldShared = q.sharedStem ?? original.sharedStem ?? "";
+        return { ...q, stem: child?.stem ?? (removeSharedPrefix(q.stem, oldShared) || q.stem), sharedStem: shared || undefined };
+      });
+    }
+  }
   const updated = items.map(q => {
     const explicit = changes.get(q.id);
     if (!isSharedCase(revision) || !shared) return explicit ?? q;
     const sameOldGroup = original?.sharedStemGroup && q.sharedStemGroup === original.sharedStemGroup;
     const sameCase = key(q.sharedStem ?? "") === key(shared)
       || (key(q.stem).startsWith(key(shared)) && Boolean(removeSharedPrefix(q.stem, shared)));
-    if (!explicit && (q.category !== revision.category || (!sameOldGroup && !sameCase) || q.multiple || q.sharedOptionGroup
+    if (!explicit && (q.category !== revision.category || q.examYear !== revision.examYear || (!sameOldGroup && !sameCase) || q.multiple || q.sharedOptionGroup
       || q.medicalQuestionType === "X" || q.questionType === "X"
       || (isSharedCase(q) && q.medicalQuestionType !== revision.medicalQuestionType))) return q;
     const child = explicit ?? q;

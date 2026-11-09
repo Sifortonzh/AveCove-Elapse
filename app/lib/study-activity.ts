@@ -1,8 +1,23 @@
-import type { StudyActivity } from "./record-sync";
+import type { ProgressValue, RecordLedger, StudyActivity } from "./record-sync";
 
 export function localDay(time: number) {
   const d = new Date(time);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function todayStudyTotals(activity: StudyActivity, progress: Record<string, ProgressValue>, ledger: RecordLedger, now: number) {
+  const day = localDay(now);
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  const start = midnight.getTime();
+  const seconds = Object.entries(activity).reduce((sum, [key, row]) => key.startsWith(day + "|") ? sum + row.seconds : sum, 0);
+  // Same unique, graded question population as the lifetime count. Reviews
+  // do not earn a second count, and legacy records without real dates aren't backdated.
+  const answered = Object.keys(progress).filter(id => {
+    const first = ledger[id]?.firstProgress;
+    return first?.value != null && first.updatedAt >= start && first.updatedAt <= now;
+  }).length;
+  return { seconds, answered };
 }
 
 export function addStudyActivity(input: StudyActivity, session: string, from: number, to: number, result?: "correct" | "wrong" | "pending"): StudyActivity {
