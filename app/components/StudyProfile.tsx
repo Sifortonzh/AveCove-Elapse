@@ -13,6 +13,11 @@ function duration(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   return `${Math.floor(minutes / 60)}时${String(minutes % 60).padStart(2, "0")}分`;
 }
+
+function StudyTimeValue({ seconds }: { seconds: number }) {
+  const minutes = Math.floor(seconds / 60);
+  return <strong className="study-clock">{Math.floor(minutes / 60)}<small>时</small>{String(minutes % 60).padStart(2, "0")}<small>分</small></strong>;
+}
 const periods: [ActivityPeriod, string][] = [["day", "日"], ["week", "周"], ["month", "月"], ["year", "年"]];
 const slots = Array.from({ length: 6 }, (_, i) => `${i * 4}–${(i + 1) * 4}时`);
 
@@ -65,7 +70,16 @@ export default function StudyProfile({ language, nickname, account, activity, pr
   return <section className="study-profile" aria-label={t.profile}>
     <header className="study-profile-nav"><button onClick={onBack}><ArrowLeft size={18} />{t.home}</button><button onClick={onAccount}><UserRound size={18} />{account ? "管理账号" : "登录同步"}</button></header>
     <section className="study-identity"><button className="study-avatar" onClick={onAccount} aria-label="管理个人身份"><AccountAvatar slot={account?.avatarSlot} /></button><div><h1>{nickname}</h1></div></section>
-    <section className="study-totals" aria-label="累计学习数据" aria-describedby="study-timing-note"><div><span><Clock3 size={17} />累计刷题时长</span><strong className="study-clock">{Math.floor(summary.seconds / 3600)}<small>时</small>{String(Math.floor(summary.seconds % 3600 / 60)).padStart(2,"0")}<small>分</small></strong><p className="study-today">今日 <b>{duration(daily.seconds)}</b></p></div><div><span>已答题量</span><b>{answered.toLocaleString()}<small>题</small></b><p className="study-today">今日新答 <b>{daily.answered.toLocaleString()} 题</b></p></div></section>
+    <section className="study-totals" aria-label="累计与今日学习数据" aria-describedby="study-timing-note">
+      <div className="study-total-pair">
+        <div className="study-total-item"><span><Clock3 size={17} />累计刷题时长</span><StudyTimeValue seconds={summary.seconds} /></div>
+        <div className="study-total-item study-total-today"><span>今日刷题时长</span><StudyTimeValue seconds={daily.seconds} /></div>
+      </div>
+      <div className="study-total-pair">
+        <div className="study-total-item"><span>已答题量</span><b>{answered.toLocaleString()}<small>题</small></b></div>
+        <div className="study-total-item study-total-today"><span>今日新答</span><b>{daily.answered.toLocaleString()}<small>题</small></b></div>
+      </div>
+    </section>
     <section className="study-metrics"><div><b>{summary.answers ? `${Math.round(summary.perAnswer)}秒` : "—"}</b><span>平均每题用时</span></div><div><b>{duration(summary.perDay)}</b><span>平均每日用时</span></div><div><b>{answered ? `${accuracy}%` : "—"}</b><span>当前平均正确率</span></div><div><b>{summary.longest}天</b><span>最长连续学习</span></div><div><b><Flame size={19} />{summary.current}天</b><span>当前连续学习</span></div></section>
     <div className="study-period"><div role="group" aria-label="统计周期">{periods.map(([id, label]) => <button key={id} aria-pressed={id === period} onClick={() => setPeriod(id)}>{label}</button>)}</div><div className="study-date"><button aria-label="上一周期" onClick={() => move(-1)}><ChevronLeft size={18} /></button><strong>{title}</strong><button aria-label="下一周期" onClick={() => move(1)}><ChevronRight size={18} /></button><button onClick={() => setAnchor(Date.now())}>今天</button></div></div>
     <div className="study-chart-grid"><article className="study-panel"><header><h2>学习热力图</h2><span>本期 {duration(series.reduce((s, r) => s + r.seconds, 0))}</span></header><div className={`study-heatmap ${period === "year" ? "annual" : ""}`}>{heatmap.map(row => <button key={row.key} onClick={() => setDetail(`${row.label} · ${duration(row.seconds)}`)} style={{ "--level": row.seconds ? Math.min(1, .18 + row.seconds / 7200) : 0 } as React.CSSProperties} aria-label={`${row.label} ${duration(row.seconds)}`} title={`${row.label} · ${duration(row.seconds)}`}>{period !== "year" && <span>{row.label}</span>}</button>)}</div><p className="study-chart-hint" aria-live="polite">{detail}</p></article>

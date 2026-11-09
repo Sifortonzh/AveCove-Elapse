@@ -872,8 +872,6 @@ dialog.note-preview-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-
 .info-notice strong { display:block;margin-bottom:3px;color:var(--green); }
 .pavilion-note-dialog .info-notice,.shared-case-editor .info-notice { margin-top:12px; }
 .study-rules-notice { margin-top:20px; }
-.study-profile .study-totals .study-today { margin:6px 0 0;color:var(--green);font-size:1rem!important; }
-.study-profile .study-totals .study-today b { display:inline;color:inherit;letter-spacing:0;font-size:1rem!important; }
 .bank-vault-grid>article { display:flex;flex-direction:column; }
 .bank-vault-grid>article>header { align-items:center;justify-content:space-between;min-height:38px; }
 .pavilion-meta { display:flex;align-items:center;gap:6px;min-width:0; }
