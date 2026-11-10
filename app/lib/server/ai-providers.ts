@@ -87,20 +87,21 @@ export function publicAiErrorMessage(error: unknown, apiKey = "") {
     .slice(0, 300);
 }
 
-export async function generateAiText(config: ActiveAiConfig, prompt: string, options: { maxTokens?: number; temperature?: number; signal?: AbortSignal } = {}) {
+export async function generateAiText(config: ActiveAiConfig, prompt: string, options: { maxTokens?: number; temperature?: number; signal?: AbortSignal; systemPrompt?: string } = {}) {
   const preset = findProvider(config.provider);
   if (!preset) throw new Error("Unsupported AI provider");
   const baseUrl = cleanBaseUrl(config.baseUrl);
   const model = currentProviderModel(config.provider, config.model);
   const maxTokens = Math.max(200, Math.min(options.maxTokens ?? 900, 20_000));
   const temperature = options.temperature ?? 0.2;
+  const system = options.systemPrompt;
 
   if (preset.protocol === "gemini") {
     const response = await fetch(`${baseUrl}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`, {
       method: "POST",
       signal: options.signal,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature, maxOutputTokens: maxTokens } }),
+      body: JSON.stringify({ ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}), contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature, maxOutputTokens: maxTokens } }),
     });
     const data = await readProviderPayload(response);
     if (!response.ok) throw new Error(providerError(data, response));
@@ -112,7 +113,7 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
       method: "POST",
       signal: options.signal,
       headers: { "Content-Type": "application/json", "x-api-key": config.apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model, max_tokens: maxTokens, temperature, messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model, max_tokens: maxTokens, temperature, system, messages: [{ role: "user", content: prompt }] }),
     });
     const data = await readProviderPayload(response);
     if (!response.ok) throw new Error(providerError(data, response));
@@ -125,7 +126,7 @@ export async function generateAiText(config: ActiveAiConfig, prompt: string, opt
     headers: { "Authorization": `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
     // DeepSeek V4 defaults to thinking. Short interactive explanations need
     // visible output rather than exhausting the deadline on reasoning tokens.
-    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature, max_tokens: maxTokens, stream: false,
+    body: JSON.stringify({ model, messages: [...(system ? [{ role: "system", content: system }] : []), { role: "user", content: prompt }], temperature, max_tokens: maxTokens, stream: false,
       ...(config.provider === "deepseek" ? { thinking: { type: "disabled" } } : {}),
     }),
   });

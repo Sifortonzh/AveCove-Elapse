@@ -1,5 +1,6 @@
 import { generateAiText, publicAiErrorMessage } from "@/app/lib/server/ai-providers";
 import { loadRequestAiConfig } from "@/app/lib/server/account-ai";
+import { FOLLOW_UP_SYSTEM_PROMPT } from "@/app/lib/ai-follow-up";
 
 export async function POST(request: Request) {
   const aiConfig = await loadRequestAiConfig(request);
@@ -7,6 +8,7 @@ export async function POST(request: Request) {
   const body = await request.json() as {
     question?: {
       stem?: string;
+      sharedStem?: string;
       options?: Array<{ label: string; text: string }>;
       answer?: string[];
       explanation?: string;
@@ -30,23 +32,27 @@ export async function POST(request: Request) {
     companion: "以“同类考点”的形式：根据当前题目的核心知识点，整理 3–5 个常一起考、容易混淆或需要联动掌握的相关考点；每点说明与本题的联系，并给出一句辨析提示。不要虚构新题或教材原文。",
   }[body.mode ?? "summary"];
 
+  const followUp = typeof body.followUp === "string" ? body.followUp.trim().slice(0, 500) : "";
+  const systemPrompt = followUp ? FOLLOW_UP_SYSTEM_PROMPT : undefined;
   const prompt = [
-    "你是一名谨慎、清晰的医学考试辅导老师。请用简体中文解析下面的医学题目。",
-    modeInstruction,
-    "优先以人民卫生出版社第十版医学教材的知识体系、术语与常见考试口径作为校对框架。",
-    "如果你无法确认具体的第十版教材原文、章节或版本差异，必须明确提醒学习者以手中的第十版人卫教材核对；不得伪造教材引文、页码、章节或声称已经检索教材。",
-    "以题库答案为起点核对逻辑。若题目或答案可能陈旧、有歧义或与现行指南不一致，必须明确指出，不要把题库答案说成绝对正确。",
-    question.explanation ? "下面还提供了导入资料自带的历史解析。它只作为对照材料，不代表最新结论；如与第十版教材框架或现行知识不一致，请分开说明差异。" : "",
-    "内容仅用于学习，不给出针对个人的诊断或治疗建议。回答控制在 500 字以内，结构清楚。",
+    ...(followUp ? [] : [
+      "你是一名谨慎、清晰的医学考试辅导老师。请用简体中文解析下面的医学题目。",
+      modeInstruction,
+      "优先以人民卫生出版社第十版医学教材的知识体系、术语与常见考试口径作为校对框架。",
+      "如果你无法确认具体的第十版教材原文、章节或版本差异，必须明确提醒学习者以手中的第十版人卫教材核对；不得伪造教材引文、页码、章节或声称已经检索教材。",
+      "以题库答案为起点核对逻辑。若题目或答案可能陈旧、有歧义或与现行指南不一致，必须明确指出，不要把题库答案说成绝对正确。",
+      question.explanation ? "下面还提供了导入资料自带的历史解析。它只作为对照材料，不代表最新结论；如与第十版教材框架或现行知识不一致，请分开说明差异。" : "",
+      "内容仅用于学习，不给出针对个人的诊断或治疗建议。回答控制在 500 字以内，结构清楚。",
+    ]),
     `题目来源：${question.category || "导入题库"} · 原题号 ${question.sourceNumber || "未知"}`,
+    question.sharedStem ? `共用题干：${question.sharedStem}` : "",
     `题目：${question.stem}`,
     ...question.options.map((option) => `${option.label}. ${option.text}`),
     `题库答案：${question.answer.join("、")}`,
     question.explanation ? `原资料解析：${question.explanation.slice(0, 3_000)}` : "",
     question.answerSource ? `原解析来源：${question.answerSource.slice(0, 300)}` : "",
     ...(body.history ?? []).slice(-6).map((message) => `${message.role === "assistant" ? "学习助理" : "学习者"}：${String(message.text ?? "").slice(0, 500)}`),
-    body.followUp ? `学习者继续追问：${String(body.followUp).slice(0, 500)}` : "",
-    body.followUp ? "请直接回应这次追问，并与前文保持一致；不需要重复整道题的完整解析。" : "",
+    followUp ? `学习者继续追问：${followUp}` : "",
   ].join("\n");
 
   const controller = new AbortController();
@@ -55,9 +61,9 @@ export async function POST(request: Request) {
   const timeoutMs = aiConfig.provider === "deepseek" ? 120_000 : 45_000;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    let explanation = await generateAiText(aiConfig, prompt, { maxTokens: 2_400, signal: controller.signal });
+    let explanation = await generateAiText(aiConfig, prompt, { maxTokens: 2_400, signal: controller.signal, systemPrompt });
     if (!explanation) {
-      explanation = await generateAiText(aiConfig, `${prompt}\n请跳过内部推理过程，只输出可直接展示给学习者的最终解析正文。`, { maxTokens: 3_200, temperature: 0.1, signal: controller.signal });
+      explanation = await generateAiText(aiConfig, `${prompt}\n请跳过内部推理过程，只输出可直接展示给学习者的最终解析正文。`, { maxTokens: 3_200, temperature: 0.1, signal: controller.signal, systemPrompt });
     }
     if (!explanation) throw new Error("AI 厂商本次未返回正文，请重新生成");
     return Response.json({ explanation });

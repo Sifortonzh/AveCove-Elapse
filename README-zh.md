@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.6.4" src="https://img.shields.io/badge/version-2.6.4-b43d35" />
+    <img alt="版本 2.6.5" src="https://img.shields.io/badge/version-2.6.5-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.6.5：** 选项支持上下移，答案和批注随原选项保留；题库说明统一为告示框；自动昼夜改为 23:00／06:00 切换；AI 追问支持疾病表格总结。
+>
 > **v2.6.4：** 原生 Emoji 头像、笔记归档管理、藏经阁星级修订、今日学习统计，以及同组共用题干联动修订。
 >
 > **v2.6.3：** 头像移到语言切换前；账号固定分配动物头像；自动昼夜按本地时间 19:00／06:00 切换，也可跟随设备。

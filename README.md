@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.6.4" src="https://img.shields.io/badge/version-2.6.4-b43d35" />
+    <img alt="Version 2.6.5" src="https://img.shields.io/badge/version-2.6.5-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.6.5:** Reorder answer choices without losing answer or annotation associations, read clearer library notices, switch to night mode at 23:00 local time, and generate structured disease summaries in AI follow-up.
+>
 > **v2.6.4:** Native emoji avatars, local note archive management, editable Pavilion ratings, today’s study totals, and safer shared-stem corrections.
 >
 > **v2.6.3:** Fixed animal avatars now appear before the language selector, and the optional day/night schedule switches at 19:00 and 06:00 local time.

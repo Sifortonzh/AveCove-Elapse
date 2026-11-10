@@ -5,6 +5,7 @@ import Image from "next/image";
 import { CircleSlash2 } from "lucide-react";
 import { appendOptionAnnotationImage, readOptionAnnotation, removeOptionAnnotationImage, updateOptionAnnotationText } from "../lib/note-annotations";
 import type { QuizQuestion } from "../lib/question-parser";
+import { DISEASE_SUMMARY_REQUEST } from "../lib/ai-follow-up";
 
 export function AnnotatedOption({ label, note, submitted, excluded, onExclude, onNote, choice, children }: {
   label: string; note: string; submitted: boolean; excluded: boolean; onExclude: () => void;
@@ -50,14 +51,7 @@ export function ChapterDirectory({ questions, currentQuestionId, progress, kille
   return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal chapter-directory" role="dialog" aria-modal="true" aria-label="章节目录" onMouseDown={(e) => e.stopPropagation()}><header><h2>章节目录 · {questions.length} 题</h2><button aria-label="关闭章节目录" onClick={onClose}>×</button></header><p>已自动展开并定位当前题所在章节；当前章节标题会保持可见，可随时收起或展开。</p><div className="chapter-directory-list">{[...groups].map(([name, items]) => { const containsCurrent = items.some((question) => question.id === currentQuestionId); return <details key={name} className={containsCurrent ? "current-chapter" : ""} open={containsCurrent}><summary>{name}<span>{items.filter(q => killed.includes(q.id) || Boolean(progress[q.id])).length}/{items.length} 题</span></summary>{items.map((q) => <button ref={q.id === currentQuestionId ? currentButton : undefined} className={q.id === currentQuestionId ? "current" : ""} aria-current={q.id === currentQuestionId ? "true" : undefined} key={q.id} onClick={() => { onOpen(q.id); onClose(); }}><b>{q.sourceNumber}</b><span>{q.stem}</span>{killed.includes(q.id) ? <em className="chapter-result" aria-label="已斩">✂️</em> : progress[q.id] && <em className={`chapter-result ${progress[q.id]}`} aria-label={progress[q.id] === "correct" ? "已做对" : "已做错"}>{progress[q.id] === "correct" ? "✅" : "❌"}</em>}</button>)}</details>; })}</div></section></div>;
 }
 
-export function AiDialogue({ question, accountId, onSave }: { question: QuizQuestion; accountId?: string; onSave: (text: string) => void }) {
-  const guidedPrompts = [
-    ["1 基础", "请用一句话复述本题考查的核心概念，并解释正确答案为什么成立"],
-    ["2 辨析", "请逐项比较本题选项，指出每个错误选项错在哪里"],
-    ["3 机制", "请从病理生理或临床机制解释本题，补充最容易误判的原因"],
-    ["4 迁移", "请给出两个同类考点或变式，并说明遇到新题时如何迁移判断"],
-    ["5 串联", "请把本题与教材章节、鉴别诊断和临床决策串联成一份复习框架"],
-  ] as const;
+export function AiDialogue({ question, accountId, onSave, renderMarkdown }: { question: QuizQuestion; accountId?: string; onSave: (text: string) => void; renderMarkdown: (text: string) => ReactNode }) {
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -65,20 +59,31 @@ export function AiDialogue({ question, accountId, onSave }: { question: QuizQues
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => request.current?.abort(), []);
   async function ask(text: string) {
-    if (!text.trim() || busy) return;
+    if (!text.trim() || request.current) return;
     setBusy(true); setError("");
     const controller = new AbortController(); request.current = controller;
-    const timer = window.setTimeout(() => controller.abort(), 60000);
+    const timer = window.setTimeout(() => controller.abort(), 125_000);
     try {
-      const response = await fetch("/api/explain", { method: "POST", headers: { "Content-Type": "application/json", "x-elapse-account-id": accountId ?? "" }, signal: controller.signal, body: JSON.stringify({ question, mode: "companion", followUp: text, history: messages.slice(-6) }) });
+      const { stem, sharedStem, options, answer, explanation, answerSource, category, sourceNumber } = question;
+      const context = { stem, sharedStem, options: options.map(({ label, text }) => ({ label, text })), answer, explanation, answerSource, category, sourceNumber };
+      const response = await fetch("/api/explain", { method: "POST", headers: { "Content-Type": "application/json", "x-elapse-account-id": accountId ?? "" }, signal: controller.signal, body: JSON.stringify({ question: context, mode: "companion", followUp: text, history: messages.slice(-6) }) });
       if (!response.headers.get("content-type")?.includes("application/json")) throw new Error("AI 服务暂时不可用，请稍后重试");
       const data = await response.json();
       if (!response.ok || !data.explanation) throw new Error(data.error || "没有收到 AI 回复");
       setMessages((prev) => [...prev, { role: "user", text }, { role: "assistant", text: data.explanation }]); setDraft("");
     } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "请求失败"); else setError("请求已取消或超时，可重新提问"); }
-    finally { window.clearTimeout(timer); setBusy(false); }
+    finally { window.clearTimeout(timer); request.current = null; setBusy(false); }
   }
-  return <section className="practice-dialogue"><h3>追问 AI · 五级理解</h3><div className="ai-guided-prompts">{guidedPrompts.map(([label, prompt]) => <button key={label} disabled={busy} title={prompt} onClick={() => void ask(prompt)}>{label}</button>)}</div>{messages.map((message, i) => <div key={i} className={`dialogue-${message.role}`}><strong>{message.role === "user" ? "我" : "AI"}</strong><p>{message.text}</p>{message.role === "assistant" && <button onClick={() => onSave(message.text)}>写入笔记</button>}</div>)}<textarea value={draft} maxLength={500} onChange={(e) => setDraft(e.target.value)} placeholder="追问判断依据、易混点或同类考点…" /><button disabled={busy || !draft.trim()} onClick={() => void ask(draft)}>{busy ? "正在回答…" : "发送追问"}</button>{busy && <button onClick={() => request.current?.abort()}>取消</button>}{error && <p role="alert">{error}</p>}</section>;
+  return <section className="practice-dialogue">
+    <button className="ai-disease-summary" type="button" disabled={busy} onClick={() => void ask(DISEASE_SUMMARY_REQUEST)}>加入本题，AI 总结疾病</button>
+    {messages.map((message, i) => <div key={i} className={`dialogue-${message.role}`}>
+      <strong>{message.role === "user" ? "我" : "AI"}</strong>
+      {message.role === "assistant" ? <>{renderMarkdown(message.text)}<button onClick={() => onSave(message.text)}>写入笔记</button></> : <p>{message.text === DISEASE_SUMMARY_REQUEST ? "总结本题疾病" : message.text}</p>}
+    </div>)}
+    <textarea aria-label="追问 AI" value={draft} maxLength={500} onChange={(e) => setDraft(e.target.value)} placeholder="追问判断依据、易混点或同类考点…" />
+    <button disabled={busy || !draft.trim()} onClick={() => void ask(draft)}>{busy ? "正在回答…" : "发送追问"}</button>
+    {busy && <button onClick={() => request.current?.abort()}>取消</button>}{error && <p role="alert">{error}</p>}
+  </section>;
 }
 
 type Point = [number, number];

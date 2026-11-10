@@ -46,6 +46,12 @@ export function hasOptionAnnotation(note: string) {
     || /!\[选项 [A-G] 批注图片\]\(data:image\/jpeg;base64,/m.test(note);
 }
 
+export function remapOptionAnnotations(note: string, labels: ReadonlyMap<string, string>) {
+  const prefix = (label: string) => labels.has(label) ? `选项 ${labels.get(label)}` : `原选项 ${label}（已删除）`;
+  return note.replace(/^> 选项 ([A-G]) 批注：/gm, (_, label: string) => `> ${prefix(label)} 批注：`)
+    .replace(/!\[选项 ([A-G]) 批注图片\]\(data:image\/jpeg;base64,/g, (_, label: string) => `![${prefix(label)} 批注图片](data:image/jpeg;base64,`);
+}
+
 export function noteImageMarkdown(note: string) {
   return [...note.matchAll(/!\[[^\]]*\]\((data:image\/jpeg;base64,[A-Za-z0-9+/=]+)\)/g)]
     .map((match) => match[0]);

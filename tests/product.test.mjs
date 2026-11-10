@@ -20,8 +20,10 @@ test("device preferences resolve languages, theme fallback boundaries and daily 
   assert.equal(resolveSystemDark(false, false, 6), false);
   assert.equal(resolveSystemDark(false, true, 23), false);
   assert.equal(resolveSystemDark(true, false, 12), true);
-  assert.equal(resolveClockDark(18), false);
-  assert.equal(resolveClockDark(19), true);
+  assert.equal(resolveClockDark(19), false);
+  assert.equal(resolveClockDark(22), false);
+  assert.equal(resolveClockDark(23), true);
+  assert.equal(resolveClockDark(0), true);
   assert.equal(resolveClockDark(5), true);
   assert.equal(resolveClockDark(6), false);
   assert.equal(nextTheme("dark"), "system");
@@ -1192,7 +1194,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.6.4");
+  assert.equal(JSON.parse(manifest).version, "2.6.5");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1490,7 +1492,7 @@ test("persists in-practice question corrections into sync and shared banks", asy
   assert.match(page, /原文件答案可能受教材版本、指南更新或识别误差影响/);
   assert.match(page, /当前题库、多端同步与后续分享都会使用这个版本/);
   assert.match(page, /questions: replaceQuestion\(bank\.questions\)/);
-  assert.match(page, /stampLearningRecord\(recordLedger, revisedQuestion\.id, \{ progress: revisedResult \}\)/);
+  assert.match(page, /stampLearningRecord\(nextLedger, id, \{ progress: revisedResult \}\)/);
   assert.match(localBank, /questions: bank\.questions/);
   assert.match(styles, /\.question-edit-modal/);
   assert.match(styles, /\.answer-edit-mask/);
@@ -1892,7 +1894,7 @@ test("ships blind review and answer-first memorization only in practice settings
   assert.doesNotMatch(homeView, /<strong>盲刷<\/strong>|<strong>背题<\/strong>/);
   assert.match(page, /sessionStudyMode === "blind"/);
   assert.match(page, /setSelected\(memorizing \? \[\.\.\.\(target\?\.answer \?\? \[\]\)\]/);
-  assert.match(page, /sessionStudyMode === "standard" && settings\.autoNext/);
+  assert.match(page, /sessionStudyMode === "standard" && \(advanceAfterCorrect \|\| settings\.autoNext\) && result === "correct"/);
   assert.match(page, /背题模式不会计入对错记录/);
   assert.match(page, /className="blind-check-action"/);
   assert.match(page, /answerSelections=\{displayedAnswerSelections\}/);
@@ -1952,7 +1954,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.6.4");
+  assert.equal(JSON.parse(packageJson).version, "2.6.5");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2360,11 +2362,13 @@ test("ships the v2.1.2 jump-safe practice and library refinements", async () => 
   assert.match(styles, /\.bank-card>footer\{grid-template-columns:1fr repeat\(5,44px\)\}/);
 });
 
-test("ships the v2.1.3 Pavilion workflow and five-level AI follow-up", async () => {
-  const [page, extras, styles] = await Promise.all([
+test("ships the Pavilion workflow and table-based AI follow-up", async () => {
+  const [page, extras, styles, route, prompts] = await Promise.all([
     text("app/page.tsx"),
     text("app/components/PracticeExtras.tsx"),
     text("app/globals.css"),
+    text("app/api/explain/route.ts"),
+    text("app/lib/ai-follow-up.ts"),
   ]);
 
   assert.match(page, /const BANK_REQUEST_STAGES = \["大一", "大二", "大三", "大四", "大五", "考研", "执医", "规培", "其他"\]/);
@@ -2375,10 +2379,30 @@ test("ships the v2.1.3 Pavilion workflow and five-level AI follow-up", async () 
   assert.match(page, /打开并导入题库/);
   assert.match(page, /bank-request-stage-nav/);
   assert.match(page, /bank-request-search/);
-  assert.match(extras, /追问 AI · 五级理解/);
-  assert.match(extras, /1 基础/);
-  assert.match(extras, /5 串联/);
-  assert.match(styles, /\.ai-guided-prompts/);
+  assert.doesNotMatch(extras, /五级理解/);
+  assert.match(extras, /加入本题，AI 总结疾病/);
+  assert.match(extras, /renderMarkdown\(message.text\)/);
+  assert.match(styles, /\.markdown-table-scroll/);
+  assert.match(route, /followUp \? FOLLOW_UP_SYSTEM_PROMPT/);
+  assert.match(prompts, /\| 项目 \| A \| B \|/);
+  assert.match(prompts, /\| 项目 \| A \|」/);
+});
+
+test("option relabeling preserves moved answers, drafts and annotations", async () => {
+  const loadModule = async path => {
+    const source = ts.transpileModule(await text(path), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+    return import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+  };
+  const { relabelOptions, remapOptionLabels } = await loadModule("app/lib/question-edit.ts");
+  const { remapOptionAnnotations } = await loadModule("app/lib/note-annotations.ts");
+  const { readMarkdownTable } = await loadModule("app/lib/markdown-table.ts");
+  const { items, labels } = relabelOptions([{ label: "C", text: "第三项" }, { label: "A", text: "第一项" }]);
+  assert.deepEqual(items, [{ label: "A", text: "第三项" }, { label: "B", text: "第一项" }]);
+  assert.deepEqual(remapOptionLabels(["A", "B", "C"], labels), ["B", "A"]);
+  assert.equal(remapOptionAnnotations("> 选项 A 批注：甲\n> 选项 B 批注：乙\n![选项 C 批注图片](data:image/jpeg;base64,aaa)", labels), "> 选项 B 批注：甲\n> 原选项 B（已删除） 批注：乙\n![选项 A 批注图片](data:image/jpeg;base64,aaa)");
+  assert.deepEqual(readMarkdownTable(["| 项目 | A | B |", "|---|---|---|", "| 症状 | 1. 发热<br>2. 咳嗽 | 无 |", "其他"], 0), {
+    headers: ["项目", "A", "B"], rows: [["症状", "1. 发热<br>2. 咳嗽", "无"]], next: 3,
+  });
 });
 
 test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair", async () => {
@@ -2389,7 +2413,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.6.4");
+  assert.equal(JSON.parse(manifest).version, "2.6.5");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2450,7 +2474,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.4");
+  assert.equal(JSON.parse(manifest).version, "2.6.5");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2468,7 +2492,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.4");
+  assert.equal(JSON.parse(manifest).version, "2.6.5");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2488,7 +2512,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.4");
+  assert.equal(JSON.parse(manifest).version, "2.6.5");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

@@ -16,7 +16,7 @@ export function resolveUiLanguage(preference: UiLanguageMode, languages: readonl
 }
 
 export function resolveClockDark(hour: number) {
-  return hour >= 19 || hour < 6;
+  return hour >= 23 || hour < 6;
 }
 
 export function resolveSystemDark(dark: boolean, light: boolean, hour: number) {

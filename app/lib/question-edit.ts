@@ -1,5 +1,24 @@
 import type { QuizQuestion } from "./question-parser";
 
+export type OptionLabelMap = ReadonlyMap<string, string>;
+
+export function relabelOptions<T extends { label: string }>(options: T[]) {
+  const labels = new Map<string, string>();
+  const items = options.map((option, index) => {
+    const label = "ABCDEFG"[index];
+    labels.set(option.label, label);
+    return { ...option, label };
+  });
+  return { items, labels };
+}
+
+export function remapOptionLabels(labels: string[], map: OptionLabelMap) {
+  return labels.flatMap(label => {
+    const next = map.get(label);
+    return next ? [next] : [];
+  });
+}
+
 export function removeMarkedQuestions(items: QuizQuestion[], ids: string[]) {
   const marked = new Set(ids);
   const remaining = items.filter(question => !marked.has(question.id));

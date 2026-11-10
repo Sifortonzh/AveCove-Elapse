@@ -63,9 +63,10 @@ import SyncStatusNotice from "./components/SyncStatusNotice";
 import SyncFileList from "./components/SyncFileList";
 import { syncErrorMessage, type SyncFileChange } from "./lib/sync-feedback";
 import { fetchSync } from "./lib/sync-request";
-import { deleteQuestionAndRenumber, insertQuestionAfter, removeMarkedQuestions } from "./lib/question-edit";
+import { deleteQuestionAndRenumber, insertQuestionAfter, relabelOptions, remapOptionLabels, removeMarkedQuestions, type OptionLabelMap } from "./lib/question-edit";
 import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
-import { hasOptionAnnotation, noteImageMarkdown } from "./lib/note-annotations";
+import { hasOptionAnnotation, noteImageMarkdown, remapOptionAnnotations } from "./lib/note-annotations";
+import { readMarkdownTable } from "./lib/markdown-table";
 import { collectNoteExportSections, downloadBankNoteArchive, printNotePdf } from "./lib/note-pdf-export";
 
 type Progress = Record<string, "correct" | "wrong">;
@@ -244,7 +245,15 @@ function inlineMarkdown(text: string) {
 
 function MarkdownNotePreview({ value, empty = "还没有可预览的内容。" }: { value: string; empty?: string }) {
   const lines = value.replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "📷 笔记图片（进入题目查看）").replace(/```elapse-ink\n[^`]+\n```/g, "✎ 已保存手绘笔记（进入题目查看）").replace(/\r/g, "").split("\n");
+  let tableEnd = 0;
+  const tableCell = (cell: string) => cell.split(/<br\s*\/?>/i).map((part, index) => <span key={index}>{index > 0 && <br />}{inlineMarkdown(part)}</span>);
   const rendered = lines.map((line, index) => {
+    if (index < tableEnd) return null;
+    const table = readMarkdownTable(lines, index);
+    if (table) {
+      tableEnd = table.next;
+      return <div className="markdown-table-scroll" key={index}><table><thead><tr>{table.headers.map((cell, column) => <th scope="col" key={column}>{tableCell(cell)}</th>)}</tr></thead><tbody>{table.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, column) => column === 0 ? <th scope="row" key={column}>{tableCell(cell)}</th> : <td key={column}>{tableCell(cell)}</td>)}</tr>)}</tbody></table></div>;
+    }
     let kind: MarkdownLineKind = "paragraph";
     let content = line;
     if (!line.trim()) kind = "space";
@@ -1740,7 +1749,8 @@ export default function HomePage() {
     setToast(featured ? `“${updated.name}”已加入精选试卷 ⭐✨` : `“${updated.name}”已移出精选试卷`);
   }
 
-  async function reviseCurrentQuestion(revision: QuizQuestion, children: QuizQuestion[] = []) {
+  async function reviseCurrentQuestion(revision: QuizQuestion, children: QuizQuestion[] = [], labels?: OptionLabelMap) {
+    await draftSaveQueueRef.current;
     const optionLabels = new Set(revision.options.map((option) => option.label.toUpperCase()));
     const revisedAnswer = [...new Set(revision.answer.map((label) => label.toUpperCase()))]
       .filter((label) => optionLabels.has(label));
@@ -1784,19 +1794,35 @@ export default function HomePage() {
     setSessionQuestions((session) => session.map(q => replacements.get(q.id) ?? q));
     setAiTexts({});
 
-    const previousSelection = answerSelections[revisedQuestion.id] ?? selected;
-    if (sessionStudyMode !== "memorize" && submitted && revisedAnswer.length && previousSelection.length) {
-      const revisedResult = [...previousSelection].sort().join("") === [...revisedAnswer].sort().join("") ? "correct" : "wrong";
-      const nextProgress = { ...progress, [revisedQuestion.id]: revisedResult as "correct" | "wrong" };
-      const nextLedger = stampLearningRecord(recordLedger, revisedQuestion.id, { progress: revisedResult });
-      persistLearningRecords({
-        progress: nextProgress,
-        firstProgress,
-        favorites,
-        notes,
-        ledger: nextLedger,
-      });
+    const id = revisedQuestion.id;
+    const remap = (items: string[]) => labels ? remapOptionLabels(items, labels) : items;
+    const previousSelection = remap(answerSelections[id] ?? (!isolatedReviewSession ? selected : []));
+    const latest = normalizeLearningRecords(latestRecordsRef.current);
+    let nextLedger = latest.ledger;
+    let nextProgress = latest.progress;
+    let nextNotes = latest.notes;
+    if (labels) {
+      const updateSelections = (items: Record<string, string[]>) => id in items ? { ...items, [id]: remap(items[id]) } : items;
+      setSelected(remap);
+      setAnswerSelections(updateSelections);
+      setReviewSelections(updateSelections);
+      setExcludedOptions(updateSelections);
+      if (latest.notes[id]) {
+        const note = remapOptionAnnotations(latest.notes[id], labels);
+        if (note !== latest.notes[id]) {
+          nextNotes = { ...latest.notes, [id]: note };
+          nextLedger = stampLearningRecord(nextLedger, id, { note });
+        }
+      }
     }
+    if ((!isolatedReviewSession || Boolean(latest.progress[id])) && sessionStudyMode !== "memorize" && submitted && revisedAnswer.length && previousSelection.length) {
+      const revisedResult = [...previousSelection].sort().join("") === [...revisedAnswer].sort().join("") ? "correct" : "wrong";
+      if (latest.progress[id] !== revisedResult) {
+        nextProgress = { ...latest.progress, [id]: revisedResult };
+        nextLedger = stampLearningRecord(nextLedger, id, { progress: revisedResult });
+      }
+    }
+    if (nextLedger !== latest.ledger) persistLearningRecords({ ...latest, progress: nextProgress, notes: nextNotes, ledger: nextLedger });
 
     setToast("题目修订已保存 ✏️✨ 当前题库、多端同步与后续分享都会使用这个版本。");
   }
@@ -2593,11 +2619,12 @@ function QuestionBankPage({ language, banks, activeBankId, progress, favorites, 
             {bank.description && <section className={`bank-description ${descriptionExpanded ? "expanded" : ""}`}><div><span><FileText size={14} />题库简介</span>{descriptionIsLong && <button type="button" aria-expanded={descriptionExpanded} onClick={() => toggleDescription(bank.id)}>{descriptionExpanded ? "收起" : "展开全文"}<ChevronRight size={14} /></button>}</div><p>{bank.description}</p></section>}
             <div className="bank-card-progress" aria-label={`已完成 ${completedCount} 道，共 ${stats.total} 道，进度 ${completionLabel}%`}><div><span>{singleOnly ? "单选进度" : "学习进度"} · {completedCount}/{stats.total}</span><b>{completionLabel}%</b></div><i><b style={{ width: `${completion}%` }} /></i></div>
           </>}
-          <div className="bank-card-meta"><span>导入于 {new Date(bank.importedAt).toLocaleDateString("zh-CN")}</span><span>仅存本机</span></div>
-          {isDeleting ? <div className="bank-delete-confirm"><p>确认删除“我的题库”中的这份文件？同步设备上的私人副本也会移除；藏经阁已发布的公开副本保持独立，不会一起删除。</p><label className="archive-delete-choice"><input type="checkbox" checked={archiveBeforeDelete} onChange={event => setArchiveBeforeDelete(event.target.checked)} disabled={deleteBusy}/>📓 是否将题库笔记以最少文件存储归档 📃</label><small>保存为一份可离线阅读的 HTML，含笔记、图片、手绘和相关题目；本机“我的笔记”也保留归档下载入口。</small>{deleteError && <p role="alert">{deleteError}</p>}<div><button disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); setDeleteError(""); try { await onDelete(bank.id, archiveBeforeDelete); setDeletingId(null); } catch (error) { setDeleteError(error instanceof Error ? error.message : "删除失败，题库保留"); } finally { setDeleteBusy(false); } }}>{deleteBusy ? "正在保存…" : "确认移除"}</button><button disabled={deleteBusy} onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="导出题库复习笔记" title={noteExportCount ? `导出 ${noteExportCount} 道精选或批注题为 PDF` : "暂无可导出的精选或批注题"} disabled={!noteExportCount} onClick={() => exportBankNotes(bank)}><Download /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => { setDeletingId(bank.id); setArchiveBeforeDelete(true); setDeleteError(""); }}><Trash2 /></button></footer>}
+          <p className="bank-import-date">导入日期：{new Date(bank.importedAt).toLocaleDateString("zh-CN")}</p>
+          {isDeleting ? <div className="bank-delete-confirm"><p>确认删除“我的题库”中的这份文件？同步设备上的私人副本也会移除；藏经阁已发布的公开副本保持独立，不会一起删除。</p><label className="archive-delete-choice"><input type="checkbox" checked={archiveBeforeDelete} onChange={event => setArchiveBeforeDelete(event.target.checked)} disabled={deleteBusy}/>📓 是否将题库笔记以最少文件存储归档 📃</label><InfoNotice title="笔记归档">将笔记、图片、手绘和相关题目保存为一份离线 HTML，也可在「我的笔记」重新下载。</InfoNotice>{deleteError && <p role="alert">{deleteError}</p>}<div><button disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); setDeleteError(""); try { await onDelete(bank.id, archiveBeforeDelete); setDeletingId(null); } catch (error) { setDeleteError(error instanceof Error ? error.message : "删除失败，题库保留"); } finally { setDeleteBusy(false); } }}>{deleteBusy ? "正在保存…" : "确认移除"}</button><button disabled={deleteBusy} onClick={() => setDeletingId(null)}>取消</button></div></div> : <footer><button className="bank-open" onClick={() => onSelect(bank.id)} disabled={isActive}>{isActive ? "正在使用" : "设为当前"}</button><button aria-label="编辑题库名称与简介" title="编辑题库名称与简介" onClick={() => beginEdit(bank)}><Pencil /></button><button aria-label="重置刷题记录" title="重置刷题记录" onClick={() => setResettingBank(bank)}><RotateCcw /></button><button aria-label="导出题库复习笔记" title={noteExportCount ? `导出 ${noteExportCount} 道精选或批注题为 PDF` : "暂无可导出的精选或批注题"} disabled={!noteExportCount} onClick={() => exportBankNotes(bank)}><Download /></button><button aria-label="分享题库" title="分享题库" onClick={() => setSharingBank(bank)}><Share2 /></button><button className="danger" aria-label="删除题库" title="删除题库" onClick={() => { setDeletingId(bank.id); setArchiveBeforeDelete(true); setDeleteError(""); }}><Trash2 /></button></footer>}
         </article>;
       })}</div>{group.banks.length > groupVisibleLimit && <button type="button" className={`bank-group-toggle ${groupExpanded ? "expanded" : ""}`} aria-expanded={groupExpanded} onClick={() => toggleGroup(group.name)}>{groupExpanded ? "收起题库" : `展开其余 ${hiddenCount} 份题库`}<ChevronRight /></button>}</section>;
       })}</div></div> : <div className="bank-empty">{keyword ? <CircleHelp /> : <Database />}<h2>{keyword ? "没有找到匹配的题库" : "题库书架还是空的"}</h2><p>{keyword ? "这里只搜索题库名称、分组、简介和来源；刷题时仍可使用“搜题”检索题目内容。" : "导入 Word、PDF 或同学分享的红豆题库文件后，会自动收录在这里。"}</p>{keyword ? <button className="ghost-action" onClick={() => setQuery("")}><X size={17} />清除搜索</button> : <button className="primary-action" onClick={onImport}><Import size={17} />导入第一份题库</button>}</div>}</section>
+      <InfoNotice className="bank-library-notice" title="题库与同步">「我的题库」是私人书架，登录后可多端同步；已发布到藏经阁的副本独立保留。<p>Elapse · Sifortonzh · avecove.com</p></InfoNotice>
     </main>
     {sharingBank && <ShareBankModal bank={sharingBank} onClose={() => setSharingBank(null)} />}
     {resettingBank && <ResetBankProgressModal bank={resettingBank} progress={progress} favorites={favorites} notes={notes} onReset={onReset} onClose={() => setResettingBank(null)} />}
@@ -3025,7 +3052,7 @@ function QuizView(props: {
   onMobilePanel: () => void; onSearch: () => void;
   onOpenRelated: (questionId: string) => void;
   onUpdateKilled: (questionIds: string[], killed: boolean) => void;
-  onEditQuestion: (question: QuizQuestion, children?: QuizQuestion[]) => Promise<void>;
+  onEditQuestion: (question: QuizQuestion, children?: QuizQuestion[], labels?: OptionLabelMap) => Promise<void>;
   onAddQuestion: (afterQuestionId: string, question: QuizQuestion) => Promise<void>;
   onDeleteQuestion: (questionId: string) => Promise<void>;
   knownNoteTags: string[];
@@ -3140,14 +3167,14 @@ function QuestionCorrectionModal({ question, bankQuestions = [], creating = fals
   question: QuizQuestion;
   bankQuestions?: QuizQuestion[];
   creating?: boolean;
-  onSave: (question: QuizQuestion, children?: QuizQuestion[]) => Promise<void>;
+  onSave: (question: QuizQuestion, children?: QuizQuestion[], labels?: OptionLabelMap) => Promise<void>;
   onClose: () => void;
 }) {
   const [stem, setStem] = useState(() => removeSharedPrefix(question.stem, question.sharedStem ?? "") || question.stem);
   const [sharedStem, setSharedStem] = useState(question.sharedStem ?? "");
   const [addedChildren, setAddedChildren] = useState<string[]>([]);
   const [childStems, setChildStems] = useState<Record<string, string>>({});
-  const [options, setOptions] = useState(question.options.map((option) => ({ ...option })));
+  const [options, setOptions] = useState(question.options.map((option) => ({ ...option, originalLabel: option.label as string | undefined })));
   const [answer, setAnswer] = useState([...question.answer]);
   const originalType = editableQuestionType(question);
   const [medicalType, setMedicalType] = useState<MedicalQuestionType>(originalType);
@@ -3180,13 +3207,13 @@ function QuestionCorrectionModal({ question, bankQuestions = [], creating = fals
     { id: "X", name: "X", detail: "多选题" },
   ];
   const normalizedOriginalAnswer = [...question.answer].sort().join("");
-  const answerChanged = [...answer].sort().join("") !== normalizedOriginalAnswer
+  const answerChanged = answer.map(label => options.find(option => option.label === label)?.originalLabel ?? "_").sort().join("") !== normalizedOriginalAnswer
     || medicalType !== originalType;
   const valid = Boolean(
     individualStem.trim()
     && (!sharedCase || (sharedStem.trim() && siblings.every(q => childStem(q).trim())))
     && options.length >= 2
-    && options.every((option) => option.text.trim())
+    && options.every((option) => option.text.trim() || option.images?.length || option.sourceImages?.length)
     && (!creating || answer.length > 0)
     && answer.every((label) => options.some((option) => option.label === label)),
   );
@@ -3216,20 +3243,26 @@ function QuestionCorrectionModal({ question, bankQuestions = [], creating = fals
   const addOption = () => {
     const label = "ABCDEFG"[options.length];
     if (!label) return;
-    setOptions((current) => [...current, { label, text: "" }]);
+    setOptions((current) => [...current, { label, text: "", originalLabel: undefined }]);
+  };
+
+  const applyOptionOrder = (items: typeof options) => {
+    const relabeled = relabelOptions(items);
+    setOptions(relabeled.items);
+    setAnswer(current => remapOptionLabels(current, relabeled.labels));
+  };
+
+  const moveOption = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= options.length) return;
+    const next = [...options];
+    [next[index], next[target]] = [next[target], next[index]];
+    applyOptionOrder(next);
   };
 
   const removeOption = (index: number) => {
     if (options.length <= 2) return;
-    const removedLabel = options[index]?.label;
-    const labelMap = new Map<string, string>();
-    const nextOptions = options.filter((_, optionIndex) => optionIndex !== index).map((option, optionIndex) => {
-      const nextLabel = "ABCDEFG"[optionIndex];
-      labelMap.set(option.label, nextLabel);
-      return { ...option, label: nextLabel };
-    });
-    setOptions(nextOptions);
-    setAnswer((current) => current.filter((label) => label !== removedLabel).map((label) => labelMap.get(label) ?? label));
+    applyOptionOrder(options.filter((_, optionIndex) => optionIndex !== index));
   };
 
   const clearOption = (index: number) => setOptions((current) => current.map((item, i) => i === index ? { ...item, text: "" } : item));
@@ -3247,10 +3280,14 @@ function QuestionCorrectionModal({ question, bankQuestions = [], creating = fals
     setBusy(true);
     setError("");
     try {
+      const labels = new Map<string, string>();
+      for (const option of options) if (option.originalLabel) labels.set(option.originalLabel, option.label);
+      const labelsChanged = !creating && question.options.some(option => labels.get(option.label) !== option.label);
       await onSave({
         ...question,
         stem: individualStem.trim(),
-        options: options.map((option) => ({ ...option, text: option.text.trim() })),
+        options: options.map(({ label, text, sourceImages, images }) => ({ label, text: text.trim(), sourceImages, images })),
+        draftAnswer: labelsChanged && question.draftAnswer ? remapOptionLabels(question.draftAnswer, labels) : question.draftAnswer,
         answer: [...answer].sort(),
         answerPending: answer.length === 0,
         multiple: medicalType === "X",
@@ -3260,7 +3297,7 @@ function QuestionCorrectionModal({ question, bankQuestions = [], creating = fals
         sharedStemGroup: separateStem ? question.sharedStemGroup : undefined,
         sharedOptionGroup: medicalType === originalType ? question.sharedOptionGroup : undefined,
         explanation: explanation.trim() || undefined,
-      }, sharedCase ? siblings.map(q => ({ ...q, stem: childStem(q).trim(), sharedStem: sharedStem.trim(), medicalQuestionType: medicalType, questionType: "A", multiple: false })) : []);
+      }, sharedCase ? siblings.map(q => ({ ...q, stem: childStem(q).trim(), sharedStem: sharedStem.trim(), medicalQuestionType: medicalType, questionType: "A", multiple: false })) : [], labelsChanged ? labels : undefined);
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "暂时无法保存修订，请稍后重试");
@@ -3276,7 +3313,7 @@ function QuestionCorrectionModal({ question, bankQuestions = [], creating = fals
         {separateStem && <section className="shared-case-editor"><label className="question-edit-field"><span>共用题干</span><textarea aria-label="共用题干" value={sharedStem} rows={4} onChange={event => setSharedStem(event.target.value)} placeholder="填写本组几道题共同使用的病例或材料" /></label>{sharedCase && !sharedStem.trim() && <button type="button" className="ghost-action" onClick={() => { setSharedStem(stem); setStem(""); }}>将现有题干移到共用题干 📋</button>}<InfoNotice title="组题修订">{(sharedCase ? siblings.length : declaredMembers.length) + 1} 题共用这段材料。保存后只同步共用题干；各题的选项、答案和学习记录保留。</InfoNotice></section>}
         <label className="question-edit-field"><span>{separateStem ? `小题 ${question.sourceNumber} · 单独问题` : "题干"}</span><textarea aria-label={separateStem ? "当前小题问题" : "题干"} value={stem} rows={separateStem ? 2 : 4} onChange={(event) => setStem(event.target.value)} placeholder={sharedCase ? "例如：该患者最可能的诊断是什么？" : undefined} /></label>
         {sharedCase && <section className="shared-case-children"><header><strong>同组小题 · {siblings.length + 1} 题</strong>{!creating && nextChild && <button type="button" className="ghost-action" onClick={() => setAddedChildren(ids => [...ids, nextChild.id])}>＋ 加入后一题 {nextChild.sourceNumber}</button>}</header>{siblings.map(q => <label key={q.id} className="question-edit-field"><span>小题 {q.sourceNumber} · 单独问题{addedChildren.includes(q.id) && <button type="button" onClick={() => setAddedChildren(ids => ids.filter(id => id !== q.id))}>移出</button>}</span><textarea aria-label={`小题 ${q.sourceNumber} 的问题`} rows={2} value={childStem(q)} onChange={event => setChildStems(values => ({ ...values, [q.id]: event.target.value }))} /></label>)}</section>}
-        <section className="option-edit-section"><div><span><strong>题目选项</strong><small>缺字或漏项时可直接修改、删除或补充</small></span><button className="add-option-button" onClick={addOption} disabled={options.length >= 7}>＋ 添加选项</button></div>{options.map((option, index) => <label key={`${option.label}-${index}`}><b>{option.label}</b><textarea rows={1} value={option.text} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} /><span className="option-edit-tools"><button type="button" onClick={() => clearOption(index)} title={`清空 ${option.label} 选项内容`} aria-label={`清空 ${option.label} 选项内容`}><RotateCcw size={15} /></button><button type="button" onClick={() => void cutOption(index)} title={`剪切 ${option.label} 选项内容`} aria-label={`剪切 ${option.label} 选项内容`} disabled={!option.text}><Scissors size={15} /></button><button className="remove-option-button" onClick={() => removeOption(index)} disabled={options.length <= 2} aria-label={`删除 ${option.label} 选项`}><Trash2 size={16} /></button></span></label>)}</section>
+        <section className="option-edit-section"><div><span><strong>题目选项</strong><small>缺字或漏项时可直接修改、删除或补充</small></span><button className="add-option-button" onClick={addOption} disabled={options.length >= 7}>＋ 添加选项</button></div>{options.map((option, index) => <label key={`${option.label}-${index}`}><b>{option.label}</b><textarea aria-label={`选项 ${option.label}`} rows={1} value={option.text} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} /><span className="option-edit-tools"><button type="button" onClick={() => moveOption(index, -1)} title={`上移选项 ${option.label}`} aria-label={`上移选项 ${option.label}`} disabled={index === 0 || busy}><ArrowUp size={15} /></button><button type="button" onClick={() => moveOption(index, 1)} title={`下移选项 ${option.label}`} aria-label={`下移选项 ${option.label}`} disabled={index === options.length - 1 || busy}><ArrowDown size={15} /></button><button type="button" onClick={() => clearOption(index)} title={`清空 ${option.label} 选项内容`} aria-label={`清空 ${option.label} 选项内容`}><RotateCcw size={15} /></button><button type="button" onClick={() => void cutOption(index)} title={`剪切 ${option.label} 选项内容`} aria-label={`剪切 ${option.label} 选项内容`} disabled={!option.text}><Scissors size={15} /></button><button className="remove-option-button" onClick={() => removeOption(index)} disabled={options.length <= 2} aria-label={`删除 ${option.label} 选项`}><Trash2 size={16} /></button></span></label>)}</section>
         <section className={`answer-edit-section ${answerVisible ? "revealed" : "concealed"}`}><header><div><strong>标准答案</strong><span>{answerVisible ? question.answer.length ? allowMultiple ? "X 型题可选择多个正确选项" : "请选择一个正确选项" : "本题暂无答案，请在这里手动补录" : "默认隐藏，避免只改文字时提前看到答案"}</span></div></header>{answerVisible ? <div className="answer-edit-choices">{options.map((option) => <button key={option.label} className={answer.includes(option.label) ? "active" : ""} onClick={() => toggleAnswer(option.label)} aria-pressed={answer.includes(option.label)}><i>{answer.includes(option.label) && <Check size={15} />}</i><b>{option.label}</b><span>{option.text || "待补充选项文字"}</span></button>)}</div> : <div className="answer-edit-mask"><div className="answer-blur-preview" aria-hidden="true">{options.slice(0, 4).map((option) => <span key={option.label}><i /><b>{option.label}</b><em>{option.text}</em></span>)}</div><div className="answer-reveal-panel"><EyeOff /><div><strong>标准答案已模糊保护</strong><p>只修题干或选项时无需查看答案；确认需要纠正答案后再主动展开。</p></div><button onClick={() => setAnswerVisible(true)}><Eye size={17} />显示并修订答案</button></div></div>}</section>
         <label className="question-edit-field explanation-edit-field"><span>原题解析 <small>可选</small></span><textarea value={explanation} rows={4} onChange={(event) => setExplanation(event.target.value)} placeholder="可粘贴原资料解析、答案依据或版本说明；没有可留空" /></label>
         {!creating && answerChanged && <div className="answer-revision-warning"><AlertCircle /><div><strong>改标准答案前，请再核对一次 ⚠️🩺</strong><p>原文件答案可能受教材版本、指南更新或识别误差影响；但手动修订也可能出错。请对照教材、官方答案或可靠解析再次核验后再保存哦 🔎✅</p></div></div>}
@@ -3376,7 +3413,7 @@ function LearningPanel({ bankName, current, submitted, note, onSearchNotes, know
   };
   return <aside className="learning-panel"><div className="learning-heading"><h2>解析与考点</h2><button className="note-search-trigger" onClick={onSearchNotes}><Search size={16} />搜索笔记</button></div><div className="learning-tabs">{modes.map((mode) => <button key={mode.id} className={aiMode === mode.id ? "active" : ""} onClick={() => onAi(mode.id)}>{mode.icon}{mode.displayLabel ?? mode.label}</button>)}</div>
     <div className="discussion-card"><div className="comment-author"><span className={`comment-avatar ${aiMode}`}><Sparkles size={16} /></span><div><strong>{activeModeLabel}</strong></div></div>{!submitted ? <div className="discussion-placeholder"><CircleHelp size={24} /><p>确认答案后查看解析。</p></div> : aiMode === "pitfall" ? <>{originalExplanation ? <div className={`original-explanation-panel ${explanationIsAi ? "ai-saved" : "source-saved"}`}><MarkdownNotePreview value={originalExplanation} /><small>来源：{current.explanationSource || (current.answerSource === "file" ? "导入文件自带解析" : "当前题库解析")}</small></div> : <div className="discussion-placeholder"><FileText size={24} /><p>原文件没有附带解析；可切换到“AI 解析”或“同类考点”让 AI 协助整理。</p></div>}{writableAiText && <button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>}</> : <>{generatedText && <div className="ai-copy"><MarkdownNotePreview value={generatedText} /></div>}{writableAiText && <div className="ai-save-actions"><button className="write-note-button" onClick={writeAiNote}><NotebookPen size={15} />写入笔记</button>{!originalExplanation && <button className="save-original-explanation-button" onClick={() => void saveGeneratedExplanation()} disabled={savingExplanation}><FileText size={15} />{savingExplanation ? "正在保存…" : "录入解析"}</button>}</div>}{aiLoading ? <div className="thinking"><i /><i /><i /><span>正在组织更易懂的解释</span></div> : !generatedText && <><p className="discussion-intro">{aiMode === "summary" ? `围绕题库答案 ${current.answer.join("、")} 提炼核心判断、选项辨析和记忆线索。` : "从当前知识点延伸 3–5 个常一起考、容易混淆或需要联动掌握的考点。"}</p><button className="generate-button" onClick={() => onAi(aiMode)}><Sparkles size={16} />生成这一条</button></>}</>}</div>
-    {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={`${account?.id ?? "guest"}:${current.id}`} accountId={account?.id} question={current} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
+    {submitted && <details className="optional-ai-dialogue"><summary>追问 AI</summary><AiDialogue key={`${account?.id ?? "guest"}:${current.id}`} accountId={account?.id} question={current} renderMarkdown={text => <MarkdownNotePreview value={text} />} onSave={(text) => onNote(appendAiToNote(note, current, "追问 AI", text))} /></details>}
     <details className="note-card collapsible-note-card" open={noteExpanded} onToggle={(event) => setNoteExpanded(event.currentTarget.open)}><summary className="note-card-heading"><NotebookPen size={17} /><strong>我的笔记</strong><span>{account ? "自动参与多端同步" : "当前保存在本机"}</span></summary><div className="note-editor-body"><div className="note-source-line"><FileText size={13} />来源：{noteSource(current)}</div><div className="note-editor-toolbar"><button disabled={!note.trim()} onClick={() => { if (window.confirm("确定清除本题的全部笔记、批注和手绘内容吗？清除会同步至其他设备。")) onNote(""); }}>清除本题笔记</button><button className={notePreview ? "active" : ""} onClick={() => setNotePreview((value) => !value)}>{notePreview ? <EyeOff size={14} /> : <Eye size={14} />}{notePreview ? "收起显示效果" : "预览显示效果"}</button></div><textarea aria-label="Markdown 编辑" value={note.replace(/```elapse-ink\n[^`]+\n```\n?/g, "").replace(/!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\)/g, "")} onChange={(event) => onNote(`${event.target.value.trimEnd()}\n${noteImageMarkdown(note).join("\n")}${note.match(/```elapse-ink\n[^`]+\n```/)?.[0] ? `\n${note.match(/```elapse-ink\n[^`]+\n```/)![0]}` : ""}`.trim())} placeholder={"# 题目笔记\n\n- 判断依据\n- 易错提醒\n\n> 标签：#待复盘"} /><NoteImages note={note} onNote={onNote} />{notePreview && <section className="note-preview-compact"><header>Markdown 显示效果<button type="button" onClick={() => setExpandedPreview(true)} aria-label="放大笔记预览"><ExternalLink size={14}/>放大查看</button></header><MarkdownNotePreview value={note} /></section>}{currentTags.length > 0 && <div className="note-tag-list">{currentTags.map((tag) => <button key={tag} title={`删除标签 ${tag}`} onClick={() => onNote(removeNoteTag(note, tag))}>#{tag}<X size={12} /></button>)}</div>}<div className="note-tag-entry"><input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTag()} placeholder="添加标签，如：心血管" /><button onClick={addTag} disabled={!tagDraft.trim()}>添加</button></div>{suggestedTags.length > 0 && <div className="note-tag-suggestions"><small>已存标签</small><div>{suggestedTags.map((tag) => <button key={tag} onClick={() => addKnownTag(tag)}>+ #{tag}</button>)}</div></div>}<div className="note-save-state"><span>{noteMessage}</span><small><Send size={14} />已自动保存</small></div><InkNote note={note} onNote={onNote} /></div></details>
     <details className="community-card"><summary className="community-title"><MessageCircle size={17} /><strong>同学讨论</strong><span>{bankName} · {comments.length} 条</span></summary><div className="community-body"><p className="comment-scope-note">当前题库独立讨论 · 原题号 {current.sourceNumber}</p>{account ? <div className="comment-identity"><UserRound size={15} /><span>{account.nickname}</span></div> : <button className="comment-login" onClick={onRequireLogin}><UserRound size={15} />登录后参与讨论</button>}<div className="comment-form">{replying && <div className="comment-reply-target">回复 {replying.nickname}<button type="button" onClick={() => setReply(null)}>取消</button></div>}<textarea ref={commentField} aria-label={replying ? `回复 ${replying.nickname}` : "发表讨论"} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 300))} placeholder="写下你的判断依据、易错点或疑问…" disabled={!account || commentBusy} /><button onClick={() => void publishComment()} disabled={!account || commentBusy || commentDraft.trim().length < 2}><Send size={14} />{commentBusy ? "发布中…" : "发布"}</button></div>{commentMessage && <p className="comment-message">{commentMessage}</p>}<div className="local-comments">{comments.length ? comments.map((comment) => <article key={comment.id}><div><b>{comment.nickname}{comment.replyTo && <> · 回复 {comment.replyTo}</>}</b><time>{new Date(comment.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p>{comment.text}</p><div className="comment-tools"><button onClick={() => void runCommentAction(() => onLikeComment(comment.id))}><ThumbsUp size={13} />{comment.likes || "赞"}</button>{comment.status === "published" && !comment.own && <button type="button" onClick={() => { if (!account) { onRequireLogin(); return; } setReply({ id: comment.id, nickname: comment.nickname, questionId: current.id }); commentField.current?.focus(); }}><MessageCircle size={13} />回复</button>}<button onClick={() => void runCommentAction(() => onReportComment(comment.id))}><Flag size={13} />举报</button>{comment.own && <button onClick={() => void runCommentAction(() => onDeleteComment(comment.id))}><Trash2 size={13} />删除</button>}</div></article>) : <p className="empty-comments">暂无讨论。</p>}</div></div></details>
     {expandedPreview && <NotePreviewDialog onClose={() => setExpandedPreview(false)}><MarkdownNotePreview value={note}/></NotePreviewDialog>}
@@ -3396,7 +3433,7 @@ function SettingsModal({ settings, counts, typeCounts, western306SubjectCounts, 
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
   return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>开始之前</span><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section study-mode-section"><label>刷题模式</label><div className="study-mode-grid"><button className={settings.studyMode === "standard" ? "active" : ""} onClick={() => update("studyMode", "standard")}><Target size={19} /><strong>标准练习</strong><span>提交后立即判题并记录对错</span></button><button className={settings.studyMode === "blind" ? "active" : ""} onClick={() => update("studyMode", "blind")}><EyeOff size={19} /><strong>盲刷</strong><span>先连续作答，需要时再对答案</span></button><button className={settings.studyMode === "memorize" ? "active" : ""} onClick={() => update("studyMode", "memorize")}><Eye size={19} /><strong>背题</strong><span>进入后直接展开标准答案</span></button></div>{settings.studyMode !== "standard" && <p className="study-mode-note">{settings.studyMode === "blind" ? "盲刷会保留每题选择，但在点击“对答案”前不判分、不显示正误。" : "背题只用于快速记忆，不会把浏览行为计入做题数、正确率或首次得分。"}</p>}</div><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
     ["all", "全部题目", Library], ["unanswered", "未练题目", Zap], ["wrong", "错题复盘", RotateCcw], ["favorite", "精选题", Star],
-  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div>{showWestern306Subjects && <div className="setting-section western306-subject-section"><label>西综 306 · 只练某一科</label><div className="western306-subject-grid"><button className={settings.western306Subject === "all" ? "active" : ""} onClick={() => update("western306Subject", "all")}><strong>全部科目</strong><em>{western306SubjectCounts.all} 道</em></button>{WESTERN_306_SUBJECTS.map((subject) => <button key={subject.id} className={settings.western306Subject === subject.id ? "active" : ""} onClick={() => update("western306Subject", subject.id)}><strong>{subject.label}</strong><em>{western306SubjectCounts[subject.id]} 道</em></button>)}</div><p className="western306-subject-note">按现代 165 题固定题号分布筛选；单科练习不包含第 108–115 题医学人文。</p></div>}<div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋X 型</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "auto" ? "active" : ""} aria-pressed={settings.themeMode === "auto"} title="19:00 至次日 06:00 为夜间" onClick={() => onChange({ ...settings, themeMode: "auto", darkMode: false })}><Clock3 size={17} />自动昼夜</button><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="点击选项即确认" detail="标准练习的单选题：点击即判分，答对自动下一题，答错停留" value={settings.confirmOnOptionClick} onChange={(value) => update("confirmOnOptionClick", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
+  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div>{showWestern306Subjects && <div className="setting-section western306-subject-section"><label>西综 306 · 只练某一科</label><div className="western306-subject-grid"><button className={settings.western306Subject === "all" ? "active" : ""} onClick={() => update("western306Subject", "all")}><strong>全部科目</strong><em>{western306SubjectCounts.all} 道</em></button>{WESTERN_306_SUBJECTS.map((subject) => <button key={subject.id} className={settings.western306Subject === subject.id ? "active" : ""} onClick={() => update("western306Subject", subject.id)}><strong>{subject.label}</strong><em>{western306SubjectCounts[subject.id]} 道</em></button>)}</div><p className="western306-subject-note">按现代 165 题固定题号分布筛选；单科练习不包含第 108–115 题医学人文。</p></div>}<div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋X 型</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "auto" ? "active" : ""} aria-pressed={settings.themeMode === "auto"} title="23:00 至次日 06:00 为夜间" onClick={() => onChange({ ...settings, themeMode: "auto", darkMode: false })}><Clock3 size={17} />自动昼夜</button><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="点击选项即确认" detail="标准练习的单选题：点击即判分，答对自动下一题，答错停留" value={settings.confirmOnOptionClick} onChange={(value) => update("confirmOnOptionClick", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
 }
 
 function SwitchRow({ label, detail, value, onChange }: { label: string; detail: string; value: boolean; onChange: (value: boolean) => void }) {
