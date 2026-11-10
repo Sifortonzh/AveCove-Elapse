@@ -140,6 +140,7 @@ type Settings = {
   studyMode: StudyMode;
   shuffleOptions: boolean;
   autoNext: boolean;
+  confirmOnOptionClick: boolean;
   showAnswerOnReturn: boolean;
   autoFavoriteWrong: boolean;
   darkMode: boolean;
@@ -154,6 +155,7 @@ const defaultSettings: Settings = {
   studyMode: "standard",
   shuffleOptions: false,
   autoNext: false,
+  confirmOnOptionClick: false,
   showAnswerOnReturn: false,
   autoFavoriteWrong: true,
   darkMode: false,
@@ -174,7 +176,7 @@ function normalizeSettings(value: unknown): Settings {
   const themeMode: ThemeMode = stored.themeMode === "light" || stored.themeMode === "dark" || stored.themeMode === "system" || stored.themeMode === "auto"
     ? stored.themeMode
     : stored.darkMode ? "dark" : "auto";
-  return { ...defaultSettings, ...stored, noteTags: noteTagCatalog(stored.noteTags), studyMode, western306Subject, themeMode, darkMode: themeMode === "dark" };
+  return { ...defaultSettings, ...stored, noteTags: noteTagCatalog(stored.noteTags), studyMode, western306Subject, themeMode, darkMode: themeMode === "dark", confirmOnOptionClick: stored.confirmOnOptionClick === true };
 }
 
 function noteSource(question: QuizQuestion) {
@@ -395,6 +397,7 @@ export default function HomePage() {
   const [bankReplacementPrompt, setBankReplacementPrompt] = useState<BankReplacementPrompt | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const draftSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const nextQuestionTimer = useRef<number | null>(null);
   const importAbortRef = useRef<AbortController | null>(null);
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
@@ -609,7 +612,14 @@ export default function HomePage() {
   }, [account]);
 
   const current = sessionQuestions[currentIndex];
+  const instantConfirm = Boolean(settings.confirmOnOptionClick && sessionStudyMode === "standard" && !sessionIsExam
+    && current && !current.answerPending && current.answer.length === 1 && !isXQuestion(current));
   const currentDiscussionId = current ? commentThreadId(activeBankId, current.id) : "";
+
+  useEffect(() => () => {
+    if (nextQuestionTimer.current !== null) window.clearTimeout(nextQuestionTimer.current);
+    nextQuestionTimer.current = null;
+  }, [view, currentIndex, current?.id, sessionQuestions, showSettings, showAnswerSheet, showSearch]);
 
   useEffect(() => {
     if (!currentDiscussionId) return;
@@ -1043,6 +1053,10 @@ export default function HomePage() {
   }
 
   function resetQuestion(nextIndex: number, revealAnswer = false) {
+    if (nextQuestionTimer.current !== null) {
+      window.clearTimeout(nextQuestionTimer.current);
+      nextQuestionTimer.current = null;
+    }
     const boundedIndex = Math.max(0, Math.min(nextIndex, sessionQuestions.length - 1));
     const target = sessionQuestions[boundedIndex];
     const memorizing = sessionStudyMode === "memorize";
@@ -1126,6 +1140,11 @@ export default function HomePage() {
   function toggleOption(label: string) {
     if (!current || submitted) return;
     setExcludedOptions((value) => ({ ...value, [current.id]: (value[current.id] ?? []).filter((item) => item !== label) }));
+    if (instantConfirm) {
+      setSelected([label]);
+      confirmPracticeAnswer([label], true);
+      return;
+    }
     const next = current.multiple
       ? selected.includes(label) ? selected.filter((item) => item !== label) : [...selected, label]
       : selected.includes(label) ? [] : [label];
@@ -1175,19 +1194,31 @@ export default function HomePage() {
 
   function submitAnswer() {
     if (sessionIsExam) { finishMockExam(); return; }
-    if (!current || !selected.length) return;
-    trackStudyAnswer(current.id, !current.answer.length ? "pending" : [...selected].sort().join(",") === [...current.answer].sort().join(",") ? "correct" : "wrong");
-    if (isolatedReviewSession) setReviewSelections((value) => ({ ...value, [current.id]: [...selected] }));
-    else setAnswerSelections((value) => ({ ...value, [current.id]: [...selected] }));
+    confirmPracticeAnswer(selected);
+  }
+
+  function scheduleNextQuestion() {
+    if (nextQuestionTimer.current !== null) window.clearTimeout(nextQuestionTimer.current);
+    nextQuestionTimer.current = window.setTimeout(() => {
+      nextQuestionTimer.current = null;
+      goNextQuestion();
+    }, 700);
+  }
+
+  function confirmPracticeAnswer(choices: string[], advanceAfterCorrect = false) {
+    if (!current || !choices.length) return;
+    trackStudyAnswer(current.id, !current.answer.length ? "pending" : [...choices].sort().join(",") === [...current.answer].sort().join(",") ? "correct" : "wrong");
+    if (isolatedReviewSession) setReviewSelections((value) => ({ ...value, [current.id]: [...choices] }));
+    else setAnswerSelections((value) => ({ ...value, [current.id]: [...choices] }));
     if (sessionStudyMode === "blind") {
       setRevealedAnswers((value) => value.includes(current.id) ? value : [...value, current.id]);
     }
     if (!current.answer.length) {
       setSubmitted(true);
-      setSessionQuestions((value) => value.map((question) => question.id === current.id ? { ...question, draftAnswer: [...selected] } : question));
-      setQuestions((value) => value.map((question) => question.id === current.id ? { ...question, draftAnswer: [...selected] } : question));
+      setSessionQuestions((value) => value.map((question) => question.id === current.id ? { ...question, draftAnswer: [...choices] } : question));
+      setQuestions((value) => value.map((question) => question.id === current.id ? { ...question, draftAnswer: [...choices] } : question));
       if (activeBankId) {
-        const bankId = activeBankId, questionId = current.id, draft = [...selected];
+        const bankId = activeBankId, questionId = current.id, draft = [...choices];
         // Serialize quick locks and read the latest bank so earlier writes cannot erase later drafts.
         draftSaveQueueRef.current = draftSaveQueueRef.current.then(async () => {
           const bank = await loadQuestionBank(bankId);
@@ -1201,7 +1232,8 @@ export default function HomePage() {
       setToast(currentIndex < sessionQuestions.length - 1 ? "✍️ 已锁定并进入下一题；在答题卡补答案后自动判分。" : "✍️ 本轮最后一题已锁定；打开答题卡补答案后自动判分。");
       return;
     }
-    const result = [...selected].sort().join("") === [...current.answer].sort().join("") ? "correct" : "wrong";
+    const result = [...choices].sort().join("") === [...current.answer].sort().join("") ? "correct" : "wrong";
+    const shouldAdvance = sessionStudyMode === "standard" && (advanceAfterCorrect || settings.autoNext) && result === "correct";
     // Reveal feedback immediately; durable storage is asynchronous and must
     // never block the current question's correct/wrong state.
     setSubmitted(true);
@@ -1213,7 +1245,7 @@ export default function HomePage() {
       const nextLedger = stampLearningRecord(recordLedger, current.id, { favorite: true, favoriteStars: nextStars });
       persistLearningRecords({ progress, firstProgress, favorites: nextFavorites, favoriteStars: { ...favoriteStars, [current.id]: nextStars }, notes, ledger: nextLedger });
       setToast(result === "wrong" ? `本题精选星级升至 ${nextStars} 星 ★` : `本题精选星级降至 ${nextStars} 星，仍保留精选 ★`);
-      if (sessionStudyMode === "standard" && settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
+      if (shouldAdvance) scheduleNextQuestion();
       return;
     }
     const nextProgress = { ...progress, [current.id]: result as "correct" | "wrong" };
@@ -1239,7 +1271,7 @@ export default function HomePage() {
     persistLearningRecords({ progress: nextProgress, firstProgress: nextFirstProgress, favorites: nextFavorites, favoriteStars: nextFavoriteStars, notes, ledger: nextLedger });
     if (raiseReviewStars) setToast(`再次做错，本题精选星级升至 ${nextStars} 星 ★`);
     if (lowerReviewStars) setToast(`答对降为 ${nextStars} 星，仍保留精选 ★`);
-    if (sessionStudyMode === "standard" && settings.autoNext && result === "correct") window.setTimeout(goNextQuestion, 700);
+    if (shouldAdvance) scheduleNextQuestion();
   }
 
   function toggleFavorite() {
@@ -2121,6 +2153,7 @@ export default function HomePage() {
           mobilePanel={showMobilePanel}
           onHome={() => setView("home")}
           onToggleOption={toggleOption}
+          instantConfirm={instantConfirm}
           onExcludeOption={toggleExcludedOption}
           onSearch={() => setShowSearch(true)}
           onOpenRelated={(questionId) => {
@@ -2982,6 +3015,7 @@ function QuizView(props: {
   account: AccountSession | null;
   comments: SharedComment[];
   onHome: () => void; onToggleOption: (label: string) => void; onExcludeOption: (label: string, beforeClick?: { selected: string[]; excluded: boolean }) => void; onSubmit: () => void;
+  instantConfirm: boolean;
   onPrevious: () => void; onNext: () => void; onFavorite: () => void; onAnswerSheet: () => void;
   onSettings: () => void; onNote: (value: string) => void; onAi: (mode: AiMode) => void;
   onSaveAiExplanation: (text: string) => Promise<void>;
@@ -3018,7 +3052,7 @@ function QuizView(props: {
   const explanationIsAi = /AI/i.test(current.explanationSource ?? "");
   const modeSuffix = props.mockExam ? " · 模拟考试" : blind ? " · 盲刷" : memorizing ? " · 背题" : "";
   const questionKind = `${props.currentIndex + 1}•${current.medicalQuestionType || current.questionType || (current.multiple ? "多" : "单")}${answerAvailable ? modeSuffix : " · 测试模式"}`;
-  const chooseHint = memorizing
+  const chooseHint = props.instantConfirm ? "点击选项即确认 · 答对自动下一题，答错停留" : memorizing
     ? answerAvailable ? "标准答案已直接展开；结合题干与原资料解析快速记忆" : "当前题库没有提供标准答案，暂时只能查看题干与选项"
     : blind
       ? answerAvailable ? "选择后不会立即判题；可继续下一题，想核对时再点“对答案”" : "答案尚未导入：选择会先保留，之后可导入答案统一核对"
@@ -3049,12 +3083,12 @@ function QuizView(props: {
         {props.killed && <div className="killed-question-banner"><Scissors size={18} /><div><strong>本题已斩</strong><span>会被后续练习跳过，不计入正确率；可随时恢复。</span></div><button onClick={() => props.onUpdateKilled([current.id], false)}>恢复本题</button></div>}
         {current.sharedStem && <section className="shared-medical-stem"><span>{current.medicalQuestionType === "A4" ? "递进病例" : "共用题干"}</span><p><MathText text={current.sharedStem} /></p><QuestionImages images={current.sharedStemImages} label="共用题干图片" /></section>}
         {props.relatedQuestions.length > 1 && <section className="linked-question-group"><header><div><strong>同组题目</strong><span>{props.relatedQuestions.length} 题共用{current.medicalQuestionType === "B1" ? "备选答案" : "题干"}，可直接切换</span></div></header><div>{props.relatedQuestions.map((question) => <button key={question.id} className={`${question.id === current.id ? "active" : ""} ${props.relatedProgress[question.id] ?? ""}`} onClick={() => props.onOpenRelated(question.id)}><b>{question.sourceNumber}</b><span>{question.stem}</span>{props.relatedProgress[question.id] === "correct" ? <Check size={14} /> : props.relatedProgress[question.id] === "wrong" ? <X size={14} /> : null}</button>)}</div></section>}
-        <article className="question-body"><h1><MathText text={current.stem} /></h1><QuestionImages key={current.id} images={current.sourceImages} extraImages={current.images} missing={current.imageSourceMissing || current.imagePending} /><p className="choose-hint">{chooseHint}<span className="option-gesture-hint">单击选择或取消 · 双击排除干扰项</span></p><div className="answer-options">{current.options.map((option) => {
+        <article className="question-body"><h1><MathText text={current.stem} /></h1><QuestionImages key={current.id} images={current.sourceImages} extraImages={current.images} missing={current.imageSourceMissing || current.imagePending} /><p className="choose-hint">{chooseHint}<span className="option-gesture-hint">{props.instantConfirm ? "排除请用选项右侧按钮" : "单击选择或取消 · 双击排除干扰项"}</span></p><div className="answer-options">{current.options.map((option) => {
           const picked = selected.includes(option.label);
           const ruledOut = excluded.includes(option.label);
           const isAnswer = submitted && current.answer.includes(option.label);
           const isWrong = submitted && picked && !current.answer.includes(option.label);
-          return <AnnotatedOption key={`${current.id}-${option.label}`} label={option.label} submitted={submitted} excluded={ruledOut} onExclude={() => props.onExcludeOption(option.label)} note={note} onNote={props.onNote} choice={<button type="button" className={`answer-option ${picked ? "selected" : ""} ${ruledOut ? "excluded" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} aria-pressed={picked} title={ruledOut ? "已排除；单击可重新选择，双击取消排除" : "单击选择或取消，双击排除"} onClick={(event) => { if (submitted || event.detail > 1) return; firstOptionClick.current = event.detail === 1 ? { questionId: current.id, label: option.label, selected, excluded: ruledOut } : null; props.onToggleOption(option.label); }} onDoubleClick={(event) => { event.preventDefault(); const first = firstOptionClick.current; firstOptionClick.current = null; props.onExcludeOption(option.label, first?.questionId === current.id && first.label === option.label ? first : undefined); }}><span>{option.label}</span><p><MathText text={option.text} /></p>{ruledOut && !submitted ? <em className="answer-state-label excluded-label"><X size={16} />已排除</em> : isAnswer ? <em className="answer-state-label correct-label"><Check size={16} />正确</em> : isWrong ? <em className="answer-state-label wrong-label"><X size={16} />错误</em> : null}</button>}><QuestionImages images={option.sourceImages} extraImages={option.images} label={`${option.label} 选项图片`} /></AnnotatedOption>;
+          return <AnnotatedOption key={`${current.id}-${option.label}`} label={option.label} submitted={submitted} excluded={ruledOut} onExclude={() => props.onExcludeOption(option.label)} note={note} onNote={props.onNote} choice={<button type="button" className={`answer-option ${picked ? "selected" : ""} ${ruledOut ? "excluded" : ""} ${isAnswer ? "correct" : ""} ${isWrong ? "wrong" : ""}`} aria-pressed={picked} title={props.instantConfirm ? "点击即确认此答案" : ruledOut ? "已排除；单击可重新选择，双击取消排除" : "单击选择或取消，双击排除"} onClick={(event) => { if (submitted || event.detail > 1) return; firstOptionClick.current = event.detail === 1 ? { questionId: current.id, label: option.label, selected, excluded: ruledOut } : null; props.onToggleOption(option.label); }} onDoubleClick={props.instantConfirm ? undefined : (event) => { event.preventDefault(); const first = firstOptionClick.current; firstOptionClick.current = null; props.onExcludeOption(option.label, first?.questionId === current.id && first.label === option.label ? first : undefined); }}><span>{option.label}</span><p><MathText text={option.text} /></p>{ruledOut && !submitted ? <em className="answer-state-label excluded-label"><X size={16} />已排除</em> : isAnswer ? <em className="answer-state-label correct-label"><Check size={16} />正确</em> : isWrong ? <em className="answer-state-label wrong-label"><X size={16} />错误</em> : null}</button>}><QuestionImages images={option.sourceImages} extraImages={option.images} label={`${option.label} 选项图片`} /></AnnotatedOption>;
         })}</div></article>
         <div className={`quiz-actions ${blind && !submitted ? "blind-actions" : ""}`}>{blind && !submitted ? <button className="blind-check-action" onClick={props.onSubmit} disabled={!selected.length && !props.mockExam}><Eye size={17} />{props.mockExam ? "交卷评分" : answerAvailable ? "对答案" : "锁定作答"}</button> : <button className="subtle-button" onClick={props.onPrevious}><ChevronLeft size={17} />上一题</button>}{submitted || memorizing || blind ? <button className="primary-action" onClick={props.onNext}>下一题<ChevronRight size={17} /></button> : <button className="primary-action" onClick={props.onSubmit} disabled={!selected.length && !props.mockExam}>{answerAvailable ? t.confirm : "锁定作答"}<ArrowRight size={17} /></button>}</div>
         {memorizing && answerAvailable && <div className="result-strip memorize-answer"><span><Eye /></span><div><strong>标准答案已展开</strong><p>题库答案：{current.answer.join("、")} · 背题模式不会计入对错记录</p></div><button onClick={() => props.onAi("summary")}><Sparkles size={16} />生成解析</button></div>}
@@ -3362,11 +3396,11 @@ function SettingsModal({ settings, counts, typeCounts, western306SubjectCounts, 
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
   return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>开始之前</span><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section study-mode-section"><label>刷题模式</label><div className="study-mode-grid"><button className={settings.studyMode === "standard" ? "active" : ""} onClick={() => update("studyMode", "standard")}><Target size={19} /><strong>标准练习</strong><span>提交后立即判题并记录对错</span></button><button className={settings.studyMode === "blind" ? "active" : ""} onClick={() => update("studyMode", "blind")}><EyeOff size={19} /><strong>盲刷</strong><span>先连续作答，需要时再对答案</span></button><button className={settings.studyMode === "memorize" ? "active" : ""} onClick={() => update("studyMode", "memorize")}><Eye size={19} /><strong>背题</strong><span>进入后直接展开标准答案</span></button></div>{settings.studyMode !== "standard" && <p className="study-mode-note">{settings.studyMode === "blind" ? "盲刷会保留每题选择，但在点击“对答案”前不判分、不显示正误。" : "背题只用于快速记忆，不会把浏览行为计入做题数、正确率或首次得分。"}</p>}</div><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
     ["all", "全部题目", Library], ["unanswered", "未练题目", Zap], ["wrong", "错题复盘", RotateCcw], ["favorite", "精选题", Star],
-  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div>{showWestern306Subjects && <div className="setting-section western306-subject-section"><label>西综 306 · 只练某一科</label><div className="western306-subject-grid"><button className={settings.western306Subject === "all" ? "active" : ""} onClick={() => update("western306Subject", "all")}><strong>全部科目</strong><em>{western306SubjectCounts.all} 道</em></button>{WESTERN_306_SUBJECTS.map((subject) => <button key={subject.id} className={settings.western306Subject === subject.id ? "active" : ""} onClick={() => update("western306Subject", subject.id)}><strong>{subject.label}</strong><em>{western306SubjectCounts[subject.id]} 道</em></button>)}</div><p className="western306-subject-note">按现代 165 题固定题号分布筛选；单科练习不包含第 108–115 题医学人文。</p></div>}<div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋X 型</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "auto" ? "active" : ""} aria-pressed={settings.themeMode === "auto"} title="19:00 至次日 06:00 为夜间" onClick={() => onChange({ ...settings, themeMode: "auto", darkMode: false })}><Clock3 size={17} />自动昼夜</button><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
+  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div>{showWestern306Subjects && <div className="setting-section western306-subject-section"><label>西综 306 · 只练某一科</label><div className="western306-subject-grid"><button className={settings.western306Subject === "all" ? "active" : ""} onClick={() => update("western306Subject", "all")}><strong>全部科目</strong><em>{western306SubjectCounts.all} 道</em></button>{WESTERN_306_SUBJECTS.map((subject) => <button key={subject.id} className={settings.western306Subject === subject.id ? "active" : ""} onClick={() => update("western306Subject", subject.id)}><strong>{subject.label}</strong><em>{western306SubjectCounts[subject.id]} 道</em></button>)}</div><p className="western306-subject-note">按现代 165 题固定题号分布筛选；单科练习不包含第 108–115 题医学人文。</p></div>}<div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>仅做单选</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>单选＋X 型</span><em>{typeCounts.single}＋{typeCounts.multiple} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "auto" ? "active" : ""} aria-pressed={settings.themeMode === "auto"} title="19:00 至次日 06:00 为夜间" onClick={() => onChange({ ...settings, themeMode: "auto", darkMode: false })}><Clock3 size={17} />自动昼夜</button><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="点击选项即确认" detail="标准练习的单选题：点击即判分，答对自动下一题，答错停留" value={settings.confirmOnOptionClick} onChange={(value) => update("confirmOnOptionClick", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
 }
 
 function SwitchRow({ label, detail, value, onChange }: { label: string; detail: string; value: boolean; onChange: (value: boolean) => void }) {
-  return <button className="switch-row" onClick={() => onChange(!value)}><div><strong>{label}</strong><span>{detail}</span></div><i className={value ? "on" : ""}><b /></i></button>;
+  return <button type="button" className="switch-row" aria-pressed={value} onClick={() => onChange(!value)}><div><strong>{label}</strong><span>{detail}</span></div><i className={value ? "on" : ""}><b /></i></button>;
 }
 
 function AnswerSheet({ questions, examPins, progress, favorites, favoriteStars, notes, killed, answerSelections, currentIndex, onBatchAnswers, onDeleteKilled, onUpdateKilled, onJump, onClose }: { questions: QuizQuestion[]; examPins?: readonly string[]; progress: Progress; favorites: string[]; favoriteStars: Record<string, number>; notes: Record<string, string>; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onBatchAnswers: (entries: BatchAnswerEntry[]) => Promise<void>; onDeleteKilled?: () => Promise<void>; onUpdateKilled: (ids: string[], killed: boolean) => void; onJump: (index: number) => void; onClose: () => void }) {
