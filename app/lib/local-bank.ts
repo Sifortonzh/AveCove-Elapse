@@ -1,6 +1,7 @@
 import type { QuizQuestion } from "./question-parser";
 import { normalizeQuestionBankGroup, suggestQuestionBankGroup } from "./bank-grouping";
 import { groupSharedCases, prepareImportedA3Cases } from "./shared-case";
+import { isXQuestion } from "./practice-stats";
 
 export type SavedQuestionBank = {
   id: string;
@@ -165,9 +166,9 @@ function notifySyncChange() {
 
 function normalizeQuestion(question: QuizQuestion, fallbackId: string): QuizQuestion {
   const answer = [...new Set((question.answer ?? []).map((item) => String(item).toUpperCase()))];
-  const rawQuestionType = String(question.questionType ?? "").trim().toUpperCase();
-  const rawMedicalType = String(question.medicalQuestionType ?? "").trim().toUpperCase();
-  const questionType = (rawQuestionType === "多" || rawQuestionType === "多选"
+  const rawQuestionType = String(question.questionType ?? "").normalize("NFKC").trim().toUpperCase();
+  const rawMedicalType = String(question.medicalQuestionType ?? "").normalize("NFKC").trim().toUpperCase();
+  const questionType = (isXQuestion({ ...question, answer })
     ? "X"
     : rawQuestionType === "单" || rawQuestionType === "单选"
       ? "A"
@@ -183,7 +184,7 @@ function normalizeQuestion(question: QuizQuestion, fallbackId: string): QuizQues
     answer,
     questionType: questionType ?? (answer.length > 1 ? "X" : "A"),
     medicalQuestionType: medicalQuestionType ?? (answer.length > 1 ? "X" : "A1"),
-    multiple: questionType === "X" || answer.length > 1,
+    multiple: questionType === "X",
   };
 }
 

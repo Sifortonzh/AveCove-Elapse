@@ -441,7 +441,7 @@ test("Hongdou import groups nonadjacent A3 cases and removes only equivalent dup
   }).outputText).toString("base64")}`;
   const grouping = compile(await text("app/lib/bank-grouping.ts"));
   const cases = compile(await text("app/lib/shared-case.ts"));
-  const source = (await text("app/lib/local-bank.ts")).replace("./bank-grouping", grouping).replace("./shared-case", cases);
+  const source = (await text("app/lib/local-bank.ts")).replace("./bank-grouping", grouping).replace("./shared-case", cases).replace("./practice-stats", compile(await text("app/lib/practice-stats.ts")));
   const { parseSharedQuestionBankPackage, sanitizeSharedQuestionBankPackage } = await import(compile(source));
   const { pavilionSubject } = await import(grouping);
   assert.equal(pavilionSubject("眼科主治题库", "主治"), "眼科学");
@@ -481,17 +481,22 @@ test("Hongdou import groups nonadjacent A3 cases and removes only equivalent dup
 
 test("filtered progress, chapter totals and newer settings share one contract", async () => {
   const output = ts.transpileModule(await text("app/lib/practice-stats.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
-  const { practiceStats, newerPreferences } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const { practiceStats, filterPracticeQuestionTypes, newerPreferences } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
   const questions = [{id:"s",multiple:false,answer:["A"]},{id:"x",multiple:false,medicalQuestionType:"X",answer:["A"]},{id:"k",multiple:false,answer:[]}];
   assert.equal(practiceStats(questions,{s:"correct"},true,["k"]).percent,100);
   assert.ok(Math.abs(practiceStats(questions,{s:"correct"},false,["k"]).percent - 200/3) < 0.0001);
   assert.equal(practiceStats(questions,{},true,["s","k"]).percent,100);
+  const mixed = [...questions, {id:"legacy",questionType:"Ｘ型",answer:["A"]}, {id:"multiple",multiple:true,answer:[]}, {id:"multi-answer",answer:["A","B"]}, {id:"b",questionType:"B",answer:["C"]}];
+  assert.deepEqual(filterPracticeQuestionTypes(mixed,true).map(q => q.id), ["s", "k", "b"]);
+  assert.equal(filterPracticeQuestionTypes(mixed,false), mixed);
   assert.equal(newerPreferences({updatedAt:20,scope:"all"},{updatedAt:10,scope:"wrong"}).scope,"all");
   assert.equal(newerPreferences({updatedAt:20},{updatedAt:30,questionTypes:"single"}).questionTypes,"single");
   const page = await text("app/page.tsx");
   assert.match(page,/章节 \{chapterStats.answered\}\/\{chapterStats.total\}/);
   assert.match(page,/单选 \{entry.singleCount/);
   assert.match(page,/MarkdownNotePreview value=\{current.explanation\}/);
+  assert.match(page,/scope: "all",\s+questionTypes: "single",/);
+  assert.match(page,/replaceSessionQuestions\(next: QuizQuestion\[\]\)\s*\{\s*const pool = filterPracticeQuestionTypes\(next, sessionNonXOnly\)/);
   assert.match(await text("app/components/PracticeExtras.tsx"),/"✅" : "❌"/);
 });
 
@@ -618,7 +623,7 @@ test("question images keep portable sources through the real importer and share 
   const groupingUrl = compile(await text("app/lib/bank-grouping.ts"));
   const sharedOutput = ts.transpileModule(await text("app/lib/shared-case.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   const sharedUrl = `data:text/javascript;base64,${Buffer.from(sharedOutput).toString("base64")}`;
-  const bankSource = (await text("app/lib/local-bank.ts")).replace(/from "\.\/bank-grouping"/g, `from "${groupingUrl}"`).replace(/from "\.\/shared-case"/g, `from "${sharedUrl}"`);
+  const bankSource = (await text("app/lib/local-bank.ts")).replace(/from "\.\/bank-grouping"/g, `from "${groupingUrl}"`).replace(/from "\.\/shared-case"/g, `from "${sharedUrl}"`).replace("./practice-stats", compile(await text("app/lib/practice-stats.ts")));
   const { parseSharedQuestionBankPackage, createSharedQuestionBankPackage } = await import(compile(bankSource));
   const { normalizeQuestionImages } = await import(compile(await text("app/lib/question-images.ts")));
   const image = { name: "image1.png", dataUrl: "data:image/png;base64,iVBORw0KGgo=", caption: "示意图" };
@@ -1194,7 +1199,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.6.5");
+  assert.equal(JSON.parse(manifest).version, "2.6.6");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1279,9 +1284,9 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /locateOriginalBank/);
   assert.match(page, /进度 \{progressLabel\}% · 正确率/);
   assert.match(page, /分享之前，请先确认版权与隐私边界/);
-  assert.match(page, /仅做单选/);
-  assert.match(page, /单选＋X 型/);
-  assert.match(page, /active\.questionTypes === "single" && isXQuestion\(question\)/);
+  assert.match(page, /只做非 X 型/);
+  assert.match(page, /全部题型/);
+  assert.match(page, /filterPracticeQuestionTypes\(subjectQuestions, nonXOnly\)/);
   assert.match(await text("app/lib/practice-stats.ts"), /question\.medicalQuestionType === "X"/);
   assert.match(page, /multiple accept="\.json,application\/json"/);
   assert.match(page, /DocumentImportWorkbench/);
@@ -1410,7 +1415,8 @@ test("keeps multiple imported banks and portable share files", async () => {
   assert.match(localBank, /copyrightNotice: bank\.copyrightNotice/);
   assert.match(localBank, /hongdou-question-bank/);
   assert.match(localBank, /avecove-western-306/);
-  assert.match(localBank, /multiple: questionType === "X" \|\| answer\.length > 1/);
+  assert.match(localBank, /isXQuestion\(\{ \.\.\.question, answer \}\)/);
+  assert.match(localBank, /multiple: questionType === "X"/);
   assert.match(localBank, /Transparently migrate the single-bank format/);
   assert.match(localBank, /export async function loadQuestionBankGroupOrder/);
   assert.match(localBank, /export async function saveQuestionBankGroupOrder/);
@@ -1954,7 +1960,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.6.5");
+  assert.equal(JSON.parse(packageJson).version, "2.6.6");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2201,6 +2207,9 @@ test("keeps touch practice controls, in-quiz search, and reusable note tags disc
   assert.doesNotMatch(page, /className="bank-answer-pending"/);
   assert.match(page, /className="sheet-answer-missing"/);
   assert.match(page, /className="sheet-annotation"/);
+  assert.match(page, /<NotebookPen className="sheet-note"/);
+  assert.match(page, /onClick=\{\(\) => exportBankNotes\(bank\)\}><Printer/);
+  assert.doesNotMatch(page, /请选择一个最符合题意的答案/);
   assert.match(annotations, /选项 \[A-G\] 批注/);
   assert.match(page, /commentThreadId\(activeBankId, current\.id\)/);
   assert.match(page, /当前题库独立讨论/);
@@ -2394,8 +2403,8 @@ test("option relabeling preserves moved answers, drafts and annotations", async 
     return import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
   };
   const { relabelOptions, remapOptionLabels } = await loadModule("app/lib/question-edit.ts");
-  const { remapOptionAnnotations } = await loadModule("app/lib/note-annotations.ts");
-  const { readMarkdownTable } = await loadModule("app/lib/markdown-table.ts");
+  const { remapOptionAnnotations, hasQuestionNote } = await loadModule("app/lib/note-annotations.ts");
+  const { readMarkdownTable, markdownInlineTokens } = await loadModule("app/lib/markdown-table.ts");
   const { items, labels } = relabelOptions([{ label: "C", text: "第三项" }, { label: "A", text: "第一项" }]);
   assert.deepEqual(items, [{ label: "A", text: "第三项" }, { label: "B", text: "第一项" }]);
   assert.deepEqual(remapOptionLabels(["A", "B", "C"], labels), ["B", "A"]);
@@ -2403,6 +2412,16 @@ test("option relabeling preserves moved answers, drafts and annotations", async 
   assert.deepEqual(readMarkdownTable(["| 项目 | A | B |", "|---|---|---|", "| 症状 | 1. 发热<br>2. 咳嗽 | 无 |", "其他"], 0), {
     headers: ["项目", "A", "B"], rows: [["症状", "1. 发热<br>2. 咳嗽", "无"]], next: 3,
   });
+  assert.deepEqual(readMarkdownTable(["项目 | A", "--- | ---", "症状 | **发热**<br />*咳嗽*"], 0), {
+    headers: ["项目", "A"], rows: [["症状", "**发热**<br />*咳嗽*"]], next: 3,
+  });
+  assert.deepEqual(markdownInlineTokens("**甲**<br />*乙*&lt;br&gt;<u>丙</u>~~丁~~<img src=x onerror=alert(1)>"), [
+    {kind:"strong",text:"甲"},{kind:"break",text:""},{kind:"italic",text:"乙"},{kind:"break",text:""},{kind:"underline",text:"丙"},{kind:"strike",text:"丁"},{kind:"text",text:"<img src=x onerror=alert(1)>"},
+  ]);
+  assert.equal(hasQuestionNote("  "), false);
+  assert.equal(hasQuestionNote("> 选项 A 批注：单独的批注\n![选项 B 批注图片](data:image/jpeg;base64,aaa)"), false);
+  assert.equal(hasQuestionNote("> 选项 A 批注：批注\n\n复习笔记"), true);
+  assert.equal(hasQuestionNote("![笔记图片](data:image/jpeg;base64,aaa)"), true);
 });
 
 test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair", async () => {
@@ -2413,7 +2432,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.6.5");
+  assert.equal(JSON.parse(manifest).version, "2.6.6");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2474,7 +2493,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.5");
+  assert.equal(JSON.parse(manifest).version, "2.6.6");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2492,7 +2511,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.5");
+  assert.equal(JSON.parse(manifest).version, "2.6.6");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2512,12 +2531,12 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.5");
+  assert.equal(JSON.parse(manifest).version, "2.6.6");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
   assert.match(styles, /button\.current/);
-  assert.match(localBank, /rawQuestionType === "多" \|\| rawQuestionType === "多选"/);
+  assert.match(localBank, /isXQuestion\(\{ \.\.\.question, answer \}\)/);
   assert.match(localBank, /rawQuestionType === "单" \|\| rawQuestionType === "单选"/);
 });
 
