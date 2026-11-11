@@ -14,11 +14,13 @@ export function collectNoteExportSections(
   favorites: string[],
   notes: Record<string, string>,
   favoriteStars: Record<string, number> = {},
+  killed: readonly string[] = [],
 ) {
+  const killedIds = new Set(killed);
   const favoriteIds = new Set(favorites);
   const chapterOrder = new Map<string, number>();
   for (const question of questions) if (!chapterOrder.has(question.category)) chapterOrder.set(question.category, chapterOrder.size);
-  const ordered = questions.map((question, index) => ({ question, index })).sort((a, b) => {
+  const ordered = questions.filter(question => !killedIds.has(question.id)).map((question, index) => ({ question, index })).sort((a, b) => {
     const stars = (q: QuizQuestion) => favoriteIds.has(q.id) ? Math.max(1, favoriteStars[q.id] ?? 1) : 0;
     return stars(b.question) - stars(a.question)
       || (chapterOrder.get(a.question.category) ?? 0) - (chapterOrder.get(b.question.category) ?? 0)
@@ -51,7 +53,9 @@ function inlineMarkdown(value: string) {
     .replace(/\n/g, "<br>");
 }
 
-export function buildNotePdfHtml(bankName: string, sections: NoteExportSection[], notes: Record<string, string>) {
+export function buildNotePdfHtml(bankName: string, sections: NoteExportSection[], notes: Record<string, string>, killed: readonly string[] = []) {
+  const killedIds = new Set(killed);
+  sections = sections.map(section => ({ ...section, questions: section.questions.filter(question => !killedIds.has(question.id)) })).filter(section => section.questions.length);
   const total = sections.reduce((sum, section) => sum + section.questions.length, 0);
   const body = sections.map((section) => `<section><h2>${escapeHtml(section.title)} <small>${section.questions.length} 题</small></h2><div class="question-grid">${section.questions.map((question) => {
     const note = notes[question.id] ?? "";
@@ -71,17 +75,21 @@ export function buildNotePdfHtml(bankName: string, sections: NoteExportSection[]
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escapeHtml(bankName)} · 学习笔记</title><style>@page{size:A4;margin:11mm}*{box-sizing:border-box}body{margin:0;color:#172724;font:9.5pt/1.48 "Times New Roman","Songti SC","STSong","SimSun",serif}main{max-width:100%;margin:auto}.cover{padding:0 0 8mm;border-bottom:2px solid #174b40}.cover h1{margin:0 0 4px;font-size:21pt}.cover p{margin:2px 0;color:#6d7b78}h2{margin:9mm 0 4mm;padding-bottom:4px;border-bottom:1.5px solid #174b40;font-size:15pt;break-after:avoid}.question-grid{columns:2;column-gap:8mm}article{display:inline-block;width:100%;margin:0 0 5mm;padding:0 0 4mm;border-bottom:1px solid #dedbd3;break-inside:avoid;page-break-inside:avoid}article header{display:flex;justify-content:space-between;gap:8px;color:#788682;font-size:7.5pt}article header span{color:#174b40;font-weight:700}article header em{text-align:right}h3{margin:4px 0 5px;font-size:10.5pt;line-height:1.45}ol{margin:0;padding:0;list-style:none;display:grid;gap:2px}li{display:grid;grid-template-columns:18px 1fr;gap:3px;padding:3px 5px;border:1px solid #e1ded6;border-radius:4px}li.correct-option{background:#dceee3;border-color:#5c9679;print-color-adjust:exact;-webkit-print-color-adjust:exact}li b{color:#174b40}li p,li img{grid-column:2;margin:2px 0 0}img{display:block;max-width:100%;max-height:55mm;object-fit:contain}.answer{margin:5px 0 0;color:#a33e35;font-weight:700}.note,.explanation{margin-top:4px;padding:5px 7px;background:#f4f1e9;border-radius:4px}.note p,.explanation p{margin:2px 0}code{font-family:monospace;background:#eee;padding:1px 3px}</style></head><body><main><div class="cover"><h1>${escapeHtml(bankName)} · 学习笔记</h1><p>仅收录精选题与带批注题，共 ${total} 题；保留题干、选项、答案、批注和解析来源。</p><p>导出时间：${new Date().toLocaleString("zh-CN")}</p></div>${body}</main></body></html>`;
 }
 
-export function printNotePdf(bankName: string, sections: NoteExportSection[], notes: Record<string, string>) {
+export function printNotePdf(bankName: string, sections: NoteExportSection[], notes: Record<string, string>, killed: readonly string[] = []) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) throw new Error("浏览器阻止了导出窗口，请允许弹出窗口后重试");
   printWindow.opener = null;
   printWindow.document.open();
-  printWindow.document.write(buildNotePdfHtml(bankName, sections, notes));
+  printWindow.document.write(buildNotePdfHtml(bankName, sections, notes, killed));
   printWindow.document.close();
   void printWindow.document.fonts.ready.then(() => window.setTimeout(() => printWindow.print(), 500));
 }
 
-export function downloadBankNoteArchive(archive: { name: string; questions: QuizQuestion[]; notes: Record<string, string> }) {
+export function buildNoteArchiveHtml(source: { name: string; questions: QuizQuestion[]; notes: Record<string, string> }, killed: readonly string[] = []) {
+  const killedIds = new Set(killed);
+  const questions = source.questions.filter(question => !killedIds.has(question.id));
+  const retainedIds = new Set(questions.map(question => question.id));
+  const archive = { ...source, questions, notes: Object.fromEntries(Object.entries(source.notes).filter(([id]) => retainedIds.has(id))) };
   let html = buildNotePdfHtml(archive.name, [{title: "题库笔记归档", questions: archive.questions}], archive.notes);
   const drawings = archive.questions.flatMap(question => {
     const match = archive.notes[question.id]?.match(/```elapse-ink\n([^`]+)\n```/);
@@ -96,8 +104,13 @@ export function downloadBankNoteArchive(archive: { name: string; questions: Quiz
   }).join("");
   const snapshot = JSON.stringify(archive).replace(/</g, "\\u003c");
   html = html.replace("</main>", `${drawings}<script type="application/json" id="elapse-note-archive">${snapshot}</script></main>`);
+  return html;
+}
+
+export function downloadBankNoteArchive(source: { name: string; questions: QuizQuestion[]; notes: Record<string, string> }, killed: readonly string[] = []) {
+  const html = buildNoteArchiveHtml(source, killed);
   const url = URL.createObjectURL(new Blob([html], {type: "text/html;charset=utf-8"}));
   const link = document.createElement("a"); link.href = url;
-  link.download = `${archive.name.replace(/[\\/:*?"<>|]/g, "-").slice(0,60)}-笔记归档.html`;
+  link.download = `${source.name.replace(/[\\/:*?"<>|]/g, "-").slice(0,60)}-笔记归档.html`;
   link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

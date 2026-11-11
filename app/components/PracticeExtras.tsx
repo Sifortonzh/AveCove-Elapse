@@ -77,8 +77,8 @@ export function AiDialogue({ question, accountId, onSave, renderMarkdown }: { qu
   return <section className="practice-dialogue">
     <button className="ai-disease-summary" type="button" disabled={busy} onClick={() => void ask(DISEASE_SUMMARY_REQUEST)}>加入本题，AI 总结疾病</button>
     {messages.map((message, i) => <div key={i} className={`dialogue-${message.role}`}>
-      <strong>{message.role === "user" ? "我" : "AI"}</strong>
-      {message.role === "assistant" ? <>{renderMarkdown(message.text)}<button onClick={() => onSave(message.text)}>写入笔记</button></> : <p>{message.text === DISEASE_SUMMARY_REQUEST ? "总结本题疾病" : message.text}</p>}
+      <header className="dialogue-message-heading"><strong>{message.role === "user" ? "我" : "AI"}</strong>{message.role === "assistant" && <button type="button" onClick={() => onSave(message.text)}>写入笔记</button>}</header>
+      {message.role === "assistant" ? renderMarkdown(message.text) : <p>{message.text === DISEASE_SUMMARY_REQUEST ? "总结本题疾病" : message.text}</p>}
     </div>)}
     <textarea aria-label="追问 AI" value={draft} maxLength={500} onChange={(e) => setDraft(e.target.value)} placeholder="追问判断依据、易混点或同类考点…" />
     <button disabled={busy || !draft.trim()} onClick={() => void ask(draft)}>{busy ? "正在回答…" : "发送追问"}</button>

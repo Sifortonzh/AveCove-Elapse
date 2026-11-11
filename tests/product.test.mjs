@@ -285,6 +285,41 @@ test("note exports rank stars before chapter order without mutating source banks
   assert.deepEqual(questions, before);
 });
 
+test("killed questions never enter printed notes or archive payloads", async () => {
+  const { collectNoteExportSections, buildNotePdfHtml, buildNoteArchiveHtml } = await loadNotePdfExport();
+  const question = { id:"keep", sourceNumber:"1", category:"章节", stem:"保留题干", options:[{label:"A",text:"选项"}], answer:["A"], multiple:false };
+  const killed = { ...question, id:"killed", stem:"不应导出的题干" };
+  const notes = {keep:"保留笔记", killed:"> 选项 A 批注：不应导出的批注\n\n不应导出的笔记"};
+  const rows = [question, killed];
+  const before = structuredClone({ rows, notes });
+  const sections = collectNoteExportSections(rows, {}, ["keep","killed"], notes, {killed:5}, ["killed"]);
+  assert.deepEqual(sections.flatMap(section => section.questions.map(q => q.id)), ["keep"]);
+  const direct = buildNotePdfHtml("测试", [{ title:"直接传入", questions:rows }], notes, ["killed"]);
+  const archive = buildNoteArchiveHtml({name:"测试",questions:rows,notes}, ["killed"]);
+  for (const html of [direct, archive]) {
+    assert.match(html,/保留题干/);
+    assert.doesNotMatch(html,/不应导出/);
+  }
+  const snapshot = JSON.parse(archive.match(/id="elapse-note-archive">([^<]+)<\/script>/)[1]);
+  assert.deepEqual(snapshot.questions.map(q => q.id), ["keep"]);
+  assert.deepEqual(snapshot.notes, {keep:"保留笔记"});
+  assert.deepEqual({rows,notes},before);
+});
+
+test("study controls stay above long notes and AI replies with concise disease fields", async () => {
+  const [page, extras, prompt] = await Promise.all([text("app/page.tsx"), text("app/components/PracticeExtras.tsx"), text("app/lib/ai-follow-up.ts")]);
+  assert.match(page, /className="note-header-preview"/);
+  const panel = page.slice(page.indexOf('function LearningPanel('), page.indexOf('function SettingsModal('));
+  assert.ok(panel.indexOf('className="note-preview-compact"') < panel.indexOf('className="note-editor-body"'));
+  const reply = extras.slice(extras.indexOf('{messages.map('), extras.indexOf('<textarea aria-label="追问 AI"'));
+  assert.ok(reply.indexOf('写入笔记') < reply.indexOf('renderMarkdown(message.text)'));
+  assert.match(prompt,/疾病名称、英文扩展、症状、体征/);
+  assert.match(prompt,/英文全称/);
+  const cleanup = page.slice(page.indexOf('async function deleteKilledQuestions()'), page.indexOf('async function removeSavedBank('));
+  assert.doesNotMatch(cleanup,/exportLearningRecord/);
+  assert.match(page,/window.confirm\("确认删除？"\)/);
+});
+
 test("wrong review excludes stronger starred questions, shuffles, and shows confirmed library totals", async () => {
   const page = await text("app/page.tsx");
   assert.match(page, /if \(active.scope === "wrong"\) return progress\[question.id\] === "wrong" && \(!favorites.includes\(question.id\) \|\| \(favoriteStars\[question.id\] \?\? 1\) <= 1\)/);
@@ -1199,7 +1234,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.6.6");
+  assert.equal(JSON.parse(manifest).version, "2.6.7");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1960,7 +1995,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.6.6");
+  assert.equal(JSON.parse(packageJson).version, "2.6.7");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2432,7 +2467,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.6.6");
+  assert.equal(JSON.parse(manifest).version, "2.6.7");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2493,7 +2528,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.6");
+  assert.equal(JSON.parse(manifest).version, "2.6.7");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2511,7 +2546,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.6");
+  assert.equal(JSON.parse(manifest).version, "2.6.7");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2531,7 +2566,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.6");
+  assert.equal(JSON.parse(manifest).version, "2.6.7");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

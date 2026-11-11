@@ -32,7 +32,9 @@ test("bulk slash removal keeps source evidence and refuses an empty bank", async
   assert.equal(items.length,3); assert.throws(()=>removeMarkedQuestions(items,["a","b","c"]),/至少保留/);
   const page=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
   assert.ok(page.indexOf('<details className="note-card collapsible-note-card"')<page.indexOf('<details className="community-card"'));
-  assert.match(page,/await exportLearningRecord\(\);\s*const saved = await saveQuestionBank/);
+  const cleanup = page.slice(page.indexOf("async function deleteKilledQuestions()"), page.indexOf("async function removeSavedBank("));
+  assert.doesNotMatch(cleanup, /exportLearningRecord/);
+  assert.match(cleanup, /const saved = await saveQuestionBank/);
 });
 
 test("time splits at four-hour and midnight boundaries without changing input", () => {

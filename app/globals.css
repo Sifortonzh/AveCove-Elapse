@@ -811,6 +811,11 @@ dialog.note-preview-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-
 .collapsible-note-card[open]>summary::before{content:"▾"}
 .collapsible-note-card>summary span{margin-left:auto;color:var(--muted);font-size:.65rem}
 .collapsible-note-card .note-editor-body{display:block}
+.collapsible-note-card>.note-card-heading{flex-wrap:wrap;gap:8px}
+.note-card-heading .note-header-preview{margin-left:auto;min-height:36px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--green);font-size:.9rem;white-space:nowrap}
+.note-card-heading .note-header-preview:disabled{opacity:.5}
+.dialogue-message-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.dialogue-message-heading>button{flex-shrink:0}
 @media(max-width:520px){.option-edit-tools{flex-direction:column}.option-edit-tools>button{height:28px;min-height:28px!important}.chapter-directory .chapter-result{font-size:.65rem}.sync-file-list>header{align-items:flex-start;flex-wrap:wrap}}
 .bank-page .bank-library-notice{margin-top:24px}
 .bank-library-notice p{margin:4px 0 0;color:var(--muted)}
