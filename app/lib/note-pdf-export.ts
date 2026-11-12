@@ -1,5 +1,6 @@
 import type { QuizQuestion } from "./question-parser";
 import { hasOptionAnnotation, readOptionAnnotation } from "./note-annotations";
+import { markdownInlineTokens, readMarkdownTable } from "./markdown-table";
 
 type Progress = Record<string, "correct" | "wrong">;
 
@@ -45,12 +46,44 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character);
 }
 
-function inlineMarkdown(value: string) {
-  return escapeHtml(value)
-    .replace(/!\[[^\]]*\]\((data:image\/jpeg;base64,[A-Za-z0-9+/=]+)\)/g, '<img src="$1" alt="笔记图片">')
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\n/g, "<br>");
+function inlineMarkdown(value: string): string {
+  return value.split(/(!\[[^\]]*\]\(data:image\/jpeg;base64,[A-Za-z0-9+/=]+\))/g).map(part => {
+    const image = part.match(/^!\[[^\]]*\]\((data:image\/jpeg;base64,[A-Za-z0-9+/=]+)\)$/);
+    if (image) return `<img src="${image[1]}" alt="笔记图片">`;
+    return markdownInlineTokens(part).map(token => {
+      if (token.kind === "break") return "<br>";
+      const text = escapeHtml(token.text);
+      if (token.kind === "code") return `<code>${text}</code>`;
+      if (token.kind === "text") return text;
+      if (token.kind === "strongItalic") return `<strong><em>${inlineMarkdown(token.text)}</em></strong>`;
+      const tag = { strong:"strong", italic:"em", strike:"s", underline:"u" }[token.kind];
+      return `<${tag}>${inlineMarkdown(token.text)}</${tag}>`;
+    }).join("");
+  }).join("");
+}
+
+export function noteMarkdownHtml(value: string) {
+  const lines = value.replace(/\r/g, "").split("\n");
+  const blocks: string[] = [];
+  let code: string[] | null = null;
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    if (/^\s*```/.test(line)) {
+      if (code) { blocks.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`); code = null; }
+      else code = [];
+      continue;
+    }
+    if (code) { code.push(line); continue; }
+    const table = readMarkdownTable(lines, index);
+    if (table) {
+      blocks.push(`<table><thead><tr>${table.headers.map(cell => `<th scope="col">${inlineMarkdown(cell)}</th>`).join("")}</tr></thead><tbody>${table.rows.map(row => `<tr>${row.map((cell, column) => column ? `<td>${inlineMarkdown(cell)}</td>` : `<th scope="row">${inlineMarkdown(cell)}</th>`).join("")}</tr>`).join("")}</tbody></table>`);
+      index = table.next - 1;
+    } else if (/^#{1,6}\s/.test(line)) blocks.push(`<h4>${inlineMarkdown(line.replace(/^#{1,6}\s+/, ""))}</h4>`);
+    else if (/^>\s?/.test(line)) blocks.push(`<blockquote>${inlineMarkdown(line.replace(/^>\s?/, ""))}</blockquote>`);
+    else if (line.trim()) blocks.push(`<p>${inlineMarkdown(line)}</p>`);
+  }
+  if (code) blocks.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+  return blocks.join("");
 }
 
 export function buildNotePdfHtml(bankName: string, sections: NoteExportSection[], notes: Record<string, string>, killed: readonly string[] = []) {
@@ -70,9 +103,12 @@ export function buildNotePdfHtml(bankName: string, sections: NoteExportSection[]
       .replace(/```elapse-ink\n[^`]+\n```/g, "")
       .trim();
     const explanationLabel = /AI/i.test(question.explanationSource ?? "") ? "AI 解析" : "原题解析";
-    return `<article><header><span>${escapeHtml(question.medicalQuestionType || (question.multiple ? "多选题" : "单选题"))}</span><em>${escapeHtml(question.category)} · 原题号 ${escapeHtml(question.sourceNumber)}</em></header><h3>${escapeHtml(question.stem)}</h3><ol>${optionItems}</ol>${question.answer.length ? "" : '<p class="answer">答案待补录</p>'}${generalNote ? `<div class="note"><strong>笔记</strong><p>${inlineMarkdown(generalNote)}</p></div>` : ""}${question.explanation ? `<div class="explanation"><strong>${explanationLabel}</strong><p>${inlineMarkdown(question.explanation)}</p></div>` : ""}</article>`;
+    const noteHtml = noteMarkdownHtml(generalNote);
+    const explanationHtml = noteMarkdownHtml(question.explanation ?? "");
+    const wide = noteHtml.includes("<table>") || explanationHtml.includes("<table>");
+    return `<article${wide ? ' class="table-question"' : ""}><header><span>${escapeHtml(question.medicalQuestionType || (question.multiple ? "多选题" : "单选题"))}</span><em>${escapeHtml(question.category)} · 原题号 ${escapeHtml(question.sourceNumber)}</em></header><h3>${escapeHtml(question.stem)}</h3><ol>${optionItems}</ol>${question.answer.length ? "" : '<p class="answer">答案待补录</p>'}${generalNote ? `<div class="note"><strong>笔记</strong>${noteHtml}</div>` : ""}${question.explanation ? `<div class="explanation"><strong>${explanationLabel}</strong>${explanationHtml}</div>` : ""}</article>`;
   }).join("")}</div></section>`).join("");
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escapeHtml(bankName)} · 学习笔记</title><style>@page{size:A4;margin:11mm}*{box-sizing:border-box}body{margin:0;color:#172724;font:9.5pt/1.48 "Times New Roman","Songti SC","STSong","SimSun",serif}main{max-width:100%;margin:auto}.cover{padding:0 0 8mm;border-bottom:2px solid #174b40}.cover h1{margin:0 0 4px;font-size:21pt}.cover p{margin:2px 0;color:#6d7b78}h2{margin:9mm 0 4mm;padding-bottom:4px;border-bottom:1.5px solid #174b40;font-size:15pt;break-after:avoid}.question-grid{columns:2;column-gap:8mm}article{display:inline-block;width:100%;margin:0 0 5mm;padding:0 0 4mm;border-bottom:1px solid #dedbd3;break-inside:avoid;page-break-inside:avoid}article header{display:flex;justify-content:space-between;gap:8px;color:#788682;font-size:7.5pt}article header span{color:#174b40;font-weight:700}article header em{text-align:right}h3{margin:4px 0 5px;font-size:10.5pt;line-height:1.45}ol{margin:0;padding:0;list-style:none;display:grid;gap:2px}li{display:grid;grid-template-columns:18px 1fr;gap:3px;padding:3px 5px;border:1px solid #e1ded6;border-radius:4px}li.correct-option{background:#dceee3;border-color:#5c9679;print-color-adjust:exact;-webkit-print-color-adjust:exact}li b{color:#174b40}li p,li img{grid-column:2;margin:2px 0 0}img{display:block;max-width:100%;max-height:55mm;object-fit:contain}.answer{margin:5px 0 0;color:#a33e35;font-weight:700}.note,.explanation{margin-top:4px;padding:5px 7px;background:#f4f1e9;border-radius:4px}.note p,.explanation p{margin:2px 0}code{font-family:monospace;background:#eee;padding:1px 3px}</style></head><body><main><div class="cover"><h1>${escapeHtml(bankName)} · 学习笔记</h1><p>仅收录精选题与带批注题，共 ${total} 题；保留题干、选项、答案、批注和解析来源。</p><p>导出时间：${new Date().toLocaleString("zh-CN")}</p></div>${body}</main></body></html>`;
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escapeHtml(bankName)} · 学习笔记</title><style>@page{size:A4;margin:11mm}*{box-sizing:border-box}body{margin:0;color:#172724;font:9.5pt/1.48 "Times New Roman","Songti SC","STSong","SimSun",serif}main{max-width:100%;margin:auto}.cover{padding:0 0 8mm;border-bottom:2px solid #174b40}.cover h1{margin:0 0 4px;font-size:21pt}.cover p{margin:2px 0;color:#6d7b78}h2{margin:9mm 0 4mm;padding-bottom:4px;border-bottom:1.5px solid #174b40;font-size:15pt;break-after:avoid}.question-grid{columns:2;column-gap:8mm}article{display:inline-block;width:100%;margin:0 0 5mm;padding:0 0 4mm;border-bottom:1px solid #dedbd3;break-inside:avoid;page-break-inside:avoid}article header{display:flex;justify-content:space-between;gap:8px;color:#788682;font-size:7.5pt}article header span{color:#174b40;font-weight:700}article header em{text-align:right}h3{margin:4px 0 5px;font-size:10.5pt;line-height:1.45}ol{margin:0;padding:0;list-style:none;display:grid;gap:2px}li{display:grid;grid-template-columns:18px 1fr;gap:3px;padding:3px 5px;border:1px solid #e1ded6;border-radius:4px}li.correct-option{background:#dceee3;border-color:#5c9679;print-color-adjust:exact;-webkit-print-color-adjust:exact}li b{color:#174b40}li p,li img{grid-column:2;margin:2px 0 0}img{display:block;max-width:100%;max-height:55mm;object-fit:contain}.answer{margin:5px 0 0;color:#a33e35;font-weight:700}.note,.explanation{margin-top:4px;padding:5px 7px;background:#f4f1e9;border-radius:4px}.note p,.explanation p{margin:2px 0}.table-question{column-span:all;display:block;break-inside:auto;page-break-inside:auto}table{width:100%;border-collapse:collapse;table-layout:fixed;margin:8px 0;font-size:9.5pt;line-height:1.6}th,td{border:1px solid #a9b9b3;padding:7px 9px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:normal}thead{display:table-header-group}thead th{background:#e4eee8;color:#174b40}tbody th{width:20%;background:#edf2ee}tr{break-inside:avoid;page-break-inside:avoid}u{text-underline-offset:2px}blockquote{margin:4px 0;padding:3px 8px;border-left:2px solid #799c8d;color:#536a61}pre{white-space:pre-wrap;overflow-wrap:anywhere}h4{margin:7px 0 3px}th,td{-webkit-print-color-adjust:exact;print-color-adjust:exact}code{font-family:monospace;background:#eee;padding:1px 3px}</style></head><body><main><div class="cover"><h1>${escapeHtml(bankName)} · 学习笔记</h1><p>仅收录精选题与带批注题，共 ${total} 题；保留题干、选项、答案、批注和解析来源。</p><p>导出时间：${new Date().toLocaleString("zh-CN")}</p></div>${body}</main></body></html>`;
 }
 
 export function printNotePdf(bankName: string, sections: NoteExportSection[], notes: Record<string, string>, killed: readonly string[] = []) {

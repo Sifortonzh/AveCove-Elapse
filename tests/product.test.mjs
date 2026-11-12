@@ -737,10 +737,12 @@ async function loadNoteAnnotations() {
 
 async function loadNotePdfExport() {
   const annotations = await text("app/lib/note-annotations.ts");
+  const markdown = await text("app/lib/markdown-table.ts");
   const exportSource = (await text("app/lib/note-pdf-export.ts"))
     .replace(/^import type .*?;\n/, "")
-    .replace(/^import \{.*?\} from "\.\/note-annotations";\n/, "");
-  const output = ts.transpileModule(`${annotations}\n${exportSource}`, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+    .replace(/^import \{.*?\} from "\.\/note-annotations";\n/, "")
+    .replace(/^import \{.*?\} from "\.\/markdown-table";\n/m, "");
+  const output = ts.transpileModule(`${annotations}\n${markdown}\n${exportSource}`, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
@@ -1234,7 +1236,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.6.7");
+  assert.equal(JSON.parse(manifest).version, "2.6.7.1");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1995,7 +1997,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.6.7");
+  assert.equal(JSON.parse(packageJson).version, "2.6.7.1");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2379,6 +2381,32 @@ test("builds a compact print-ready export from featured and annotated questions 
   assert.match(html, /columns:2/);
 });
 
+test("exports real Markdown tables with safe emphasis and full-width print layout", async () => {
+  const { noteMarkdownHtml, buildNotePdfHtml, buildNoteArchiveHtml } = await loadNotePdfExport();
+  const markdown = "# 疾病总结\n\n| 项目 | A | B |\n| --- | --- | --- |\n| 疾病名称 | **甲** | *乙* |\n| 症状 | 1. 发热<br>2. 咳嗽 | <u>无</u> |\n| 提示 | ~~旧说法~~ | <script>alert(1)</script> |";
+  const rendered = noteMarkdownHtml(markdown);
+  assert.match(rendered, /<thead><tr><th scope="col">项目/);
+  assert.match(rendered, /<strong>甲<\/strong>/);
+  assert.match(rendered, /<em>乙<\/em>/);
+  assert.match(rendered, /发热<br>2\. 咳嗽/);
+  assert.match(rendered, /<u>无<\/u>/);
+  assert.match(rendered, /<s>旧说法<\/s>/);
+  assert.doesNotMatch(rendered, /<script>/);
+  assert.match(rendered, /&lt;script&gt;/);
+  const q = {id:"table",sourceNumber:"1",category:"测试",stem:"题目",options:[{label:"A",text:"选项"}],answer:["A"],multiple:false,explanation:markdown};
+  const notes = {table:markdown};
+  for (const html of [buildNotePdfHtml("测试",[{title:"笔记",questions:[q]}],notes),buildNoteArchiveHtml({name:"测试",questions:[q],notes})]) {
+    assert.match(html, /<article class="table-question">/);
+    assert.match(html, /column-span:all/);
+    assert.match(html, /display:table-header-group/);
+    assert.equal((html.match(/<table>/g) ?? []).length,2);
+    assert.doesNotMatch(html, /<p><table>/);
+  }
+  assert.match(noteMarkdownHtml("![图](data:image/jpeg;base64,QUJDRA==)"), /<img src="data:image/);
+  assert.doesNotMatch(noteMarkdownHtml("![图](https://example.com/private)"), /<img/);
+  assert.doesNotMatch(noteMarkdownHtml("```\n|代码|文本|\n|---|---|\n```"), /<table>/);
+});
+
 test("exposes the complete v2.1.1 workflow in the practice UI", async () => {
   const [page, extras] = await Promise.all([text("app/page.tsx"), text("app/components/PracticeExtras.tsx")]);
   assert.match(page, /批量补答案/);
@@ -2467,7 +2495,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.6.7");
+  assert.equal(JSON.parse(manifest).version, "2.6.7.1");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2528,7 +2556,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.7");
+  assert.equal(JSON.parse(manifest).version, "2.6.7.1");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2546,7 +2574,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.7");
+  assert.equal(JSON.parse(manifest).version, "2.6.7.1");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2566,7 +2594,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.7");
+  assert.equal(JSON.parse(manifest).version, "2.6.7.1");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

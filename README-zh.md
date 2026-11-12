@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.6.7" src="https://img.shields.io/badge/version-2.6.7-b43d35" />
+    <img alt="版本 2.6.7.1" src="https://img.shields.io/badge/version-2.6.7.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.6.7.1：** 修复学习笔记 PDF／HTML 导出的 Markdown 表格，支持强调样式、单元格换行和通栏打印布局。
+>
 > **v2.6.7：** 笔记预览紧邻标题，AI 回答顶部可写入笔记；疾病表格增加英文扩展并精简症状、体征字段；已斩题不进入 PDF／HTML 笔记导出，清理只需确认删除。
 >
 > **v2.6.6：** 默认只练非 X 型，答题卡标记笔记，刷题提示更简洁，题库改用打印图标导出笔记，AI 表格支持强调样式和换行。

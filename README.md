@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.6.7" src="https://img.shields.io/badge/version-2.6.7-b43d35" />
+    <img alt="Version 2.6.7.1" src="https://img.shields.io/badge/version-2.6.7.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.6.7.1:** Exported PDF and HTML study notes now render Markdown tables, rich emphasis, and cell line breaks with full-width print layouts.
+>
 > **v2.6.7:** Preview notes beside their heading, save long AI replies from the top, review concise disease tables with English terminology, and omit skipped questions from PDF and HTML note exports.
 >
 > **v2.6.6:** Non-X practice is now the default for new preferences. The answer sheet marks notes, practice removes redundant hints, and AI tables render emphasis and line breaks.

@@ -5,6 +5,7 @@ import { Bell, X } from "lucide-react";
 import { type UiLanguage, uiText } from "../lib/ui-preferences";
 
 const updates = [
+  { version: "v2.6.7.1", at: "2026-11-12T23:54:00+08:00", detail: "学习笔记导出支持 Markdown 表格、强调样式、换行和通栏打印。" },
   { version: "v2.6.7", at: "2026-11-11T22:34:00+08:00", detail: "笔记预览与 AI 写入更顺手，疾病总结新增英文扩展，笔记导出排除已斩题。" },
   { version: "v2.6.6", at: "2026-11-10T23:08:00+08:00", detail: "非 X 型练习、答题卡笔记标记、精简刷题界面、笔记打印图标和 AI 表格格式。" },
   { version: "v2.6.5", at: "2026-11-10T17:10:00+08:00", detail: "选项改序、题库告示框、23:00 自动夜间和 AI 疾病表格总结。" },
