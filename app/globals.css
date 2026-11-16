@@ -811,6 +811,7 @@ dialog.note-preview-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-
 .collapsible-note-card[open]>summary::before{content:"▾"}
 .collapsible-note-card>summary span{margin-left:auto;color:var(--muted);font-size:.65rem}
 .collapsible-note-card .note-editor-body{display:block}
+.notes-batch-tools{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.notes-batch-tools input,.notes-batch-tools button{padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink)}
 .collapsible-note-card>.note-card-heading{flex-wrap:wrap;gap:8px}
 .note-card-heading .note-header-preview{margin-left:auto;min-height:36px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--green);font-size:.9rem;white-space:nowrap}
 .note-card-heading .note-header-preview:disabled{opacity:.5}

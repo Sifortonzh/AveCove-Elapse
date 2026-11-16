@@ -36,9 +36,11 @@ export function collectNoteExportSections(
   const featured = take((question) => favoriteIds.has(question.id));
   const annotated = take((question) => hasOptionAnnotation(notes[question.id] ?? "")
     || Boolean(question.explanation?.trim() && /AI/i.test(question.explanationSource ?? "")));
+  const written = take(question => Boolean(notes[question.id]?.trim()));
   return [
     { title: "精选题", questions: featured },
     { title: "批注题", questions: annotated },
+    { title: "笔记题", questions: written },
   ].filter((section) => section.questions.length);
 }
 
