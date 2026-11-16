@@ -8,6 +8,7 @@ import { isXQuestion } from "@/app/lib/practice-stats";
 import { normalizeQuestionBankGroup, pavilionSubject } from "@/app/lib/bank-grouping";
 
 type PavilionRow = {
+  flashcards?: boolean;
   id: string;
   source_bank_id: string;
   name: string;
@@ -72,6 +73,7 @@ function publicEntry(row: PavilionRow) {
     groupName: pavilionSubject(row.name, row.group_name),
     studyStage: row.study_stage,
     questionCount: row.question_count,
+    flashcards: row.flashcards === true,
     singleCount: row.single_count,
     multipleCount: row.multiple_count,
     uploaderNickname: row.uploader_nickname,
@@ -99,6 +101,7 @@ export async function GET(request: Request) {
     }
     const rows = await query<PavilionRow>(
       `SELECT p.id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, p.annotation, p.rating,
+        (COALESCE(payload#>>'{bank,questions,0,flashcardAnswer}', '') <> '') AS flashcards,
         COALESCE(NULLIF(u.nickname, ''), p.uploader_nickname) AS uploader_nickname, p.updated_at,
         (p.user_id = $1) AS own
        FROM pavilion_question_banks p LEFT JOIN users u ON u.id = p.user_id

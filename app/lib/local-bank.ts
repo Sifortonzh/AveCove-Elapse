@@ -34,6 +34,7 @@ export type QuestionBankInput = {
 };
 
 export type PavilionQuestionBank = {
+  flashcards?: boolean;
   id: string;
   sourceBankId: string;
   name: string;
@@ -669,6 +670,7 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
 // Public banks contain source material, never an uploader's personal study state.
 export function publicQuestion(question: QuizQuestion): QuizQuestion {
   const keys: Array<keyof QuizQuestion> = ["id", "sourceNumber", "category", "stem", "answer", "answerPending", "multiple", "examProfile", "examYear", "examFormat", "questionType", "medicalQuestionType", "points", "sharedStem", "sharedStemGroup", "sharedOptionGroup", "answerSource", "sourceImages", "images", "sharedStemImages", "imagePending", "imageSourceMissing"];
+  keys.push("flashcardAnswer", "flashcardSourceId");
   const result = Object.fromEntries(keys.filter(key => question[key] !== undefined).map(key => [key, question[key]])) as QuizQuestion;
   result.options = question.options.map(option => ({ label: option.label, text: option.text, ...(option.sourceImages ? { sourceImages: option.sourceImages } : {}), ...(option.images ? { images: option.images } : {}) }));
   if (!/AI|手动保存|个人笔记/i.test(question.explanationSource ?? "")) {

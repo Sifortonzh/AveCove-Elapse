@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.6.8" src="https://img.shields.io/badge/version-2.6.8-b43d35" />
+    <img alt="Version 2.7.0" src="https://img.shields.io/badge/version-2.7.0-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.7.0:** Flashcards v1: a separate library, chapter review, reveal/hide answers, notes, stars, AI, JSON import/export and existing bank sync/sharing. Convert a question, note or AI reply into a card. No spaced-repetition scheduler yet.
+>
 > **v2.6.8:** Export ordinary notes, batch-group notes with tags and export the filtered group, and instantly lock pending single-choice answers.
 >
 > **v2.6.7.1:** Exported PDF and HTML study notes now render Markdown tables, rich emphasis, and cell line breaks with full-width print layouts.

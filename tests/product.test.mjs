@@ -5,6 +5,21 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("flashcards validate source answers and preserve chapters without changing scoring", async () => {
+  const output=ts.transpileModule(await text("app/lib/flashcards.ts"),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  const {parseFlashcards,questionFlashcard,isFlashcardBank}=await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+  const input={format:"hongdou-flashcards",version:1,bank:{name:"测试",cards:[{front:"正面",back:"反面",category:"章节"}]}};
+  const before=structuredClone(input);const bank=parseFlashcards(input);
+  assert.ok(isFlashcardBank(bank));assert.equal(bank.questions[0].category,"章节");assert.equal(bank.questions[0].flashcardAnswer,"反面");assert.deepEqual(input,before);
+  assert.throws(()=>parseFlashcards({...input,version:2}));assert.throws(()=>parseFlashcards({...input,bank:{cards:[{front:"题目",back:""}]}}));
+  const q={id:"one",stem:"小题",sharedStem:"病例",category:"章节",options:[{label:"A",text:"正确"},{label:"B",text:"错误"}],answer:["A"],multiple:false};
+  const card=questionFlashcard(q);assert.equal(card.stem,"病例\n小题");assert.match(card.flashcardAnswer,/正确/);assert.doesNotMatch(card.flashcardAnswer,/错误/);
+  assert.throws(()=>questionFlashcard({...q,answer:[]}));assert.equal(questionFlashcard(q,"笔记内容").flashcardAnswer,"笔记内容");
+  const page=await text("app/page.tsx");assert.match(page,/唯快不破/);assert.match(page,/view === "flashcards" \? isFlashcardBank\(bank\) : !isFlashcardBank\(bank\)/);
+  assert.match(await text("app/lib/local-bank.ts"),/keys.push\("flashcardAnswer", "flashcardSourceId"\)/);
+  assert.doesNotMatch(await text("app/components/FlashcardStudy.tsx"),/trackStudyAnswer|stampLearningRecord/);
+});
+
 test("device preferences resolve languages, theme fallback boundaries and daily verses", async () => {
   const source = await text("app/lib/ui-preferences.ts");
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -668,6 +683,11 @@ test("question images keep portable sources through the real importer and share 
   const exported = createSharedQuestionBankPackage({ ...input, id: "bank", updatedAt: new Date().toISOString() });
   assert.deepEqual(exported.bank.questions[0].sourceImages, [image]);
   assert.deepEqual(exported.bank.questions[0].options[0].sourceImages, [image]);
+  const flashcard = { ...question, flashcardAnswer:"核心答案", flashcardSourceId:"原题ID" };
+  const sharedFlashcard = createSharedQuestionBankPackage({ ...input, questions:[flashcard] });
+  const restoredFlashcard = parseSharedQuestionBankPackage(sharedFlashcard);
+  assert.equal(restoredFlashcard.questions[0].flashcardAnswer, "核心答案");
+  assert.equal(restoredFlashcard.questions[0].flashcardSourceId, "原题ID");
   assert.equal(normalizeQuestionImages([image], [image]).length, 1);
   assert.equal(normalizeQuestionImages([{ url: "https://example.org/figure.png" }]).length, 1);
   assert.equal(normalizeQuestionImages([{ url: "javascript:alert(1)" }, { dataUrl: "data:text/html;base64,AAAA" }, { url: "file:///private/image.png" }]).length, 0);
@@ -1236,7 +1256,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.6.8");
+  assert.equal(JSON.parse(manifest).version, "2.7.0");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1997,7 +2017,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.6.8");
+  assert.equal(JSON.parse(packageJson).version, "2.7.0");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2495,7 +2515,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.6.8");
+  assert.equal(JSON.parse(manifest).version, "2.7.0");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2556,7 +2576,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.8");
+  assert.equal(JSON.parse(manifest).version, "2.7.0");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2574,7 +2594,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.8");
+  assert.equal(JSON.parse(manifest).version, "2.7.0");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2594,7 +2614,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.6.8");
+  assert.equal(JSON.parse(manifest).version, "2.7.0");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

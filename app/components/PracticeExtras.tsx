@@ -51,7 +51,7 @@ export function ChapterDirectory({ questions, currentQuestionId, progress, kille
   return <div className="modal-layer" onMouseDown={onClose}><section className="search-modal chapter-directory" role="dialog" aria-modal="true" aria-label="章节目录" onMouseDown={(e) => e.stopPropagation()}><header><h2>章节目录 · {questions.length} 题</h2><button aria-label="关闭章节目录" onClick={onClose}>×</button></header><p>已自动展开并定位当前题所在章节；当前章节标题会保持可见，可随时收起或展开。</p><div className="chapter-directory-list">{[...groups].map(([name, items]) => { const containsCurrent = items.some((question) => question.id === currentQuestionId); return <details key={name} className={containsCurrent ? "current-chapter" : ""} open={containsCurrent}><summary>{name}<span>{items.filter(q => killed.includes(q.id) || Boolean(progress[q.id])).length}/{items.length} 题</span></summary>{items.map((q) => <button ref={q.id === currentQuestionId ? currentButton : undefined} className={q.id === currentQuestionId ? "current" : ""} aria-current={q.id === currentQuestionId ? "true" : undefined} key={q.id} onClick={() => { onOpen(q.id); onClose(); }}><b>{q.sourceNumber}</b><span>{q.stem}</span>{killed.includes(q.id) ? <em className="chapter-result" aria-label="已斩">✂️</em> : progress[q.id] && <em className={`chapter-result ${progress[q.id]}`} aria-label={progress[q.id] === "correct" ? "已做对" : "已做错"}>{progress[q.id] === "correct" ? "✅" : "❌"}</em>}</button>)}</details>; })}</div></section></div>;
 }
 
-export function AiDialogue({ question, accountId, onSave, renderMarkdown }: { question: QuizQuestion; accountId?: string; onSave: (text: string) => void; renderMarkdown: (text: string) => ReactNode }) {
+export function AiDialogue({ question, accountId, onSave, renderMarkdown, onFlashcard }: { onFlashcard?: (text:string)=>void; question: QuizQuestion; accountId?: string; onSave: (text: string) => void; renderMarkdown: (text: string) => ReactNode }) {
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -77,7 +77,7 @@ export function AiDialogue({ question, accountId, onSave, renderMarkdown }: { qu
   return <section className="practice-dialogue">
     <button className="ai-disease-summary" type="button" disabled={busy} onClick={() => void ask(DISEASE_SUMMARY_REQUEST)}>加入本题，AI 总结疾病</button>
     {messages.map((message, i) => <div key={i} className={`dialogue-${message.role}`}>
-      <header className="dialogue-message-heading"><strong>{message.role === "user" ? "我" : "AI"}</strong>{message.role === "assistant" && <button type="button" onClick={() => onSave(message.text)}>写入笔记</button>}</header>
+      <header className="dialogue-message-heading"><strong>{message.role === "user" ? "我" : "AI"}</strong>{message.role === "assistant" && <button type="button" onClick={() => onSave(message.text)}>写入笔记</button>}{message.role === "assistant" && onFlashcard && <button type="button" onClick={() => onFlashcard(message.text)}>⚡ 制成闪卡</button>}</header>
       {message.role === "assistant" ? renderMarkdown(message.text) : <p>{message.text === DISEASE_SUMMARY_REQUEST ? "总结本题疾病" : message.text}</p>}
     </div>)}
     <textarea aria-label="追问 AI" value={draft} maxLength={500} onChange={(e) => setDraft(e.target.value)} placeholder="追问判断依据、易混点或同类考点…" />

@@ -10,6 +10,8 @@ export type QuizQuestion = {
   options: QuizOption[];
   answer: string[];
   answerPending?: boolean;
+  flashcardAnswer?: string;
+  flashcardSourceId?: string;
   draftAnswer?: string[];
   multiple: boolean;
   examProfile?: "western-medicine-306";
