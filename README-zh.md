@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.7.1" src="https://img.shields.io/badge/version-2.7.1-b43d35" />
+    <img alt="版本 2.7.1.1" src="https://img.shields.io/badge/version-2.7.1.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.7.1.1：** 独立诗词名句栏：已采集[古诗文库](https://www.gushiwenku.cn/mingju/)名句目录前 100 页、去重后 1,505 条，保留作者、篇名及来源链接。北京时间每 4 小时切换，本地载入，不在用户访问时爬取。更新命令：`node scripts/collect-banner-quotes.mjs 100`（输出待审核补丁）。
+>
 > **v2.7.1：** 闪卡提示词与示例 JSON、主动回忆再练、统一导航配色、题目移动章节、正则搜索，以及分组名称和简介编辑与同步。暂未加入间隔复习调度。
 >
 > **v2.6.8：** 普通笔记导出、批量按标签分组与按组导出，待答案题点击即锁定并过题。

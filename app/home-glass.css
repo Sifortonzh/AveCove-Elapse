@@ -82,6 +82,34 @@
 }
 .home-shell .home-topbar .home-quote { flex: 1 1 18rem; min-width: 0; max-width: none; }
 .home-shell .home-topbar .home-quote h1 { font-size: clamp(1.2rem, 2vw, 1.8rem) !important; line-height: 1.35; }
+.home-shell .home-topbar { margin-bottom: 20px; }
+.home-verse-banner {
+  max-width: 1160px;
+  margin: 0 auto 24px;
+  padding: clamp(22px, 3vw, 36px) clamp(20px, 4vw, 44px);
+  border: 1px solid var(--home-border);
+  border-radius: 24px;
+  background: linear-gradient(120deg, #fffdf6b8, #e7f0ec99, #e6ecf5a6);
+  box-shadow: inset 0 1px 0 #ffffffb3, 0 12px 36px #263b3210;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.home-verse-banner blockquote {
+  margin: 0;
+  color: var(--ink);
+  font-family: "Songti SC", "STSong", "SimSun", Georgia, serif;
+  font-size: clamp(1.3rem, 2.4vw, 2rem) !important;
+  font-weight: 600;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.home-verse-banner footer { margin-top: 12px; text-align: right; line-height: 1.6; }
+.home-verse-banner a { color: var(--muted); text-decoration: none; font-size: 1rem !important; }
+.home-verse-banner a:hover { color: var(--bean); text-decoration: underline; }
+.home-verse-banner a:focus-visible { outline: 2px solid var(--bean); outline-offset: 4px; border-radius: 4px; }
+.home-verse-banner cite { font-style: normal; }
+.dark .home-verse-banner { background: linear-gradient(120deg, #ffffff0a, #9bb8ad0a); box-shadow: inset 0 1px 0 #ffffff12, 0 12px 36px #00000025; }
+@media(max-width:620px) { .home-verse-banner { padding: 20px; border-radius: 20px; } .home-verse-banner footer { text-align: left; } }
 .home-shell .home-topbar .top-actions { flex: 0 0 auto; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; margin-inline-start: auto; }
 .home-shell .home-language-control {
   position: relative;

@@ -1,3 +1,5 @@
+import bannerQuotes from "../data/banner-quotes.json";
+
 export const uiLanguages = ["zh-CN", "zh-TW", "en", "ja", "ko"] as const;
 export type UiLanguage = typeof uiLanguages[number];
 export type UiLanguageMode = UiLanguage | "system";
@@ -52,16 +54,8 @@ export const homeDetails = {
   ko: { bankResults: "문제집 검색 결과", summary: "AI 해설", source: "원문 해설", related: "관련 주제", tryAi: "사용해 보기", blog: "작성자 블로그", examNote: "무작위 연습은 최대 20문항, 모의고사는 최대 100문항입니다. 일반 연습에서 답을 확정한 문항을 장별로 추출하고 별도로 채점합니다.", importShort: "가져오기" },
 } as const;
 
-export const homeQuotes = [
-  { title: "黑发不知勤学早，白首方悔读书迟。", source: "颜真卿《劝学》" },
-  { title: "纸上得来终觉浅，绝知此事要躬行。", source: "陆游《冬夜读书示子聿》" },
-  { title: "旧书不厌百回读，熟读深思子自知。", source: "苏轼《送安惇秀才失解西归》" },
-  { title: "少年辛苦终身事，莫向光阴惰寸功。", source: "杜荀鹤《题弟侄书堂》" },
-  { title: "读书破万卷，下笔如有神。", source: "杜甫《奉赠韦左丞丈二十二韵》" },
-  { title: "及时当勉励，岁月不待人。", source: "陶渊明《杂诗》" },
-  { title: "问渠那得清如许？为有源头活水来。", source: "朱熹《观书有感》" },
-] as const;
+export const homeQuotes = bannerQuotes.quotes;
 export function dailyQuoteIndex(date: Date) {
-  const days = Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000);
-  return ((days % homeQuotes.length) + homeQuotes.length) % homeQuotes.length;
+  const slot = Math.floor((date.getTime() + 8 * 3_600_000) / (4 * 3_600_000));
+  return Number.isFinite(slot) && homeQuotes.length ? ((slot % homeQuotes.length) + homeQuotes.length) % homeQuotes.length : 0;
 }

@@ -42,7 +42,7 @@ test("flashcards validate source answers and preserve chapters without changing 
 });
 
 test("device preferences resolve languages, theme fallback boundaries and daily verses", async () => {
-  const source = await text("app/lib/ui-preferences.ts");
+  const source = (await text("app/lib/ui-preferences.ts")).replace('import bannerQuotes from "../data/banner-quotes.json";', `const bannerQuotes = ${await text("app/data/banner-quotes.json")};`);
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   const { resolveUiLanguage, resolveClockDark, resolveSystemDark, nextTheme, dailyQuoteIndex, homeQuotes, uiLanguages, uiText } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
   assert.equal(resolveUiLanguage("system", ["de", "zh-Hant-HK"]), "zh-TW");
@@ -67,6 +67,12 @@ test("device preferences resolve languages, theme fallback boundaries and daily 
   assert.equal(nextTheme("auto"), "light");
   assert.equal(new Set(Array.from({ length: 7 }, (_, i) => dailyQuoteIndex(new Date(2026, 10, i + 1, 13)))).size, 7);
   assert.ok(homeQuotes.every(item => item.title && item.source));
+  assert.ok(homeQuotes.length >= 1000);
+  assert.equal(dailyQuoteIndex(new Date("2026-11-17T03:59:59+08:00")), dailyQuoteIndex(new Date("2026-11-17T00:00:00+08:00")));
+  const before = dailyQuoteIndex(new Date("2026-11-17T03:59:59+08:00"));
+  assert.equal(dailyQuoteIndex(new Date("2026-11-17T04:00:00+08:00")), (before + 1) % homeQuotes.length);
+  assert.equal(dailyQuoteIndex(new Date("2026-11-17T20:00:00+08:00")), dailyQuoteIndex(new Date("2026-11-17T12:00:00Z")));
+  assert.ok(homeQuotes.every(item => item.author && item.work && item.url.startsWith("https://www.gushiwenku.cn/mingju/")));
   assert.equal(new Set(uiLanguages.map(language => uiText(language).banks)).size, 5);
   for (const language of uiLanguages) assert.equal(Object.values(uiText(language)).filter(Boolean).length, Object.keys(uiText("zh-CN")).length);
 });
@@ -1277,7 +1283,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.7.1");
+  assert.equal(JSON.parse(manifest).version, "2.7.1.1");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -2038,7 +2044,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.7.1");
+  assert.equal(JSON.parse(packageJson).version, "2.7.1.1");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2536,7 +2542,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.7.1");
+  assert.equal(JSON.parse(manifest).version, "2.7.1.1");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2597,7 +2603,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.1");
+  assert.equal(JSON.parse(manifest).version, "2.7.1.1");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2615,7 +2621,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.1");
+  assert.equal(JSON.parse(manifest).version, "2.7.1.1");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2635,7 +2641,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.1");
+  assert.equal(JSON.parse(manifest).version, "2.7.1.1");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
