@@ -5,12 +5,13 @@ import {createSharedQuestionBankPackage} from "../lib/local-bank";
 import {AiDialogue} from "./PracticeExtras";
 import {QuestionImages} from "./QuestionImages";
 import type {QuizQuestion} from "../lib/question-parser";
-import {FLASHCARD_LEARNING_PROMPT,parseFlashcards} from "../lib/flashcards";
+import FlashcardGuide from "./FlashcardGuide";
+import {parseFlashcards} from "../lib/flashcards";
 import {printNotePdf} from "../lib/note-pdf-export";
 
 export function FlashcardImport({onSave,onClose}:{onSave:(bank:ReturnType<typeof parseFlashcards>)=>Promise<void>;onClose:()=>void}){
- const [error,setError]=useState("");const [busy,setBusy]=useState(false); const [copied,setCopied]=useState(false);
- return <div className="modal-layer"><section className="settings-modal"><header><h2>⚡ 红豆闪卡导入</h2><button onClick={onClose}>关闭</button></header><input type="file" accept=".json,application/json" disabled={busy} onChange={async e=>{const f=e.target.files?.[0];if(!f)return;setBusy(true);setError("");try{if(f.size>24000000)throw Error("请选择小于 24 MB 的 JSON");await onSave(parseFlashcards(JSON.parse(await f.text())));onClose();}catch(err){setError(err instanceof Error?err.message:"导入失败");}finally{setBusy(false);}}}/><button onClick={async()=>{try{await navigator.clipboard.writeText(FLASHCARD_LEARNING_PROMPT);setCopied(true);}catch{setError("请展开后手动复制提示词");}}}>{copied?"已复制":"复制 AI 整理提示词"}</button><details><summary>查看格式与提示词</summary><p>{FLASHCARD_LEARNING_PROMPT}</p></details>{error&&<p role="alert">{error}</p>}</section></div>;
+ const [error,setError]=useState("");const [busy,setBusy]=useState(false);
+ return <div className="modal-layer"><section className="settings-modal"><header><h2>⚡ 红豆闪卡导入</h2><button onClick={onClose}>关闭</button></header><input type="file" accept=".json,application/json" disabled={busy} onChange={async e=>{const f=e.target.files?.[0];if(!f)return;setBusy(true);setError("");try{if(f.size>24000000)throw Error("请选择小于 24 MB 的 JSON");await onSave(parseFlashcards(JSON.parse(await f.text())));onClose();}catch(err){setError(err instanceof Error?err.message:"导入失败");}finally{setBusy(false);}}}/><FlashcardGuide />{error&&<p role="alert">{error}</p>}</section></div>;
 }
 
 export default function FlashcardStudy({bank,notes,favorites,accountId,defaultQuick=false,onNote,onStar,onSave,onBack,renderMarkdown}:{bank:SavedQuestionBank;notes:Record<string,string>;favorites:string[];accountId?:string;defaultQuick?:boolean;onNote:(id:string,text:string)=>void;onStar:(id:string)=>void;onSave:(bank:SavedQuestionBank)=>Promise<void>;onBack:()=>void;renderMarkdown:(value:string)=>ReactNode}){

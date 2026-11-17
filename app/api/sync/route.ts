@@ -16,6 +16,7 @@ type BankBundle = {
   activeBankId?: string | null;
   banks?: unknown[];
   groupOrder?: unknown;
+  groupDescriptions?: unknown;
   bankOrder?: unknown;
   sortMode?: unknown;
   deletedBanks?: unknown;
@@ -62,6 +63,11 @@ function mergeQuestionBankBundles(currentValue: unknown, incomingValue: unknown)
     banks: [...banks.values()].sort((left, right) => validTimestamp(right.updatedAt).localeCompare(validTimestamp(left.updatedAt))).slice(0, 40),
     deletedBanks,
     groupOrder: Array.isArray(preferenceSource.groupOrder) ? preferenceSource.groupOrder : [],
+    groupDescriptions: (() => {
+      const value = preferenceSource.groupDescriptions ?? current.groupDescriptions;
+      if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+      return Object.fromEntries(Object.entries(value).slice(0, 80).filter(([, v]) => typeof v === "string").map(([k, v]) => [k.slice(0, 60), (v as string).slice(0, 1000)]));
+    })(),
     bankOrder: Array.isArray(preferenceSource.bankOrder) ? preferenceSource.bankOrder : [],
     sortMode: typeof preferenceSource.sortMode === "string" ? preferenceSource.sortMode : "imported-desc",
     preferencesUpdatedAt: validTimestamp(preferenceSource.preferencesUpdatedAt),
