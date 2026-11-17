@@ -16,11 +16,36 @@ function normalize(value: string, joinChinese = false) {
 
 export type QuestionSearchScope = "all" | "stem" | "options";
 
+export function compileSearchRegex(query: string) {
+  if (query.length > 300) throw new Error("正则最多 300 个字符。");
+  const literal = query.match(/^\/(.*)\/([iu]*)$/);
+  const source = literal ? literal[1] : query;
+  // Keep the synchronous search bounded: reject quantified groups, backreferences,
+  // lookarounds and multiple unbounded repetitions rather than freezing an iPad.
+  if (/\\[1-9]|\(\?|\)[*+{]/.test(source) || (source.match(/(?<!\\)[*+]|\{\d+,\}/g)?.length ?? 0) > 1) throw new Error("请简化正则：不支持回溯引用、特殊分组或多重无限重复。");
+  try { return new RegExp(source, literal?.[2] || "iu"); }
+  catch { throw new Error("正则格式无效，请检查括号、字符组及标志。"); }
+}
+
 export function getSearchTerms(query: string) {
   return [...new Set(normalize(query).split(" ").filter(Boolean))].slice(0, 8);
 }
 
-export function searchQuestionBanks(banks: SavedQuestionBank[], query: string, limit = 100, scope: QuestionSearchScope = "all"): QuestionSearchMatch[] {
+export function searchQuestionBanks(banks: SavedQuestionBank[], query: string, limit = 100, scope: QuestionSearchScope = "all", regex = false): QuestionSearchMatch[] {
+  if (regex) {
+    const pattern = compileSearchRegex(query);
+    const results: QuestionSearchMatch[] = [];
+    for (const bank of banks) for (const question of bank.questions) {
+      const fields: Array<[QuestionSearchMatch["matchedFields"][number], string]> = scope === "all" ? [["题库", bank.name], ["分组", bank.groupName], ["分类", question.category], ["题号", question.sourceNumber]] : [];
+      if (scope !== "options") fields.push(["题干", `${question.sharedStem ?? ""}\n${question.stem}`]);
+      const option = scope !== "stem" ? question.options.find(o => pattern.test(o.text.slice(0, 2048))) : undefined;
+      const matchedFields = fields.filter(([, value]) => pattern.test(value.slice(0, 2048))).map(([field]) => field);
+      if (option) matchedFields.push("选项");
+      if (matchedFields.length) results.push({ bank, question, score: 1, matchedFields, matchedOption: option ? `${option.label}. ${option.text}` : undefined });
+      if (results.length >= limit) return results;
+    }
+    return results;
+  }
   const terms = getSearchTerms(query);
   if (!terms.length) return [];
   const fullQuery = normalize(query);

@@ -5,6 +5,7 @@ import { Bell, X } from "lucide-react";
 import { type UiLanguage, uiText } from "../lib/ui-preferences";
 
 const updates = [
+  { version: "v2.7.1", at: "2026-11-17T22:45:00+08:00", detail: "闪卡规范提示词与示例、主动回忆再练、统一导航配色、章节移动与正则检索。" },
   { version: "v2.7.0", at: "2026-11-16T22:10:00+08:00", detail: "唯快不破闪卡首版：章节复习、显隐答案、笔记、星标、AI、导入导出及题目转卡。" },
   { version: "v2.6.8", at: "2026-11-16T21:55:00+08:00", detail: "普通笔记导出、批量分组及待答案题快速锁定。" },
   { version: "v2.6.7.1", at: "2026-11-12T23:54:00+08:00", detail: "学习笔记导出支持 Markdown 表格、强调样式、换行和通栏打印。" },

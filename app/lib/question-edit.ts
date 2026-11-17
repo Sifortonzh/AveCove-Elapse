@@ -2,6 +2,15 @@ import type { QuizQuestion } from "./question-parser";
 
 export type OptionLabelMap = ReadonlyMap<string, string>;
 
+export function moveQuestionChapter(items: QuizQuestion[], questionId: string, category: string) {
+  const current = items.find(q => q.id === questionId);
+  if (!current || current.category === category || !category.trim()) return items;
+  const next = items.map(q => q.id === questionId ? { ...q, category: category.trim() } : q);
+  const destination = next.filter(q => q.category === category.trim()).sort((a, b) => a.sourceNumber.localeCompare(b.sourceNumber, "zh-CN", { numeric: true }));
+  let index = 0;
+  return next.map(q => q.category === category.trim() ? destination[index++] : q);
+}
+
 export function relabelOptions<T extends { label: string }>(options: T[]) {
   const labels = new Map<string, string>();
   const items = options.map((option, index) => {

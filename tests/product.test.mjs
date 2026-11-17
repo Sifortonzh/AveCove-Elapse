@@ -5,6 +5,27 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("chapter movement keeps identities and sorts destination by source number", async () => {
+  const source = ts.transpileModule(await text("app/lib/question-edit.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { moveQuestionChapter } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+  const items = [{id:"a",category:"one",sourceNumber:"11"},{id:"b",category:"two",sourceNumber:"20"},{id:"c",category:"two",sourceNumber:"2"}];
+  const moved = moveQuestionChapter(items,"a","two");
+  assert.deepEqual(moved.map(q=>q.sourceNumber),["2","11","20"]);
+  assert.equal(items[0].category,"one");
+  assert.equal(moved.find(q=>q.id==="a").category,"two");
+});
+
+test("regex search finds raw stems and options and rejects unsafe or malformed patterns", async () => {
+  const source = ts.transpileModule(await text("app/lib/question-search.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const {searchQuestionBanks,compileSearchRegex} = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+  const bank = {name:"bank",groupName:"group",questions:[{id:"a",category:"chapter",sourceNumber:"1",stem:"Hepatitis A",options:[{label:"A",text:"RNA"}]}]};
+  assert.equal(searchQuestionBanks([bank],"hepatitis [AB]",60,"stem",true).length,1);
+  assert.equal(searchQuestionBanks([bank],"^RNA$",60,"options",true)[0].matchedOption,"A. RNA");
+  assert.throws(()=>compileSearchRegex("["));
+  assert.throws(()=>compileSearchRegex("(a+)+$"));
+  assert.throws(()=>compileSearchRegex("a*a*a*"));
+});
+
 test("flashcards validate source answers and preserve chapters without changing scoring", async () => {
   const output=ts.transpileModule(await text("app/lib/flashcards.ts"),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
   const {parseFlashcards,questionFlashcard,isFlashcardBank}=await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
@@ -1256,7 +1277,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.7.0");
+  assert.equal(JSON.parse(manifest).version, "2.7.1");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -2017,7 +2038,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.7.0");
+  assert.equal(JSON.parse(packageJson).version, "2.7.1");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2515,7 +2536,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.7.0");
+  assert.equal(JSON.parse(manifest).version, "2.7.1");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2576,7 +2597,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.0");
+  assert.equal(JSON.parse(manifest).version, "2.7.1");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2594,7 +2615,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.0");
+  assert.equal(JSON.parse(manifest).version, "2.7.1");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2614,7 +2635,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.0");
+  assert.equal(JSON.parse(manifest).version, "2.7.1");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

@@ -117,6 +117,7 @@ export type QuestionBankSyncBundle = {
   activeBankId: string | null;
   banks: SavedQuestionBank[];
   groupOrder?: string[];
+  groupDescriptions?: Record<string, string>;
   bankOrder?: string[];
   sortMode?: QuestionBankSortMode;
   deletedBanks?: Record<string, string>;
@@ -383,6 +384,31 @@ export async function loadQuestionBankGroupOrder(): Promise<string[]> {
   return normalizeGroupOrder(await readValue<unknown>(GROUP_ORDER_KEY));
 }
 
+function normalizeGroupDescriptions(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).slice(0, 80).filter(([, v]) => typeof v === "string").map(([k, v]) => [k.slice(0, 60), (v as string).slice(0, 1000)]));
+}
+
+export async function loadQuestionBankGroupDescriptions() {
+  return normalizeGroupDescriptions(await readValue<unknown>("group-descriptions"));
+}
+
+export async function editQuestionBankGroup(previous: string, name: string, description: string) {
+  const groupName = normalizeQuestionBankGroup(name.trim());
+  if (!groupName || groupName.length > 60) throw new Error("分组名称需为 1–60 字。");
+  const banks = await listQuestionBanks();
+  if (previous !== groupName && banks.some(b => b.groupName === groupName)) throw new Error("已有同名分组，请换个名称，避免误合并。");
+  const descriptions = await loadQuestionBankGroupDescriptions();
+  delete descriptions[previous];
+  descriptions[groupName] = description.trim().slice(0, 1000);
+  const order = (await loadQuestionBankGroupOrder()).map(n => n === previous ? groupName : n);
+  const updatedAt = new Date().toISOString();
+  await writeValues([
+    ...banks.filter(b => (b.groupName || "未分组题库") === previous).map(b => [bankKey(b.id), { ...b, groupName, updatedAt }] as [IDBValidKey, unknown]),
+    ["group-descriptions", descriptions], [GROUP_ORDER_KEY, order], [PREFERENCES_UPDATED_AT_KEY, updatedAt],
+  ]);
+}
+
 export async function saveQuestionBankGroupOrder(order: string[]): Promise<string[]> {
   const normalized = normalizeGroupOrder(order);
   await touchQuestionBankPreferences([[GROUP_ORDER_KEY, normalized]]);
@@ -591,6 +617,7 @@ export async function exportQuestionBankSyncBundle(): Promise<QuestionBankSyncBu
     activeBankId: await readValue<string>(ACTIVE_ID_KEY) ?? null,
     banks: await listQuestionBanks(),
     groupOrder: await loadQuestionBankGroupOrder(),
+    groupDescriptions: await loadQuestionBankGroupDescriptions(),
     bankOrder: await loadQuestionBankOrder(),
     sortMode: await loadQuestionBankSortMode(),
     deletedBanks: normalizeDeletedBanks(await readValue<unknown>(DELETED_BANKS_KEY)),
@@ -659,6 +686,7 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
   if (remotePreferencesUpdatedAt > localPreferencesUpdatedAt) {
     await writeValues([
       [GROUP_ORDER_KEY, normalizeGroupOrder(bundle.groupOrder)],
+      ...("groupDescriptions" in bundle ? [["group-descriptions", normalizeGroupDescriptions(bundle.groupDescriptions)] as [IDBValidKey, unknown]] : []),
       [BANK_ORDER_KEY, normalizeBankOrder(bundle.bankOrder)],
       [SORT_MODE_KEY, normalizeSortMode(bundle.sortMode)],
       [PREFERENCES_UPDATED_AT_KEY, remotePreferencesUpdatedAt],
