@@ -2129,7 +2129,7 @@ export default function HomePage() {
       const card = questionFlashcard(question, content);
       const id = `flashdeck-${activeBankId ?? "demo"}`;
       const existing = questionBanks.find(bank=>bank.id===id);
-      await saveFlashDeck({...existing,id,name:existing?.name ?? `${bankName} · 闪卡`,groupName:existing?.groupName ?? question.category,questions:[...(existing?.questions.filter(q=>q.id!==card.id)??[]),card],importedAt:existing?.importedAt??new Date().toISOString()});
+      await saveFlashDeck({...existing,id,name:existing?.name ?? `${bankName} · 闪卡`,groupName:questionBanks.find(bank=>bank.id===activeBankId)?.groupName || existing?.groupName || suggestQuestionBankGroup(bankName,questions) || "其他",questions:[...(existing?.questions.filter(q=>q.id!==card.id)??[]),card],importedAt:existing?.importedAt??new Date().toISOString()});
       if (notes[question.id]) flashNote(card.id,notes[question.id]);
       setToast("已加入唯快不破 ⚡ 同源题库自动归组，笔记已保留。");
     } catch(e) { setToast(e instanceof Error?e.message:"制作闪卡失败"); }
