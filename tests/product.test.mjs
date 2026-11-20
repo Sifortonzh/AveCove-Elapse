@@ -16,7 +16,7 @@ test("flashcard refinement reuses practice directory and preview while concealin
  assert.match(source, /card.id===q.id\?currentButton/);
  assert.doesNotMatch(source, /trackStudyAnswer|stampLearningRecord/);
  const page=await text("app/page.tsx");
- assert.match(page, /groupName:questionBanks.find\(bank=>bank.id===activeBankId\)\?\.groupName/);
+ assert.match(page, /const subjectGroup = source\?\.groupName/);
  const css=await text("app/components/FlashcardStudy.css");
  assert.match(css, /max-width:850px/);
  assert.match(css, /safe-area-inset-bottom/);
@@ -30,6 +30,33 @@ test("chapter movement keeps identities and sorts destination by source number",
   assert.deepEqual(moved.map(q=>q.sourceNumber),["2","11","20"]);
   assert.equal(items[0].category,"one");
   assert.equal(moved.find(q=>q.id==="a").category,"two");
+  const interleaved = [...items.slice(0,2), {id:"d",category:"three",sourceNumber:"3"}, items[2]];
+  assert.deepEqual(moveQuestionChapter(interleaved,"a","two").map(q=>q.id), ["c","a","b","d"]);
+});
+
+test("Pavilion revisions are scoped to the publication and preserve only matching records", async () => {
+  const source = ts.transpileModule(await text("app/lib/pavilion-revision.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const { newerPavilionEntry, preservePavilionRecordIds, normalizePavilionRevision } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+  const bank = {id:"local", pavilion:{id:"real",revision:"2026-11-19T10:00:00Z"}};
+  const real = {id:"real",uploadedAt:"2026-11-20T10:00:00Z"};
+  assert.equal(newerPavilionEntry(bank,[{...real,id:"copy"}]), undefined);
+  assert.equal(newerPavilionEntry(bank,[real]),real);
+  assert.equal(newerPavilionEntry(bank,[{...real,uploadedAt:bank.pavilion.revision}]),undefined);
+  assert.equal(normalizePavilionRevision({id:"bad#id",revision:real.uploadedAt}),undefined);
+  const old = {id:"old",sourceNumber:"1",category:"一",stem:"同一道题",options:[{label:"A",text:"甲"}]};
+  const update = {...old,id:"remote",sourceNumber:"20",category:"二"};
+  let n=0;
+  assert.deepEqual(preservePavilionRecordIds([old],[{...old,stem:"全新题"},update],()=>`new-${++n}`).map(q=>q.id),["new-1","old"]);
+  assert.deepEqual(preservePavilionRecordIds([old],[{...update,options:[{label:"B",text:"甲"}]}],()=>"fresh").map(q=>q.id),["fresh"]);
+  assert.equal(old.category,"一");
+});
+
+test("flashcard knowledge outline nests Markdown and limits context to relevant stems", async () => {
+  const source = ts.transpileModule(await text("app/lib/knowledge-tree.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const {parseKnowledgeOutline, relatedFlashcardStems}=await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+  assert.deepEqual(parseKnowledgeOutline("- 锚点\n  - **相关**\n    - 区分\n  - 另一支"),[{text:"锚点",children:[{text:"**相关**",children:[{text:"区分",children:[]}]},{text:"另一支",children:[]}]}]);
+  const anchor={id:"a",stem:"主动回忆的步骤",category:"学习"};
+  assert.deepEqual(relatedFlashcardStems(anchor,[anchor,{id:"b",stem:"主动回忆的方法",category:"学习",flashcardAnswer:"私有答案"},{id:"c",stem:"南北地理"}],"回忆"),["主动回忆的方法"]);
 });
 
 test("regex search finds raw stems and options and rejects unsafe or malformed patterns", async () => {
@@ -416,8 +443,8 @@ test("direct slash skip and answer-sheet batch ranges use visible numbers only",
 test("Pavilion import reuses guarded private-bank storage and chapter heading stays pinned", async () => {
   const page = await text("app/page.tsx"), css = await text("app/globals.css"), extras = await text("app/components/PracticeExtras.tsx");
   assert.match(page, /onImport=\{importPavilionBank\}/);
-  assert.match(page, /await onImport\(parseSharedQuestionBankPackage\(result.package\)\)/);
-  assert.match(page, /async function importPavilionBank[^]*?await saveImportedBank/);
+  assert.match(page, /await onImport\(parseSharedQuestionBankPackage\(result.package\), entry, result.revision/);
+  assert.match(page, /async function importPavilionBank[^]*?preservePavilionRecordIds[^]*?await saveQuestionBank/);
   assert.match(page, /aria-label="搜索已收录题库"/);
   assert.match(page, /collectionSearchRef.current\?\.focus\(\{ preventScroll: true \}\)/);
   const importer = page.slice(page.indexOf("  async function importPavilionBank("),page.indexOf("  async function handleFiles("));
@@ -535,7 +562,7 @@ test("Hongdou import groups nonadjacent A3 cases and removes only equivalent dup
   }).outputText).toString("base64")}`;
   const grouping = compile(await text("app/lib/bank-grouping.ts"));
   const cases = compile(await text("app/lib/shared-case.ts"));
-  const source = (await text("app/lib/local-bank.ts")).replace("./bank-grouping", grouping).replace("./shared-case", cases).replace("./practice-stats", compile(await text("app/lib/practice-stats.ts")));
+  const source = (await text("app/lib/local-bank.ts")).replace("./bank-grouping", grouping).replace("./shared-case", cases).replace("./practice-stats", compile(await text("app/lib/practice-stats.ts"))).replace("./pavilion-revision", compile(await text("app/lib/pavilion-revision.ts")));
   const { parseSharedQuestionBankPackage, sanitizeSharedQuestionBankPackage } = await import(compile(source));
   const { pavilionSubject } = await import(grouping);
   assert.equal(pavilionSubject("眼科主治题库", "主治"), "眼科学");
@@ -717,7 +744,7 @@ test("question images keep portable sources through the real importer and share 
   const groupingUrl = compile(await text("app/lib/bank-grouping.ts"));
   const sharedOutput = ts.transpileModule(await text("app/lib/shared-case.ts"), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
   const sharedUrl = `data:text/javascript;base64,${Buffer.from(sharedOutput).toString("base64")}`;
-  const bankSource = (await text("app/lib/local-bank.ts")).replace(/from "\.\/bank-grouping"/g, `from "${groupingUrl}"`).replace(/from "\.\/shared-case"/g, `from "${sharedUrl}"`).replace("./practice-stats", compile(await text("app/lib/practice-stats.ts")));
+  const bankSource = (await text("app/lib/local-bank.ts")).replace(/from "\.\/bank-grouping"/g, `from "${groupingUrl}"`).replace(/from "\.\/shared-case"/g, `from "${sharedUrl}"`).replace("./practice-stats", compile(await text("app/lib/practice-stats.ts"))).replace("./pavilion-revision", compile(await text("app/lib/pavilion-revision.ts")));
   const { parseSharedQuestionBankPackage, createSharedQuestionBankPackage } = await import(compile(bankSource));
   const { normalizeQuestionImages } = await import(compile(await text("app/lib/question-images.ts")));
   const image = { name: "image1.png", dataUrl: "data:image/png;base64,iVBORw0KGgo=", caption: "示意图" };
@@ -1300,7 +1327,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.7.2");
+  assert.equal(JSON.parse(manifest).version, "2.7.3");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1393,7 +1420,7 @@ test("includes the requested product flows and copy", async () => {
   assert.match(page, /DocumentImportWorkbench/);
   assert.match(page, /下载提取文字 JSON/);
   assert.doesNotMatch(page, /function AiImportFallbackModal/);
-  assert.match(page, /答对后 0\.7 秒进入下一题/);
+  assert.match(page, /label="答对自动下一题" value=\{settings.autoNext\}/);
   assert.match(styles, /Independent desktop scroll regions/);
   assert.match(styles, /\.home-sidebar\{[^}]*overflow-y:auto/);
   assert.match(styles, /\.home-quote\{[^}]*backdrop-filter:blur/);
@@ -1996,8 +2023,7 @@ test("ships blind review and answer-first memorization only in practice settings
   assert.match(page, /type StudyMode = "standard" \| "blind" \| "memorize"/);
   assert.match(settingsModal, /<strong>盲刷<\/strong>/);
   assert.match(settingsModal, /<strong>背题<\/strong>/);
-  assert.match(settingsModal, /点击“对答案”前不判分、不显示正误/);
-  assert.match(settingsModal, /不会把浏览行为计入做题数、正确率或首次得分/);
+  assert.doesNotMatch(settingsModal, /study-mode-note/);
   assert.doesNotMatch(homeView, /<strong>盲刷<\/strong>|<strong>背题<\/strong>/);
   assert.match(page, /sessionStudyMode === "blind"/);
   assert.match(page, /setSelected\(memorizing \? \[\.\.\.\(target\?\.answer \?\? \[\]\)\]/);
@@ -2045,7 +2071,7 @@ test("offers five-subject filtering only for modern Western Medicine 306 banks",
   assert.match(page, /western306Subject: Western306SubjectScope/);
   assert.match(page, /western306SubjectForQuestion\(question\) === active\.western306Subject/);
   assert.match(settingsModal, /西综 306 · 只练某一科/);
-  assert.match(settingsModal, /单科练习不包含第 108–115 题医学人文/);
+  assert.doesNotMatch(settingsModal, /western306-subject-note/);
   assert.match(settingsModal, /showWestern306Subjects &&/);
   assert.match(styles, /\.western306-subject-grid/);
 });
@@ -2061,7 +2087,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.7.2");
+  assert.equal(JSON.parse(packageJson).version, "2.7.3");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2559,7 +2585,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.7.2");
+  assert.equal(JSON.parse(manifest).version, "2.7.3");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2620,7 +2646,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.2");
+  assert.equal(JSON.parse(manifest).version, "2.7.3");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2638,7 +2664,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.2");
+  assert.equal(JSON.parse(manifest).version, "2.7.3");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2658,7 +2684,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.2");
+  assert.equal(JSON.parse(manifest).version, "2.7.3");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

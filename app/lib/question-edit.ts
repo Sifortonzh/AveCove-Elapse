@@ -4,11 +4,28 @@ export type OptionLabelMap = ReadonlyMap<string, string>;
 
 export function moveQuestionChapter(items: QuizQuestion[], questionId: string, category: string) {
   const current = items.find(q => q.id === questionId);
-  if (!current || current.category === category || !category.trim()) return items;
-  const next = items.map(q => q.id === questionId ? { ...q, category: category.trim() } : q);
-  const destination = next.filter(q => q.category === category.trim()).sort((a, b) => a.sourceNumber.localeCompare(b.sourceNumber, "zh-CN", { numeric: true }));
-  let index = 0;
-  return next.map(q => q.category === category.trim() ? destination[index++] : q);
+  const target = category.trim();
+  if (!current || current.category === target || !target) return items;
+  const remaining = items.filter(q => q.id !== questionId);
+  const first = remaining.findIndex(q => q.category === target);
+  const destination = [...remaining.filter(q => q.category === target), { ...current, category: target }]
+    .sort((a, b) => String(a.sourceNumber).localeCompare(String(b.sourceNumber), "zh-CN", { numeric: true }));
+  if (first < 0) return [...remaining, ...destination];
+  return [...remaining.slice(0, first), ...destination, ...remaining.slice(first).filter(q => q.category !== target)];
+}
+
+export function orderEditedSession(session: QuizQuestion[], bank: QuizQuestion[], reorder: boolean) {
+  const lookup = new Map(bank.map(q => [q.id, q]));
+  if (!reorder) return session.map(q => {
+    const updated = lookup.get(q.id);
+    if (!updated) return q;
+    const options = new Map(updated.options.map(option => [option.label, option]));
+    const labels = q.options.map(option => option.label).filter(label => options.has(label));
+    const kept = new Set(labels);
+    return { ...updated, options: [...labels.map(label => options.get(label)!), ...updated.options.filter(option => !kept.has(option.label))] };
+  });
+  const ids = new Set(session.map(q => q.id));
+  return bank.filter(q => ids.has(q.id));
 }
 
 export function relabelOptions<T extends { label: string }>(options: T[]) {

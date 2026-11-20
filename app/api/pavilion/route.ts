@@ -92,12 +92,12 @@ export async function GET(request: Request) {
     await ensurePavilionTable();
     const id = new URL(request.url).searchParams.get("id")?.slice(0, 100) ?? "";
     if (id) {
-      const rows = await query<{ payload: SharedQuestionBankPackage }>("SELECT payload FROM pavilion_question_banks WHERE id = $1", [id]);
+      const rows = await query<{ payload: SharedQuestionBankPackage; updated_at: Date }>("SELECT payload, updated_at FROM pavilion_question_banks WHERE id = $1", [id]);
       if (!rows[0]) return NextResponse.json({ error: "这份题库已被移出藏经阁。" }, { status: 404 });
       const payload = sanitizeSharedQuestionBankPackage(rows[0].payload);
       const subject = pavilionSubject(payload.bank.name, payload.bank.groupName, payload.bank.sourceTitle);
       payload.bank.groupName = subject === "未分组" ? "" : subject;
-      return NextResponse.json({ package: payload }, { headers: { "Cache-Control": "private, no-store" } });
+      return NextResponse.json({ package: payload, revision: rows[0].updated_at.toISOString() }, { headers: { "Cache-Control": "private, no-store" } });
     }
     const rows = await query<PavilionRow>(
       `SELECT p.id, source_bank_id, name, group_name, study_stage, question_count, single_count, multiple_count, p.annotation, p.rating,

@@ -1,6 +1,7 @@
 import { generateAiText, publicAiErrorMessage } from "@/app/lib/server/ai-providers";
 import { loadRequestAiConfig } from "@/app/lib/server/account-ai";
 import { FOLLOW_UP_SYSTEM_PROMPT } from "@/app/lib/ai-follow-up";
+import { KNOWLEDGE_TREE_SYSTEM_PROMPT } from "@/app/lib/knowledge-tree";
 
 export async function POST(request: Request) {
   const aiConfig = await loadRequestAiConfig(request);
@@ -16,7 +17,8 @@ export async function POST(request: Request) {
       category?: string;
       sourceNumber?: string;
     };
-    mode?: "summary" | "pitfall" | "companion";
+    mode?: "summary" | "pitfall" | "companion" | "knowledge-tree";
+    related?: unknown;
     followUp?: string;
     history?: Array<{ role?: "user" | "assistant"; text?: string }>;
   };
@@ -30,11 +32,14 @@ export async function POST(request: Request) {
     summary: "生成简洁可靠的 AI 解析：先用一句话给出核心判断，再分点解释正确答案与关键鉴别，最后给一个便于记忆的短句。",
     pitfall: "以“原题解析校对”的形式：只校对并梳理随原文件导入的解析依据，不要把 AI 推断冒充原文；没有原文解析时明确说明。",
     companion: "以“同类考点”的形式：根据当前题目的核心知识点，整理 3–5 个常一起考、容易混淆或需要联动掌握的相关考点；每点说明与本题的联系，并给出一句辨析提示。不要虚构新题或教材原文。",
+    "knowledge-tree": "以当前闪卡为锚点生成知识树。",
   }[body.mode ?? "summary"];
 
   const followUp = typeof body.followUp === "string" ? body.followUp.trim().slice(0, 500) : "";
-  const systemPrompt = followUp ? FOLLOW_UP_SYSTEM_PROMPT : undefined;
-  const prompt = [
+  const tree = body.mode === "knowledge-tree";
+  const systemPrompt = tree ? KNOWLEDGE_TREE_SYSTEM_PROMPT : followUp ? FOLLOW_UP_SYSTEM_PROMPT : undefined;
+  const related = Array.isArray(body.related) ? body.related.slice(0, 5).filter((value): value is string => typeof value === "string").map(value => value.slice(0, 300)) : [];
+  const prompt = tree ? JSON.stringify({ anchor: String(question.stem).slice(0, 2000), answer: String(question.options[0]?.text ?? "").slice(0, 4000), keyword: followUp.slice(0, 60), related }) : [
     ...(followUp ? [] : [
       "你是一名谨慎、清晰的医学考试辅导老师。请用简体中文解析下面的医学题目。",
       modeInstruction,

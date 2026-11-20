@@ -5,6 +5,7 @@ import { Bell, X } from "lucide-react";
 import { type UiLanguage, uiText } from "../lib/ui-preferences";
 
 const updates = [
+  { version: "v2.7.3", at: "2026-11-20T22:30:00+08:00", detail: "藏经阁新版提醒、章节题目重排、闪卡 AI 知识树、练习控件精简。" },
   { version: "v2.7.2", at: "2026-11-18T22:50:00+08:00", detail: "闪卡沿用普通练习布局：章节定位、右侧操作与答题卡、下方 Markdown 笔记、居中大字与阴影遮蔽，适配手机。" },
   { version: "v2.7.1", at: "2026-11-17T22:45:00+08:00", detail: "闪卡规范提示词与示例、主动回忆再练、统一导航配色、章节移动与正则检索。" },
   { version: "v2.7.0", at: "2026-11-16T22:10:00+08:00", detail: "唯快不破闪卡首版：章节复习、显隐答案、笔记、星标、AI、导入导出及题目转卡。" },

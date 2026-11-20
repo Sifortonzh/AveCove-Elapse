@@ -52,6 +52,7 @@ import {
   western306SubjectForQuestion, type Western306Subject,
 } from "./lib/medical-ai-import";
 import { pavilionSubject, suggestQuestionBankGroup } from "./lib/bank-grouping";
+import { latestPavilionEntry, newerPavilionEntry, normalizePavilionRevision, preservePavilionRecordIds } from "./lib/pavilion-revision";
 import { getSearchTerms, compileSearchRegex, searchQuestionBanks, type QuestionSearchScope } from "./lib/question-search";
 import { compactQuestionNumbers } from "./lib/question-number";
 import { filterPracticeQuestionTypes, isXQuestion, practiceStats, newerPreferences } from "./lib/practice-stats";
@@ -66,7 +67,7 @@ import SyncStatusNotice from "./components/SyncStatusNotice";
 import SyncFileList from "./components/SyncFileList";
 import { syncErrorMessage, type SyncFileChange } from "./lib/sync-feedback";
 import { fetchSync } from "./lib/sync-request";
-import { deleteQuestionAndRenumber, insertQuestionAfter, moveQuestionChapter, relabelOptions, remapOptionLabels, removeMarkedQuestions, type OptionLabelMap } from "./lib/question-edit";
+import { deleteQuestionAndRenumber, insertQuestionAfter, moveQuestionChapter, orderEditedSession, relabelOptions, remapOptionLabels, removeMarkedQuestions, type OptionLabelMap } from "./lib/question-edit";
 import { applyBatchAnswers, pendingAnswerQuestions, type BatchAnswerEntry } from "./lib/batch-answer";
 import { hasOptionAnnotation, hasQuestionNote, noteImageMarkdown, remapOptionAnnotations } from "./lib/note-annotations";
 import { markdownInlineTokens, readMarkdownTable } from "./lib/markdown-table";
@@ -351,6 +352,7 @@ export default function HomePage() {
   const [activeBankId, setActiveBankId] = useState<string | null>(null);
   const [sessionQuestions, setSessionQuestions] = useState<QuizQuestion[]>([]);
   const [sessionNonXOnly, setSessionNonXOnly] = useState(false);
+  const [sessionSequential, setSessionSequential] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [excludedOptions, setExcludedOptions] = useState<Record<string, string[]>>({});
@@ -376,6 +378,10 @@ export default function HomePage() {
   const [activity, setActivity] = useState<StudyActivity>({});
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [showSettings, setShowSettings] = useState(false);
+  const [pavilionTarget, setPavilionTarget] = useState<string | null>(null);
+  const [pavilionUpdate, setPavilionUpdate] = useState<{ bankId: string; entry: PavilionQuestionBank } | null>(null);
+  const pavilionDismissed = useRef(new Set<string>());
+  const pavilionCache = useRef<{ accountId: string; at: number; entries: PavilionQuestionBank[] } | null>(null);
   const [showAnswerSheet, setShowAnswerSheet] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showMineruWorkbench, setShowMineruWorkbench] = useState(false);
@@ -1050,6 +1056,7 @@ export default function HomePage() {
     setSessionQuestions(pool);
     setSessionNonXOnly(nonXOnly);
     setSessionStudyMode(active.studyMode);
+    setSessionSequential(!proportionalExam && active.questionOrder === "sequential" && active.scope !== "wrong" && active.scope !== "favorite");
     setSessionScope(active.scope);
     setReviewProgress({});
     setReviewSelections({});
@@ -1171,6 +1178,7 @@ export default function HomePage() {
     setSessionNonXOnly(nonXOnly);
     setSessionStudyMode("standard");
     setSessionScope("all");
+    setSessionSequential(true);
     setSessionIsExam(false);
     setExamFinished(false);
     setRevealedAnswers([]);
@@ -1475,10 +1483,29 @@ export default function HomePage() {
     return saveActiveBank({ ...input, id: existing.id, questions });
   }
 
-  async function importPavilionBank(input: QuestionBankInput) {
-    const saved = await saveImportedBank({ ...input, importedAt: new Date().toISOString() });
+  async function importPavilionBank(input: QuestionBankInput, entry: PavilionQuestionBank, revision: string) {
+    const owner = learningOwnerRef.current;
+    const origin = normalizePavilionRevision({ id: entry.id, revision });
+    if (!origin) throw new Error("藏经阁版本信息无效，请刷新后重试");
+    const banks = await listQuestionBanks();
+    if (owner !== learningOwnerRef.current) throw new Error("账号已切换，请重试");
+    const tracked = banks.find(bank => bank.pavilion?.id === entry.id);
+    if (tracked?.pavilion && Date.parse(tracked.pavilion.revision) >= Date.parse(origin.revision)) {
+      setToast("已是这份题库的最新版本");
+      return;
+    }
+    const legacy = !entry.own ? banks.find(bank => !bank.pavilion && latestPavilionEntry(bank, [entry])?.id === entry.id) : undefined;
+    // Older copies have no publication ID. Require unchanged content before adopting one.
+    const legacyMatches = legacy && preservePavilionRecordIds(legacy.questions, input.questions, () => "").filter(q => q.id).length;
+    const existing = tracked ?? (legacy && legacyMatches && legacyMatches >= Math.ceil(Math.min(legacy.questions.length, input.questions.length) / 2) ? legacy : undefined);
+    const id = existing?.id ?? `pavilion-${entry.id}`;
+    let index = 0;
+    const updated = preservePavilionRecordIds(existing?.questions ?? [], input.questions, () => `${id}:${Date.parse(origin.revision)}:${++index}`);
+    const now = new Date().toISOString();
+    const saved = await saveQuestionBank({ ...input, id, questions: updated, pavilion: origin, groupName: existing?.groupName ?? input.groupName,
+      featured: existing?.featured, importedAt: existing?.importedAt ?? now, updatedAt: now }, !isFlashcardBank(input) && (!existing || existing.id === activeBankId));
     await refreshLocalQuestionBanks();
-    setToast(`“${saved.name}”已导入我的题库 📚✨`);
+    setToast(existing ? `“${saved.name}”已更新，匹配题目的记录已保留。` : `“${saved.name}”已导入 📚`);
   }
 
   async function handleFiles(files: File[]) {
@@ -1837,8 +1864,8 @@ export default function HomePage() {
     }
 
     setQuestions(saved.questions);
-    const replacements = new Map(saved.questions.map(q => [q.id, q]));
-    const retainedCurrent = replaceSessionQuestions(sessionQuestions.map(q => replacements.get(q.id) ?? q));
+    const chapterChanged = questions.find(q => q.id === revisedQuestion.id)?.category !== revisedQuestion.category;
+    const retainedCurrent = replaceSessionQuestions(orderEditedSession(sessionQuestions, saved.questions, chapterChanged && sessionSequential && !sessionIsExam));
     setAiTexts({});
 
     const id = revisedQuestion.id;
@@ -2101,6 +2128,7 @@ export default function HomePage() {
     setSessionNonXOnly(nonXOnly);
     setSessionStudyMode("standard");
     setSessionScope("all");
+    setSessionSequential(true);
     setSessionIsExam(false);
     setExamFinished(false);
     setRevealedAnswers([]);
@@ -2112,6 +2140,34 @@ export default function HomePage() {
 
   const resolvedDark = settings.themeMode === "auto" ? clockDark : settings.themeMode === "system" ? systemDark : settings.themeMode === "dark";
   const flashDeck = questionBanks.find(bank => bank.id === flashcardId && isFlashcardBank(bank));
+  const currentPublicationBank = learningMode !== "english" && view === "quiz" && !sessionIsExam ? activeBankId : view === "flashcards" ? flashDeck?.id : null;
+  const publicationBank = questionBanks.find(bank => bank.id === currentPublicationBank);
+  const publicationAccount = account?.id;
+  useEffect(() => {
+    if (!publicationBank || !publicationAccount) return;
+    let cancelled = false;
+    const check = async () => {
+      const cached = pavilionCache.current;
+      const fresh = cached?.accountId === publicationAccount && Date.now() - cached.at < 90_000;
+      try {
+        const entries = fresh && cached ? cached.entries : await fetchPublicPavilionEntries();
+        if (cancelled) return;
+        if (!fresh) pavilionCache.current = { accountId: publicationAccount, at: Date.now(), entries };
+        const entry = newerPavilionEntry(publicationBank, entries);
+        if (entry && !pavilionDismissed.current.has(`${publicationAccount}:${entry.id}:${entry.uploadedAt}`)) setPavilionUpdate({ bankId: publicationBank.id, entry });
+      } catch { /* An unavailable public catalogue must not interrupt offline study. */ }
+    };
+    void check();
+    window.addEventListener("focus", check);
+    return () => { cancelled = true; window.removeEventListener("focus", check); };
+  }, [publicationAccount, publicationBank]);
+  function closePavilionUpdate(open: boolean) {
+    if (!pavilionUpdate) return;
+    const { entry } = pavilionUpdate;
+    pavilionDismissed.current.add(`${publicationAccount}:${entry.id}:${entry.uploadedAt}`);
+    setPavilionUpdate(null);
+    if (open) { setPavilionTarget(entry.id); setView("bank-requests"); }
+  }
   const saveFlashDeck = async (input: QuestionBankInput) => {
     const saved = await saveQuestionBank({...input,updatedAt:new Date().toISOString()});
     setQuestionBanks(banks=>[saved,...banks.filter(bank=>bank.id!==saved.id)]);
@@ -2129,7 +2185,10 @@ export default function HomePage() {
       const card = questionFlashcard(question, content);
       const id = `flashdeck-${activeBankId ?? "demo"}`;
       const existing = questionBanks.find(bank=>bank.id===id);
-      await saveFlashDeck({...existing,id,name:existing?.name ?? `${bankName} · 闪卡`,groupName:questionBanks.find(bank=>bank.id===activeBankId)?.groupName || existing?.groupName || suggestQuestionBankGroup(bankName,questions) || "其他",questions:[...(existing?.questions.filter(q=>q.id!==card.id)??[]),card],importedAt:existing?.importedAt??new Date().toISOString()});
+      const source = questionBanks.find(bank => bank.id === activeBankId);
+      const priorGroup = existing?.groupName;
+      const subjectGroup = source?.groupName || (priorGroup && !existing?.questions.some(q => q.category === priorGroup) ? priorGroup : "") || suggestQuestionBankGroup(bankName, questions) || "其他";
+      await saveFlashDeck({...existing,id,name:existing?.name ?? `${bankName} · 闪卡`,groupName:subjectGroup,questions:[...(existing?.questions.filter(q=>q.id!==card.id)??[]),card],importedAt:existing?.importedAt??new Date().toISOString()});
       if (notes[question.id]) flashNote(card.id,notes[question.id]);
       setToast("已加入唯快不破 ⚡ 同源题库自动归组，笔记已保留。");
     } catch(e) { setToast(e instanceof Error?e.message:"制作闪卡失败"); }
@@ -2200,7 +2259,7 @@ export default function HomePage() {
           notes={notes}
         />
       ) : view === "bank-requests" ? (
-        <QuestionBankVaultPage key={account?.id ?? "guest"} language={language} banks={questionBanks} account={account} onImport={importPavilionBank} onRequireLogin={() => setShowAccount(true)} onBack={() => setView("banks")} />
+        <QuestionBankVaultPage key={`${account?.id ?? "guest"}:${pavilionTarget ?? "all"}`} targetId={pavilionTarget} language={language} banks={questionBanks} account={account} onImport={importPavilionBank} onRequireLogin={() => setShowAccount(true)} onBack={() => { setPavilionTarget(null); setView("banks"); }} />
       ) : view === "notes" ? (
         <NotesPage language={language} killedQuestions={killedQuestions} archives={noteArchives} onDeleteArchive={async archive => {
           const owner = learningOwnerRef.current;
@@ -2337,6 +2396,7 @@ export default function HomePage() {
       {showAccount && <AccountModal account={account} syncStatus={syncStatus} syncFiles={syncFiles} syncing={manualSyncing} nickname={nickname} onClose={() => setShowAccount(false)} onAuthenticated={finishAuthentication} onNickname={user => { setAccount(user); saveNickname(user.nickname); }} onLogout={logoutAccount} onDelete={deleteAccount} onSync={() => pushRemoteState(true)} onExport={() => { void exportLearningRecord(); }} onImport={importLearningRecord} />}
       {bankReplacementPrompt && <BankReplacementModal prompt={bankReplacementPrompt} onChoose={resolveBankReplacement} />}
       {incomingBankShare && <IncomingBankShareModal share={incomingBankShare} onImport={() => void importIncomingBankShare()} onClose={clearIncomingBankShare} />}
+      {publicationAccount && pavilionUpdate && pavilionUpdate.bankId === currentPublicationBank && <div className="modal-layer"><section className="bank-replacement-modal" role="dialog" aria-modal="true" aria-label="题库有新版本"><header><h2>题库有新版本</h2></header><p>《{pavilionUpdate.entry.name}》已更新。导入后，能匹配的题目会保留刷题进度、笔记和精选。未匹配的题目不会继承旧记录。</p><footer><button className="ghost-action" onClick={() => closePavilionUpdate(false)}>取消</button><button className="primary-action" onClick={() => closePavilionUpdate(true)}>前往藏经阁</button></footer></section></div>}
       {toast && <SuccessToast message={toast} onClose={() => setToast("")} />}
     </main>
   );
@@ -2879,7 +2939,7 @@ async function fetchPublicPavilionEntries() {
   return result.entries ?? [];
 }
 
-function QuestionBankVaultPage({ language, banks, account, onImport, onRequireLogin, onBack }: { language: UiLanguage; banks: SavedQuestionBank[]; account: AccountSession | null; onImport: (bank: QuestionBankInput) => Promise<void>; onRequireLogin: () => void; onBack: () => void }) {
+function QuestionBankVaultPage({ targetId, language, banks, account, onImport, onRequireLogin, onBack }: { targetId?: string | null; language: UiLanguage; banks: SavedQuestionBank[]; account: AccountSession | null; onImport: (bank: QuestionBankInput, entry: PavilionQuestionBank, revision: string) => Promise<void>; onRequireLogin: () => void; onBack: () => void }) {
   const [entries, setEntries] = useState<PavilionQuestionBank[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -2904,6 +2964,15 @@ function QuestionBankVaultPage({ language, banks, account, onImport, onRequireLo
   }, [account]);
 
   const nameOrder = useMemo(() => new Intl.Collator("zh-CN-u-co-pinyin", { numeric: true }), []);
+  useEffect(() => {
+    if (!targetId || !entries.some(entry => entry.id === targetId)) return;
+    const frame = window.requestAnimationFrame(() => {
+      const card = document.getElementById("pavilion-publication");
+      card?.focus({ preventScroll: true });
+      card?.scrollIntoView({ block: "center" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [targetId, entries]);
   const stageEntries = useMemo(() => entries.filter(entry => stageFilter === "全部" || entry.studyStage === stageFilter), [entries, stageFilter]);
   const subjects = useMemo(() => [...new Set(stageEntries.map(entry => entry.groupName))].sort(nameOrder.compare), [stageEntries, nameOrder]);
   const subjectSuggestions = useMemo(() => [...new Set([
@@ -2913,10 +2982,11 @@ function QuestionBankVaultPage({ language, banks, account, onImport, onRequireLo
   const visibleEntries = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase("zh-CN");
     return stageEntries.filter((entry) => (
+      (!targetId || targetId === entry.id) &&
       (!subjects.includes(subjectFilter) || entry.groupName === subjectFilter)
       && (!keyword || [entry.name, entry.groupName, entry.studyStage].join(" ").toLocaleLowerCase("zh-CN").includes(keyword))
     )).sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
-  }, [query, stageEntries, subjectFilter, subjects, nameOrder]);
+  }, [query, stageEntries, subjectFilter, subjects, nameOrder, targetId]);
   const groups = useMemo(() => {
     const bySubject = new Map<string, PavilionQuestionBank[]>();
     for (const entry of visibleEntries) {
@@ -2974,9 +3044,9 @@ function QuestionBankVaultPage({ language, banks, account, onImport, onRequireLo
     setImportingId(entry.id);
     try {
       const response = await fetch(`/api/pavilion?id=${encodeURIComponent(entry.id)}`, { cache: "no-store" });
-      const result = await response.json() as { package?: unknown; error?: string };
+      const result = await response.json() as { package?: unknown; revision?: string; error?: string };
       if (!response.ok || !result.package) throw new Error(result.error ?? "题库暂时无法导入");
-      await onImport(parseSharedQuestionBankPackage(result.package));
+      await onImport(parseSharedQuestionBankPackage(result.package), entry, result.revision ?? entry.uploadedAt);
       setMessage(`“${entry.name}”已导入我的题库 📚✨`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "题库暂时无法导入，请重试");
@@ -2997,7 +3067,7 @@ function QuestionBankVaultPage({ language, banks, account, onImport, onRequireLo
     <header className="bank-page-header"><button className="bank-request-back" onClick={onBack} aria-label={t.back}><ChevronLeft />{t.back}</button><h1 className="bank-request-page-title">{t.vault}</h1><span className="bank-page-header-spacer" /></header>
     <main>
       <section className="bank-request-compose bank-vault-uploader"><header><div><h2>批量上传题库</h2></div><Upload /></header><label className="bank-vault-source-search"><Search size={18}/><input aria-label="搜索待上传题库" value={sourceQuery} onChange={e=>setSourceQuery(e.target.value)} placeholder="搜索题库名称、分组或来源"/>{sourceQuery&&<button type="button" aria-label="清空待上传搜索" onClick={()=>setSourceQuery("")}><X size={16}/></button>}</label><div className="bank-vault-select-head"><button type="button" onClick={() => setSelected(ids => allSelected ? ids.filter(id => !visibleSources.some(bank => bank.id === id)) : [...new Set([...ids, ...visibleSources.map(bank => bank.id)])])}><CheckCircle2 />{allSelected ? "取消全选" : (sourceQuery.trim() ? "全选搜索结果" : "全选题库")}</button><span>已选择 {selected.length}/{banks.length} · 显示 {visibleSources.length} 份</span></div>{visibleSources.length ? <div className="bank-vault-source-grid">{visibleSources.map((bank) => <button type="button" key={bank.id} className={selected.includes(bank.id) ? "active" : ""} onClick={() => toggleSelected(bank.id)}><i>{selected.includes(bank.id) && <Check />}</i><span><strong>{bank.name}</strong><small>{pavilionSubject(bank.name, bank.groupName, bank.sourceTitle)} · {bank.questions.length} 题</small></span></button>)}</div> : <div className="bank-request-empty"><Database /><strong>{banks.length ? "没有匹配的题库" : "“我的题库”还是空的"}</strong><p>{banks.length ? "换一个关键词试试，已选择的题库会保留。" : "请先导入题库，再批量收入藏经阁。"}</p></div>}<label className="pavilion-subject-editor">上传科目（可选）<input list="pavilion-upload-subjects" maxLength={60} value={uploadSubject} onChange={event => setUploadSubject(event.target.value)} placeholder="留空自动匹配；也可指定同一科目" /><datalist id="pavilion-upload-subjects">{subjectSuggestions.map(subject => <option key={subject} value={subject} />)}</datalist></label><label className="pavilion-rating-editor">🌟 上传者自评<select aria-label="藏经阁上传星级" value={uploadRating} onChange={event => setUploadRating(Number(event.target.value))}>{[1, 2, 3, 4, 5].map(value => <option key={value} value={value}>{value} 星 {"★".repeat(value)}</option>)}</select></label><label className="pavilion-annotation-editor">📝 公开备注（可选 · {Array.from(uploadAnnotation).length}/50 字）<textarea aria-label="藏经阁公开批注" value={uploadAnnotation} onChange={event => setUploadAnnotation(Array.from(event.target.value).slice(0, 50).join(""))} rows={2} placeholder="题库特点、版本或使用提醒；请勿填写私人信息" /></label><InfoNotice title="上传说明">所有注册用户均可浏览与下载题库，也能看到备注和自评星级。本次备注应用于所有选中的题库。</InfoNotice><footer><button className="primary-action" onClick={() => void uploadSelected()} disabled={!selected.length || busy}><Upload />{busy ? "正在上传…" : `上传 ${selected.length || ""} 份题库`}</button></footer></section>
-      <section className="bank-request-list"><nav className="bank-request-stage-nav" aria-label="按培养阶段筛选藏经阁"><button className={stageFilter === "全部" ? "active" : ""} onClick={() => { setStageFilter("全部"); setSubjectFilter(""); }}>全部</button>{PAVILION_STUDY_STAGES.map((stage) => <button className={stageFilter === stage ? "active" : ""} key={stage} onClick={() => { setStageFilter(stage); setSubjectFilter(""); }}>{stage}</button>)}<button type="button" className="pavilion-search-trigger" aria-label="搜索已收录题库" title="搜索已收录题库" onClick={() => { collectionSearchRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }); collectionSearchRef.current?.focus({ preventScroll: true }); }}>🔍</button></nav><header><div><h2>已收录题库 <em>{visibleEntries.length}/{entries.length}</em></h2></div><label className="bank-request-search"><Search size={16} /><input ref={collectionSearchRef} aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库或科目" /></label></header>{account && subjects.length > 0 && <label className="pavilion-subject-filter"><span>科目</span><select aria-label="按科目筛选藏经阁" value={subjects.includes(subjectFilter) ? subjectFilter : ""} onChange={event => setSubjectFilter(event.target.value)}><option value="">全部科目</option>{subjects.map(subject => <option key={subject} value={subject}>{subject}</option>)}</select></label>}{!account ? <div className="bank-request-empty"><UserRound /><strong>登录后查看公共藏经阁</strong><button className="primary-action" onClick={onRequireLogin}>登录 / 注册</button></div> : visibleEntries.length ? <div className="bank-group-list pavilion-subject-groups">{groups.map(([subject, items]) => <details className="bank-group-section pavilion-subject-group" key={subject} open><summary><strong>{subject}</strong><small>{items.length} 份</small></summary><div className="bank-request-grid bank-vault-grid">{items.map((entry) => <article key={entry.id} className={entry.flashcards ? "flashcard-pavilion" : ""}><header><div className="pavilion-meta"><span>{entry.studyStage}</span><em>{entry.uploaderNickname || "共享"}{entry.own ? " · 我的上传" : ""}</em></div>{entry.own && <button type="button" className="pavilion-note-edit" title="编辑备注与星级" aria-label={`编辑 ${entry.name} 的备注与星级`} onClick={() => setEditingAnnotation(entry)}><Pencil size={16} /></button>}</header><h3>{entry.flashcards ? "⚡ " : ""}{entry.name}</h3><p className="bank-request-subject">{entry.groupName || "未分组"} · 总题 {entry.questionCount} / 单选 {entry.singleCount ?? "—"} / X {entry.multipleCount ?? "—"}</p><p className="pavilion-rating-display" aria-label={entry.rating ? `上传者自评 ${entry.rating} 星` : "尚未评星"}>{entry.rating ? `${"★".repeat(entry.rating)}${"☆".repeat(5 - entry.rating)} · 上传者自评` : "尚未评星"}</p>{entry.annotation && <p className="pavilion-public-annotation">📝 {entry.annotation}</p>}<small>更新于 {new Date(entry.uploadedAt).toLocaleString("zh-CN")}</small><footer><button className="pavilion-import-button" disabled={Boolean(importingId)} onClick={() => void importEntry(entry)}><Import />{importingId === entry.id ? "正在导入…" : (entry.flashcards ? "导入闪卡库" : "导入我的题库")}</button><div className="pavilion-file-actions"><button onClick={() => void downloadEntry(entry)}><Download />下载 JSON</button>{entry.own && <button className="danger" aria-label={`移出 ${entry.name}`} title="移出藏经阁" onClick={() => void removeEntry(entry.id)}><Trash2 />删除</button>}</div></footer></article>)}</div></details>)}</div> : <div className="bank-request-empty"><Library /><strong>{entries.length ? "当前筛选没有题库" : "藏经阁里还没有题库"}</strong></div>}</section>
+      <section className="bank-request-list">{targetId && <p><a href="#pavilion-publication">查看对应新版</a></p>}<nav className="bank-request-stage-nav" aria-label="按培养阶段筛选藏经阁"><button className={stageFilter === "全部" ? "active" : ""} onClick={() => { setStageFilter("全部"); setSubjectFilter(""); }}>全部</button>{PAVILION_STUDY_STAGES.map((stage) => <button className={stageFilter === stage ? "active" : ""} key={stage} onClick={() => { setStageFilter(stage); setSubjectFilter(""); }}>{stage}</button>)}<button type="button" className="pavilion-search-trigger" aria-label="搜索已收录题库" title="搜索已收录题库" onClick={() => { collectionSearchRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }); collectionSearchRef.current?.focus({ preventScroll: true }); }}>🔍</button></nav><header><div><h2>已收录题库 <em>{visibleEntries.length}/{entries.length}</em></h2></div><label className="bank-request-search"><Search size={16} /><input ref={collectionSearchRef} aria-label="搜索藏经阁" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库或科目" /></label></header>{account && subjects.length > 0 && <label className="pavilion-subject-filter"><span>科目</span><select aria-label="按科目筛选藏经阁" value={subjects.includes(subjectFilter) ? subjectFilter : ""} onChange={event => setSubjectFilter(event.target.value)}><option value="">全部科目</option>{subjects.map(subject => <option key={subject} value={subject}>{subject}</option>)}</select></label>}{!account ? <div className="bank-request-empty"><UserRound /><strong>登录后查看公共藏经阁</strong><button className="primary-action" onClick={onRequireLogin}>登录 / 注册</button></div> : visibleEntries.length ? <div className="bank-group-list pavilion-subject-groups">{groups.map(([subject, items]) => <details className="bank-group-section pavilion-subject-group" key={subject} open><summary><strong>{subject}</strong><small>{items.length} 份</small></summary><div className="bank-request-grid bank-vault-grid">{items.map((entry) => <article key={entry.id} id={entry.id === targetId ? "pavilion-publication" : undefined} tabIndex={entry.id === targetId ? -1 : undefined} className={entry.flashcards ? "flashcard-pavilion" : ""}><header><div className="pavilion-meta"><span>{entry.studyStage}</span><em>{entry.uploaderNickname || "共享"}{entry.own ? " · 我的上传" : ""}</em></div>{entry.own && <button type="button" className="pavilion-note-edit" title="编辑备注与星级" aria-label={`编辑 ${entry.name} 的备注与星级`} onClick={() => setEditingAnnotation(entry)}><Pencil size={16} /></button>}</header><h3>{entry.flashcards ? "⚡ " : ""}{entry.name}</h3><p className="bank-request-subject">{entry.groupName || "未分组"} · 总题 {entry.questionCount} / 单选 {entry.singleCount ?? "—"} / X {entry.multipleCount ?? "—"}</p><p className="pavilion-rating-display" aria-label={entry.rating ? `上传者自评 ${entry.rating} 星` : "尚未评星"}>{entry.rating ? `${"★".repeat(entry.rating)}${"☆".repeat(5 - entry.rating)} · 上传者自评` : "尚未评星"}</p>{entry.annotation && <p className="pavilion-public-annotation">📝 {entry.annotation}</p>}<small>更新于 {new Date(entry.uploadedAt).toLocaleString("zh-CN")}</small><footer><button className="pavilion-import-button" disabled={Boolean(importingId)} onClick={() => void importEntry(entry)}><Import />{importingId === entry.id ? "正在导入…" : (targetId === entry.id ? "导入新版（保留记录）" : entry.flashcards ? "导入闪卡库" : "导入我的题库")}</button><div className="pavilion-file-actions"><button onClick={() => void downloadEntry(entry)}><Download />下载 JSON</button>{entry.own && <button className="danger" aria-label={`移出 ${entry.name}`} title="移出藏经阁" onClick={() => void removeEntry(entry.id)}><Trash2 />删除</button>}</div></footer></article>)}</div></details>)}</div> : <div className="bank-request-empty"><Library /><strong>{entries.length ? "当前筛选没有题库" : "藏经阁里还没有题库"}</strong></div>}</section>
     </main>{editingAnnotation && <PavilionAnnotationDialog entry={editingAnnotation} onClose={() => setEditingAnnotation(null)} onSave={changes => {
       setEntries(items => items.map(item => item.id === editingAnnotation.id ? { ...item, ...changes } : item));
       setEditingAnnotation(null);
@@ -3203,7 +3273,7 @@ function QuizView(props: {
     </div></div>}
     <div className="quiz-workspace">
       <section className="question-pane">
-        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span className="question-number" title={currentNumber?.details ?? `原题号 ${current.sourceNumber}`} aria-label={currentNumber?.details ?? `原题号 ${current.sourceNumber}`}>{currentNumber?.label ?? current.sourceNumber}</span></div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} title="在当前题之后插入一道新题" aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} title="从题库中删除当前题" aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} title="纠错编辑" aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} title="搜索题目" aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => props.onUpdateKilled([current.id], !props.killed)} title="直接斩掉本题；批量斩题请打开答题卡" aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className="question-flash-trigger" onClick={() => props.onFlashcard()} title="将正确答案制成闪卡">⚡ 闪</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? `精选 ★${favoriteStars}` : "精选"}</button></div></div>
+        <div className="question-topline"><div><span className={`question-kind ${current.multiple ? "multi" : ""}`}>{questionKind}</span><span className="question-number" title={currentNumber?.details ?? `原题号 ${current.sourceNumber}`} aria-label={currentNumber?.details ?? `原题号 ${current.sourceNumber}`}>{currentNumber?.label ?? current.sourceNumber}</span></div><div className="question-top-actions"><button className="question-add-trigger" onClick={beginAddingQuestion} aria-label="新增题目"><Plus size={16} />增</button><button className="question-delete-trigger" onClick={() => { setDeleteError(""); setDeletingQuestion(true); }} aria-label="删除题目"><Trash2 size={16} />删</button><button className="question-edit-trigger" onClick={() => setEditingQuestion(true)} aria-label="纠错编辑"><Pencil size={16} />改</button><button className="question-search-trigger" onClick={props.onSearch} aria-label="搜索题目"><Search size={16} />查</button><button className={`question-kill-trigger ${props.killed ? "active" : ""}`} onClick={() => props.onUpdateKilled([current.id], !props.killed)} aria-label={props.killed ? "本题已斩" : "斩题"}><Scissors size={16} />斩</button><button className="question-flash-trigger" onClick={() => props.onFlashcard()} title="将正确答案制成闪卡">⚡ 闪</button><button className={favorite ? "favorite active" : "favorite"} onClick={props.onFavorite}><Star size={17} fill={favorite ? "currentColor" : "none"} />{favorite ? `精选 ★${favoriteStars}` : "精选"}</button></div></div>
         {props.killed && <div className="killed-question-banner"><Scissors size={18} /><div><strong>本题已斩</strong><span>会被后续练习跳过，不计入正确率；可随时恢复。</span></div><button onClick={() => props.onUpdateKilled([current.id], false)}>恢复本题</button></div>}
         {current.sharedStem && <section className="shared-medical-stem"><span>{current.medicalQuestionType === "A4" ? "递进病例" : "共用题干"}</span><p><MathText text={current.sharedStem} /></p><QuestionImages images={current.sharedStemImages} label="共用题干图片" /></section>}
         {props.relatedQuestions.length > 1 && <section className="linked-question-group"><header><strong>同组题目</strong></header><div>{props.relatedQuestions.map((question) => <button key={question.id} className={`${question.id === current.id ? "active" : ""} ${props.relatedProgress[question.id] ?? ""}`} onClick={() => props.onOpenRelated(question.id)}><b>{question.sourceNumber}</b><span>{question.stem}</span>{props.relatedProgress[question.id] === "correct" ? <Check size={14} /> : props.relatedProgress[question.id] === "wrong" ? <X size={14} /> : null}</button>)}</div></section>}
@@ -3531,13 +3601,13 @@ function SettingsModal({ settings, counts, typeCounts, western306SubjectCounts, 
   onStart: () => void;
 }) {
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
-  return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><span>开始之前</span><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section study-mode-section"><label>刷题模式</label><div className="study-mode-grid"><button className={settings.studyMode === "standard" ? "active" : ""} onClick={() => update("studyMode", "standard")}><Target size={19} /><strong>标准练习</strong><span>提交后立即判题并记录对错</span></button><button className={settings.studyMode === "blind" ? "active" : ""} onClick={() => update("studyMode", "blind")}><EyeOff size={19} /><strong>盲刷</strong><span>先连续作答，需要时再对答案</span></button><button className={settings.studyMode === "memorize" ? "active" : ""} onClick={() => update("studyMode", "memorize")}><Eye size={19} /><strong>背题</strong><span>进入后直接展开标准答案</span></button></div>{settings.studyMode !== "standard" && <p className="study-mode-note">{settings.studyMode === "blind" ? "盲刷会保留每题选择，但在点击“对答案”前不判分、不显示正误。" : "背题只用于快速记忆，不会把浏览行为计入做题数、正确率或首次得分。"}</p>}</div><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
+  return <div className="modal-layer" onMouseDown={onClose}><section className="settings-modal" onMouseDown={(event) => event.stopPropagation()}><header><div><h2>设置你的练习方式</h2></div><button onClick={onClose}><X /></button></header><div className="setting-section study-mode-section"><label>刷题模式</label><div className="study-mode-grid"><button className={settings.studyMode === "standard" ? "active" : ""} onClick={() => update("studyMode", "standard")}><Target size={19} /><strong>标准练习</strong></button><button className={settings.studyMode === "blind" ? "active" : ""} onClick={() => update("studyMode", "blind")}><EyeOff size={19} /><strong>盲刷</strong></button><button className={settings.studyMode === "memorize" ? "active" : ""} onClick={() => update("studyMode", "memorize")}><Eye size={19} /><strong>背题</strong></button></div></div><div className="setting-section"><label>题目范围</label><div className="choice-grid">{([
     ["all", "全部题目", Library], ["unanswered", "未练题目", Zap], ["wrong", "错题复盘", RotateCcw], ["favorite", "精选题", Star],
-  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div>{showWestern306Subjects && <div className="setting-section western306-subject-section"><label>西综 306 · 只练某一科</label><div className="western306-subject-grid"><button className={settings.western306Subject === "all" ? "active" : ""} onClick={() => update("western306Subject", "all")}><strong>全部科目</strong><em>{western306SubjectCounts.all} 道</em></button>{WESTERN_306_SUBJECTS.map((subject) => <button key={subject.id} className={settings.western306Subject === subject.id ? "active" : ""} onClick={() => update("western306Subject", subject.id)}><strong>{subject.label}</strong><em>{western306SubjectCounts[subject.id]} 道</em></button>)}</div><p className="western306-subject-note">按现代 165 题固定题号分布筛选；单科练习不包含第 108–115 题医学人文。</p></div>}<div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>只做非 X 型</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>全部题型</span><em>{typeCounts.all} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "auto" ? "active" : ""} aria-pressed={settings.themeMode === "auto"} title="23:00 至次日 06:00 为夜间" onClick={() => onChange({ ...settings, themeMode: "auto", darkMode: false })}><Clock3 size={17} />自动昼夜</button><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" detail="减少位置记忆干扰" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="点击选项即确认" detail="非 X 型：有答案即判分；待答案题点击即锁定并进入下一题" value={settings.confirmOnOptionClick} onChange={(value) => update("confirmOnOptionClick", value)} /><SwitchRow label="答对自动下一题" detail="答对后 0.7 秒进入下一题；答错时停留复盘" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" detail="回看已作答题目时，直接恢复判题结果与答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" detail="自动进入复盘清单" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
+  ] as Array<[Scope, string, typeof Library]>).map(([value, label, Icon]) => <button key={value} className={settings.scope === value ? "active" : ""} onClick={() => update("scope", value)}><Icon size={18} /><span>{label}</span><em>{counts[value]}</em></button>)}</div></div>{showWestern306Subjects && <div className="setting-section western306-subject-section"><label>西综 306 · 只练某一科</label><div className="western306-subject-grid"><button className={settings.western306Subject === "all" ? "active" : ""} onClick={() => update("western306Subject", "all")}><strong>全部科目</strong><em>{western306SubjectCounts.all} 道</em></button>{WESTERN_306_SUBJECTS.map((subject) => <button key={subject.id} className={settings.western306Subject === subject.id ? "active" : ""} onClick={() => update("western306Subject", subject.id)}><strong>{subject.label}</strong><em>{western306SubjectCounts[subject.id]} 道</em></button>)}</div></div>}<div className="setting-section"><label>题型范围</label><div className="segmented type-segmented"><button className={settings.questionTypes === "single" ? "active" : ""} onClick={() => update("questionTypes", "single")}><CheckCircle2 size={17} /><span>只做非 X 型</span><em>{typeCounts.single} 道</em></button><button className={settings.questionTypes === "all" ? "active" : ""} onClick={() => update("questionTypes", "all")}><ListChecks size={17} /><span>全部题型</span><em>{typeCounts.all} 道</em></button></div></div><div className="setting-section"><label>题目顺序</label><div className="segmented"><button className={settings.questionOrder === "sequential" ? "active" : ""} onClick={() => update("questionOrder", "sequential")}><BookOpen size={17} />顺序练习</button><button className={settings.questionOrder === "random" ? "active" : ""} onClick={() => update("questionOrder", "random")}><Shuffle size={17} />随机练习</button></div></div><div className="setting-section"><label>界面主题</label><div className="segmented theme-segmented"><button className={settings.themeMode === "auto" ? "active" : ""} aria-pressed={settings.themeMode === "auto"} title="23:00 至次日 06:00 为夜间" onClick={() => onChange({ ...settings, themeMode: "auto", darkMode: false })}><Clock3 size={17} />自动昼夜</button><button className={settings.themeMode === "system" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "system", darkMode: false })}><Settings2 size={17} />跟随设备</button><button className={settings.themeMode === "light" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "light", darkMode: false })}><Sun size={17} />日间</button><button className={settings.themeMode === "dark" ? "active" : ""} onClick={() => onChange({ ...settings, themeMode: "dark", darkMode: true })}><Moon size={17} />夜间</button></div></div><div className="switch-list"><SwitchRow label="选项随机" value={settings.shuffleOptions} onChange={(value) => update("shuffleOptions", value)} /><SwitchRow label="点击选项即确认" value={settings.confirmOnOptionClick} onChange={(value) => update("confirmOnOptionClick", value)} /><SwitchRow label="答对自动下一题" value={settings.autoNext} onChange={(value) => update("autoNext", value)} /><SwitchRow label="返回上一题时显示答案" value={settings.showAnswerOnReturn} onChange={(value) => update("showAnswerOnReturn", value)} /><SwitchRow label="错题自动收藏" value={settings.autoFavoriteWrong} onChange={(value) => update("autoFavoriteWrong", value)} /></div><button className="start-button" onClick={onStart} disabled={!counts[settings.scope]}><Play size={17} fill="currentColor" />{counts[settings.scope] ? "开始练习" : "当前筛选没有题目"} <span>{counts[settings.scope]} 道</span></button></section></div>;
 }
 
-function SwitchRow({ label, detail, value, onChange }: { label: string; detail: string; value: boolean; onChange: (value: boolean) => void }) {
-  return <button type="button" className="switch-row" aria-pressed={value} onClick={() => onChange(!value)}><div><strong>{label}</strong><span>{detail}</span></div><i className={value ? "on" : ""}><b /></i></button>;
+function SwitchRow({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
+  return <button type="button" className="switch-row" aria-pressed={value} onClick={() => onChange(!value)}><div><strong>{label}</strong></div><i className={value ? "on" : ""}><b /></i></button>;
 }
 
 function AnswerSheet({ questions, examPins, progress, favorites, favoriteStars, notes, killed, answerSelections, currentIndex, onBatchAnswers, onDeleteKilled, onUpdateKilled, onJump, onClose }: { questions: QuizQuestion[]; examPins?: readonly string[]; progress: Progress; favorites: string[]; favoriteStars: Record<string, number>; notes: Record<string, string>; killed: string[]; answerSelections: Record<string, string[]>; currentIndex: number; onBatchAnswers: (entries: BatchAnswerEntry[]) => Promise<void>; onDeleteKilled?: () => Promise<void>; onUpdateKilled: (ids: string[], killed: boolean) => void; onJump: (index: number) => void; onClose: () => void }) {

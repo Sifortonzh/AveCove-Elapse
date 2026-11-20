@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="Version 2.7.2" src="https://img.shields.io/badge/version-2.7.2-b43d35" />
+    <img alt="Version 2.7.3" src="https://img.shields.io/badge/version-2.7.3-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.7.3:** Pavilion revision reminders and record-preserving updates, chapter moves that reorder sequential practice, a Markdown knowledge tree anchored to a flashcard, and simpler practice controls.
+>
 > **v2.7.2:** Refined flashcard practice using the shared chapter directory and enlarged note preview. Right-side tools and a marked, current-card-aware answer sheet; notes below the card, centered answers, concealed-answer shadows, subject grouping and responsive phone layouts. Study outcomes remain separate from quiz accuracy.
 >
 > **v2.7.1.1:** A dedicated verse banner with 1,505 source-attributed quotations collected from the first 100 catalogue pages of [Gushiwenku](https://www.gushiwenku.cn/mingju/). Rotates every four hours on China Standard Time; bundled locally without browser-side scraping. Refresh script: `node scripts/collect-banner-quotes.mjs 100` (outputs a reviewable patch).

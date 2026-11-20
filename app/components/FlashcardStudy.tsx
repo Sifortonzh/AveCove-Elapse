@@ -4,6 +4,7 @@ import type {SavedQuestionBank} from "../lib/local-bank";
 import {createSharedQuestionBankPackage} from "../lib/local-bank";
 import {AiDialogue, ChapterDirectory} from "./PracticeExtras";
 import NotePreviewDialog from "./NotePreviewDialog";
+import FlashcardKnowledgeTree from "./FlashcardKnowledgeTree";
 import {ArrowLeft, ChevronLeft, ChevronRight, Layers, Star, NotebookPen, Eye, EyeOff, Pencil, Shuffle, Download, Printer} from "lucide-react";
 import "./FlashcardStudy.css";
 import {QuestionImages} from "./QuestionImages";
@@ -65,7 +66,7 @@ export default function FlashcardStudy({bank,notes,favorites,accountId,defaultQu
   </div><label className="flashcard-quick"><input type="checkbox" checked={quick} onChange={e=>setQuick(e.target.checked)}/>揭示后点击直接过卡</label>
    {revealed&&<div className="flashcard-recall"><button onClick={()=>{setRetry(ids=>ids.includes(q.id)?ids:[...ids,q.id]);setRemembered(ids=>ids.filter(id=>id!==q.id));next();}}>再练</button><button onClick={()=>{setRemembered(ids=>ids.includes(q.id)?ids:[...ids,q.id]);setRetry(ids=>ids.filter(id=>id!==q.id));next();}}>记住了</button></div>}
    <button className="flashcard-retry" disabled={!retry.length} onClick={()=>{open(retry[0]);setRetry(ids=>ids.slice(1));}}>重练 {retry.length}</button>
-  </section>{revealed&&<section className="flashcard-tool-card"><AiDialogue key={q.id} question={q as QuizQuestion} accountId={accountId} renderMarkdown={renderMarkdown} onSave={text=>{onNote(q.id,[notes[q.id],text].filter(Boolean).join("\n\n"));setNotesOpen(true);}}/></section>}</aside></div>
+  </section>{revealed&&<FlashcardKnowledgeTree key={q.id} card={q} deck={bank.questions} accountId={accountId} renderMarkdown={renderMarkdown} onSave={text=>{onNote(q.id,[notes[q.id],text].filter(Boolean).join("\n\n"));setNotesOpen(true);}}/>}{revealed&&<section className="flashcard-tool-card"><AiDialogue key={q.id} question={q as QuizQuestion} accountId={accountId} renderMarkdown={renderMarkdown} onSave={text=>{onNote(q.id,[notes[q.id],text].filter(Boolean).join("\n\n"));setNotesOpen(true);}}/></section>}</aside></div>
   {chapters&&<ChapterDirectory cardMode questions={bank.questions} progress={{}} currentQuestionId={q.id} onOpen={open} onClose={()=>setChapters(false)}/>}
   {sheet&&<div className="modal-layer" onMouseDown={()=>setSheet(false)}><section className="search-modal flashcard-sheet" role="dialog" aria-modal="true" aria-label="闪卡答题卡" onMouseDown={e=>e.stopPropagation()}><header><h2>答题卡 · {bank.questions.length} 张</h2><button onClick={()=>setSheet(false)}>关闭</button></header><div className="number-grid">{bank.questions.map((card,i)=><button ref={card.id===q.id?currentButton:undefined} key={card.id} className={`${card.id===q.id?"current":""} ${remembered.includes(card.id)?"remembered":""}`} aria-current={card.id===q.id?"true":undefined} aria-label={`第 ${i+1} 张${favorites.includes(card.id)?"，精选":""}${notes[card.id]?.trim()?"，有笔记":""}`} onClick={()=>{move(i);setSheet(false);}}>{i+1}{favorites.includes(card.id)&&<Star size={12}/>} {notes[card.id]?.trim()&&<NotebookPen size={12}/>} {retry.includes(card.id)&&<span>↻</span>}</button>)}</div></section></div>}
   {preview&&<NotePreviewDialog onClose={()=>setPreview(false)}>{renderMarkdown(note)}</NotePreviewDialog>}

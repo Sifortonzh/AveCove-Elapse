@@ -2,8 +2,10 @@ import type { QuizQuestion } from "./question-parser";
 import { normalizeQuestionBankGroup, suggestQuestionBankGroup } from "./bank-grouping";
 import { groupSharedCases, prepareImportedA3Cases } from "./shared-case";
 import { isXQuestion } from "./practice-stats";
+import { normalizePavilionRevision, type PavilionRevision } from "./pavilion-revision";
 
 export type SavedQuestionBank = {
+  pavilion?: PavilionRevision;
   id: string;
   name: string;
   description: string;
@@ -19,6 +21,7 @@ export type SavedQuestionBank = {
 };
 
 export type QuestionBankInput = {
+  pavilion?: PavilionRevision;
   id?: string;
   name: string;
   description?: string;
@@ -203,6 +206,7 @@ function normalizeBank(input: QuestionBankInput): SavedQuestionBank {
   return {
     id,
     name,
+    pavilion: normalizePavilionRevision(input.pavilion),
     description: typeof input.description === "string" ? input.description.trim().slice(0, 4_000) : "",
     sourceTitle: typeof input.sourceTitle === "string" ? input.sourceTitle.trim().slice(0, 160) : "",
     edition: typeof input.edition === "string" ? input.edition.trim().slice(0, 80) : "",
@@ -660,6 +664,7 @@ export async function mergeQuestionBankSyncBundle(value: unknown): Promise<{ mer
     if (current?.updatedAt && (!candidate.updatedAt || current.updatedAt >= candidate.updatedAt)) continue;
     await saveQuestionBank({
       id: candidate.id,
+      pavilion: normalizePavilionRevision(candidate.pavilion) ?? current?.pavilion,
       name: typeof candidate.name === "string" ? candidate.name.slice(0, 160) : "同步题库",
       description: typeof candidate.description === "string" ? candidate.description.slice(0, 4_000) : "",
       sourceTitle: typeof candidate.sourceTitle === "string" ? candidate.sourceTitle.slice(0, 160) : "",
