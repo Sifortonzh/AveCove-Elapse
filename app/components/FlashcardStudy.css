@@ -24,6 +24,6 @@
 .knowledge-flow-node{position:relative;min-height:44px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);overflow-wrap:anywhere}
 .knowledge-flow>.knowledge-flow-branches>li>.knowledge-flow-node{border-color:var(--connector);background:var(--green-soft);color:var(--ink);font-weight:700}
 .knowledge-flow>.knowledge-flow-branches>li+li{margin-top:12px}
-.knowledge-flow-node .markdown-note-preview{margin:0;padding:0;border:0;background:transparent;min-width:0}
+.knowledge-flow-node .markdown-note-preview{margin:0;padding:0;border:0;background:transparent;min-width:0;min-height:0}
 .knowledge-flow-node .markdown-note-preview p{margin:0;color:inherit;line-height:1.55}
 .knowledge-flow-source{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);white-space:pre-wrap;overflow-wrap:anywhere}
