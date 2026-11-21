@@ -5,6 +5,19 @@ import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 
+test("knowledge flowchart sits after notes and question editor shows type codes without secondary explanations", async () => {
+  const [study, tree, css, page] = await Promise.all([text("app/components/FlashcardStudy.tsx"), text("app/components/FlashcardKnowledgeTree.tsx"), text("app/components/FlashcardStudy.css"), text("app/page.tsx")]);
+  assert.match(study, /flashcard-notes[^\n]*<\/details>\s*\{revealed&&<FlashcardKnowledgeTree/);
+  assert.ok(study.indexOf("<FlashcardKnowledgeTree") < study.indexOf('<aside className="flashcard-tools"'));
+  assert.match(tree, /knowledge-flow-node/);
+  assert.match(tree, /<code>\{result\}<\/code>/);
+  assert.match(css, /knowledge-flow-branches>li::after/);
+  const editor = page.slice(page.indexOf("function QuestionCorrectionModal("), page.indexOf("function LearningPanel("));
+  assert.match(editor, /aria-pressed=\{medicalType === type\}[^\n]*<b>\{type\}<\/b>/);
+  assert.doesNotMatch(editor, /type\.detail|question-edit-impact|可手动纠正|X 型题可选择多个正确选项/);
+  assert.match(editor, /setAnswerVisible\(true\)/);
+});
+
 test("flashcard refinement reuses practice directory and preview while concealing answer content", async () => {
  const source=await text("app/components/FlashcardStudy.tsx");
  assert.match(source, /ChapterDirectory cardMode/);
@@ -1327,7 +1340,7 @@ test("ships the Elapse 2.1 MinerU workbench and KaTeX rendering", async () => {
   assert.match(workbench, /不会调用 AI 或消耗 AI 额度/);
   assert.match(math, /katex\.renderToString/);
   assert.match(layout, /katex\/dist\/katex\.min\.css/);
-  assert.equal(JSON.parse(manifest).version, "2.7.3");
+  assert.equal(JSON.parse(manifest).version, "2.7.3.1");
 });
 
 test("keeps the dedicated two-column dermatology MinerU converter available", async () => {
@@ -1609,22 +1622,17 @@ test("persists in-practice question corrections into sync and shared banks", asy
 
   assert.match(page, /function QuestionCorrectionModal/);
   assert.match(page, /修订题目与标准答案/);
-  assert.match(page, /标准答案已模糊保护/);
   assert.match(page, /显示并修订答案/);
   assert.match(page, /setAnswerVisible\] = useState\(creating \|\| question\.answer\.length === 0\)/);
-  assert.match(page, /本题暂无答案，请在这里手动补录/);
-  assert.match(page, /可手动纠正 A1、A2、A3、A4、B1、C、X 型/);
   assert.match(page, /＋ 添加选项/);
   assert.match(page, /function insertQuestionAfterCurrent/);
   assert.match(page, /function deleteCurrentQuestion/);
   assert.match(page, /删除原题号/);
-  assert.match(page, /本题的作答、精选、笔记和斩题记录也会一并清理/);
+  assert.match(page, /本题及其作答、精选、笔记和斩题记录将删除/);
   assert.match(page, /在当前题后新增一道题/);
-  assert.match(page, /后续连续原题号会自动顺延/);
-  assert.match(page, /原题解析 <small>可选<\/small>/);
+  assert.match(page, /原题解析（可选）/);
   assert.match(page, /questions: result\.questions/);
-  assert.match(page, /原文件答案可能受教材版本、指南更新或识别误差影响/);
-  assert.match(page, /当前题库、多端同步与后续分享都会使用这个版本/);
+  assert.match(page, /请核对新答案再保存/);
   assert.match(page, /questions: replaceQuestion\(bank\.questions\)/);
   assert.match(page, /stampLearningRecord\(nextLedger, id, \{ progress: revisedResult \}\)/);
   assert.match(localBank, /questions: bank\.questions/);
@@ -1930,7 +1938,7 @@ test("keeps imported explanations separate and upgrades AI-assisted notes to sea
   ]);
 
   assert.match(page, /className="source-explanation"/);
-  assert.match(page, /原资料解析/);
+  assert.match(page, /原题解析（可选）/);
   assert.match(page, /current\.answerSource/);
   assert.match(page, /写入笔记/);
   assert.match(page, /Markdown 编辑/);
@@ -2050,7 +2058,6 @@ test("supports grouped medical questions and synchronized slash-skipping", async
   assert.match(parser, /sharedStemGroup\?: string/);
   assert.match(page, /className=\{`question-kill-trigger/);
   assert.match(page, /function parseKillNumberSpec/);
-  assert.match(page, /不计入做题数、正确率或 306 得分/);
   assert.match(page, /className="shared-medical-stem"/);
   assert.match(page, /className="linked-question-group"/);
   assert.match(page, /className="sheet-slash">／/);
@@ -2087,7 +2094,7 @@ test("ships the current practice and library experience on the restrained Spatia
     text("Dockerfile"),
   ]);
 
-  assert.equal(JSON.parse(packageJson).version, "2.7.3");
+  assert.equal(JSON.parse(packageJson).version, "2.7.3.1");
   assert.match(readme, /## Product map/);
   assert.match(readmeZh, /## 产品地图/);
   assert.match(page, /className="home-bento"/);
@@ -2323,7 +2330,7 @@ test("keeps touch practice controls, in-quiz search, and reusable note tags disc
   assert.match(page, /tablet-quiz-action.*exam-submit-floating/);
   assert.doesNotMatch(page, /question-previous-top/);
   assert.match(page, /returnToQuiz=\{view === "quiz"/);
-  assert.match(page, /关闭搜索即可回到刚才的题目与已选答案/);
+  assert.match(page, /<strong>返回练习<\/strong>/);
   assert.match(page, /已存标签/);
   assert.match(page, /Markdown 显示效果/);
   assert.match(styles, /pointer:coarse/);
@@ -2585,7 +2592,7 @@ test("ships the v2.1.5 curriculum-aware Pavilion and answer-sheet-number repair"
     text("package.json"),
   ]);
 
-  assert.equal(JSON.parse(manifest).version, "2.7.3");
+  assert.equal(JSON.parse(manifest).version, "2.7.3.1");
   assert.match(page, /function QuestionBankVaultPage/);
   assert.match(page, /批量上传/);
   assert.match(page, /上传 \$\{selected\.length \|\| ""\} 份题库/);
@@ -2646,7 +2653,7 @@ test("ships the v2.2.1 isolated Featured session with adaptive star levels", asy
     text("app/lib/record-sync.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.3");
+  assert.equal(JSON.parse(manifest).version, "2.7.3.1");
   assert.match(page, /sessionScope === "wrong" \|\| sessionScope === "favorite"/);
   assert.match(page, /active\.scope === "wrong" \|\| active\.scope === "favorite"/);
   assert.match(page, /if \(sessionScope === "favorite"\)/);
@@ -2664,7 +2671,7 @@ test("ships the full-page note library and structured 306 companion import", asy
     text("app/lib/medical-ai-import.ts"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.3");
+  assert.equal(JSON.parse(manifest).version, "2.7.3.1");
   assert.match(page, /function NotesPage/);
   assert.match(page, /const \[activeTags, setActiveTags\]/);
   assert.match(page, /同时包含/);
@@ -2684,7 +2691,7 @@ test("ships v2.3.3 chapter auto-location and JSON type normalization", async () 
     text("app/globals.css"),
     text("package.json"),
   ]);
-  assert.equal(JSON.parse(manifest).version, "2.7.3");
+  assert.equal(JSON.parse(manifest).version, "2.7.3.1");
   assert.match(page, /currentQuestionId=\{current\.id\}/);
   assert.match(extras, /open=\{containsCurrent\}/);
   assert.match(extras, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);

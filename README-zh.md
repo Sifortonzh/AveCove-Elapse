@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sifortonzh/AveCove-Elapse/actions/workflows/ci.yml/badge.svg" /></a>
-    <img alt="版本 2.7.3" src="https://img.shields.io/badge/version-2.7.3-b43d35" />
+    <img alt="版本 2.7.3.1" src="https://img.shields.io/badge/version-2.7.3.1-b43d35" />
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-087ea4?logo=react&logoColor=white" />
     <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white" />
@@ -27,6 +27,8 @@
 </p>
 
 > [!IMPORTANT]
+> **v2.7.3.1：** 闪卡知识树移到批注与笔记下方，以带连线的流程图展示，可切换 Markdown 原文。增、删、改、查、斩弹窗精简说明，医学题型仅显示代号。
+>
 > **v2.7.3：** 藏经阁新版提醒与保留记录导入、移动章节后重排顺序练习、以闪卡为锚点生成 Markdown 知识树，以及精简刷题控件。
 >
 > **v2.7.2：** 闪卡沿用普通练习布局和章节目录：右侧操作与答题卡定位标记、下方 Markdown 笔记与放大、居中大字和阴影遮蔽，按来源科目归组并适配手机；不影响普通刷题正确率。
